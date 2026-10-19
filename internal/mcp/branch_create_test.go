@@ -12,17 +12,18 @@ import (
 func TestBranchCreateTool(t *testing.T) {
 	experimental := withExperimental()
 	args := map[string]any{"service_id": "e6ue9697jf"}
-	baseReq := api.BranchCreate{ServiceID: "e6ue9697jf"}
-	parent := sampleService()
-	parentPassword := withStoredPassword(parent, "parent-pw")
-	queued := sampleBranch(branchStatus(api.DeployStatusQUEUED))
+	baseReq := api.BranchCreate{}
 
-	// setupCreate registers fetching the parent and creating a branch of it
-	// with req, answered with branch.
-	setupCreate := func(req api.BranchCreate, branch api.Branch) func(m *mocks.MockClientWithResponsesInterface) {
+	// The create response carries the branch's new password, once.
+	created := sampleBranch(branchStatus(api.DeployStatusQUEUED), func(b *api.Branch) {
+		b.InitialPassword = new("branch-pw")
+	})
+
+	// expectCreate registers creating a branch of the sample service with req,
+	// answered with branch.
+	expectCreate := func(req api.BranchCreate, branch api.Branch) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectGetService(m, "e6ue9697jf", parent)
-			m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, req).
+			m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", req).
 				Return(&api.CreateBranchResponse{
 					HTTPResponse: httpResponse(http.StatusAccepted),
 					JSON202:      &branch,
@@ -30,8 +31,7 @@ func TestBranchCreateTool(t *testing.T) {
 		}
 	}
 
-	sameUsers := ` The branch uses the same users and passwords as service "test-service" (e6ue9697jf).`
-	acceptedMsg := "Branch creation request accepted. The branch may still be provisioning." + sameUsers
+	acceptedMsg := "Branch creation request accepted. The branch may still be provisioning."
 	storedPassword := map[string]any{
 		"success": true,
 		"method":  "keyring",
@@ -67,20 +67,13 @@ func TestBranchCreateTool(t *testing.T) {
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
-			// A branch always counts as DEV, so prod allows branching a PROD
-			// service.
-			name: "read-only prod allows branching a PROD service",
+			// A branch always counts as DEV, so prod allows branching even a
+			// PROD service, without looking up the service's tag.
+			name: "read-only prod allows branching",
 			tool: toolBranchCreate,
-			args: map[string]any{"service_id": "e6ue9697jf"},
-			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "prod"}), parentPassword},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectTaggedService("PROD", 1)(m)
-				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, baseReq).
-					Return(&api.CreateBranchResponse{
-						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &queued,
-					}, nil)
-			},
+			args: args,
+			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
+			mock: expectCreate(baseReq, created),
 			wantOutput: map[string]any{
 				"branch":           sampleBranchDetail(api.DeployStatusQUEUED),
 				"message":          acceptedMsg,
@@ -88,27 +81,12 @@ func TestBranchCreateTool(t *testing.T) {
 			},
 		},
 		{
-			name: "parent not found",
-			tool: toolBranchCreate,
-			args: args,
-			opts: []runOption{experimental},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.ClientError{Message: new("service not found")},
-					}, nil)
-			},
-			wantErr: "service not found",
-		},
-		{
 			name: "network error",
 			tool: toolBranchCreate,
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "e6ue9697jf", parent)
-				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, baseReq).
+				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to create branch: connection refused",
@@ -119,8 +97,7 @@ func TestBranchCreateTool(t *testing.T) {
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "e6ue9697jf", parent)
-				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, baseReq).
+				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(&api.CreateBranchResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
 						JSON4XX:      &api.ClientError{Message: new("service is not a Fluid Service")},
@@ -134,55 +111,64 @@ func TestBranchCreateTool(t *testing.T) {
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "e6ue9697jf", parent)
-				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, baseReq).
+				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(&api.CreateBranchResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
 			wantErr: "empty response from API",
 		},
 		{
 			// Only service IDs go in the default, so a branch never becomes it.
-			name: "copies the password and leaves the default alone",
+			name: "saves the password and leaves the default alone",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental, parentPassword},
-			mock: setupCreate(baseReq, queued),
+			opts: []runOption{experimental},
+			mock: expectCreate(baseReq, created),
 			wantOutput: map[string]any{
 				"branch":           sampleBranchDetail(api.DeployStatusQUEUED),
 				"message":          acceptedMsg,
 				"password_storage": storedPassword,
 			},
-			checks: []checkFunc{checkStoredPassword("br4nch1d9x", "parent-pw"), checkDefaultService("")},
+			checks: []checkFunc{checkStoredPassword("br4nch1d9x", "branch-pw"), checkDefaultService("")},
 		},
 		{
-			// A missing parent password isn't fatal: the branch exists either
-			// way, so the tool reports the failure rather than erroring.
-			name: "reports a parent password that isn't saved",
+			// A storage failure isn't fatal: the branch exists either way, so
+			// the tool reports the failure rather than erroring.
+			name: "reports a password storage failure",
 			tool: toolBranchCreate,
-			args: map[string]any{"service_id": "e6ue9697jf"},
-			opts: []runOption{experimental},
-			mock: setupCreate(baseReq, queued),
+			args: args,
+			opts: []runOption{experimental, withKeyringError(errors.New("keyring is locked"))},
+			mock: expectCreate(baseReq, created),
 			wantOutput: map[string]any{
 				"branch":  sampleBranchDetail(api.DeployStatusQUEUED),
 				"message": acceptedMsg,
 				"password_storage": map[string]any{
 					"success": false,
 					"method":  "keyring",
-					"message": "Failed to copy the password of parent service e6ue9697jf: no password found in keyring for this service",
+					"message": "Failed to save password to keyring: keyring is locked",
 				},
+			},
+		},
+		{
+			name: "no initial password",
+			tool: toolBranchCreate,
+			args: args,
+			opts: []runOption{experimental},
+			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED))),
+			wantOutput: map[string]any{
+				"branch":  sampleBranchDetail(api.DeployStatusQUEUED),
+				"message": acceptedMsg,
 			},
 		},
 		{
 			name: "custom name and compute",
 			tool: toolBranchCreate,
 			args: map[string]any{"service_id": "e6ue9697jf", "name": "ci-4821", "cpu_memory": "2 CPU/16 GB"},
-			opts: []runOption{experimental, parentPassword},
-			mock: setupCreate(api.BranchCreate{
-				ServiceID: "e6ue9697jf",
+			opts: []runOption{experimental},
+			mock: expectCreate(api.BranchCreate{
 				Name:      new("ci-4821"),
 				CPUMillis: new(2000),
 				MemoryGbs: new(16),
-			}, queued),
+			}, created),
 			wantOutput: map[string]any{
 				"branch":           sampleBranchDetail(api.DeployStatusQUEUED),
 				"message":          acceptedMsg,
@@ -194,14 +180,14 @@ func TestBranchCreateTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchCreate,
 			args:     map[string]any{"service_id": "e6ue9697jf", "wait": true},
-			opts:     []runOption{experimental, parentPassword},
+			opts:     []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				setupCreate(baseReq, queued)(m)
+				expectCreate(baseReq, created)(m)
 				expectGetBranch(m, sampleBranch())
 			},
 			wantOutput: map[string]any{
 				"branch":           sampleBranchDetail(api.DeployStatusREADY),
-				"message":          "Branch is ready." + sameUsers,
+				"message":          "Branch is ready.",
 				"password_storage": storedPassword,
 			},
 		},

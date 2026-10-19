@@ -14,7 +14,7 @@ import (
 
 func TestDbSavePasswordCmd(t *testing.T) {
 	setupGetService := func(m *mocks.MockClientWithResponsesInterface) {
-		expectResolveRef(m, "svc-12345", sampleService())
+		expectResolveTarget(m, "svc-12345", sampleService())
 	}
 
 	// checkKeyringPassword asserts the mock keyring holds want for role.
@@ -53,24 +53,24 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name: "network error fetching service",
 			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
+				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service not found",
 			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefNotFound(m, "svc-12345")
+				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service 'svc-12345' not found",
+			wantErr: "service or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "ambiguous name refused",
 			args: []string{"db", "save-password", "my-api-db", "--password=pw"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+				expectResolveTargetStatus(m, "my-api-db", http.StatusBadRequest, &api.ClientError{Message: new("ambiguous service name matches multiple services")})
 			},
 			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
@@ -79,7 +79,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
+				expectResolveTargetStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -203,17 +203,28 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name: "replica ID saves against parent primary",
 			args: []string{"db", "save-password", "rep-67890", "--password=replica-pw"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "rep-67890", sampleReplica())
+				expectResolveTarget(m, "rep-67890", sampleReplica())
 				expectGetService(m, "svc-12345", sampleService())
 			},
 			wantStderr: "Read replicas share the primary's credentials; saving against primary 'test-service' (svc-12345).\nPassword saved for service 'test-service' (svc-12345), role tsdbadmin\n",
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				// Stored against the parent primary, matching the connect read path.
 				checkKeyringPassword("tsdbadmin", "replica-pw")(t, result)
-				if pw, err := (&common.KeyringStorage{}).Get(sampleReplica(), "tsdbadmin"); err == nil {
+				if pw, err := (&common.KeyringStorage{}).Get(api.Service{ServiceID: "rep-67890", ProjectID: testProjectID}, "tsdbadmin"); err == nil {
 					t.Errorf("expected no password stored under the replica ID, got %q", pw)
 				}
 			}},
+		},
+		{
+			// A branch has its own password, saved under its own ID.
+			name: "branch saves against itself",
+			args: []string{"db", "save-password", "test-branch", "--password=branch-pw"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveTarget(m, "test-branch", sampleBranch())
+			},
+			wantStderr: "Password saved for branch 'test-branch' (br-12345), role tsdbadmin\n",
+			checks:     []checkFunc{checkStoredPassword("br-12345", "branch-pw")},
 		},
 	})
 }

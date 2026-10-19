@@ -11,18 +11,18 @@ import (
 )
 
 func TestBranchResizeCmd(t *testing.T) {
-	setupResize := func(req api.ResizeInput, status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
+	setupResize := func(req api.BranchResizeInput, status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectGetBranch(m, sampleBranch())
+			expectResolveBranch(m, "br-12345", sampleBranch())
 			branch := sampleBranch(branchStatus(status))
-			m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "br-12345", req).
+			m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", req).
 				Return(&api.ResizeBranchResponse{
 					HTTPResponse: httpResponse(http.StatusAccepted),
 					JSON202:      &branch,
 				}, nil)
 		}
 	}
-	req2000 := api.ResizeInput{CPUMillis: "2000", MemoryGbs: "16"}
+	req2000 := api.BranchResizeInput{CPUMillis: "2000", MemoryGbs: "16"}
 	noWaitStderr := "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
 		"Resize request accepted for branch 'test-branch' (br-12345).\n" +
 		"Use 'tiger branch get' to check branch status.\n"
@@ -40,7 +40,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			name:    "missing branch id",
 			args:    []string{"branch", "resize", "--cpu", "2000"},
 			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
-			wantErr: "branch ID is required",
+			wantErr: "branch name or ID is required",
 		},
 		{
 			name:    "missing cpu and memory",
@@ -72,8 +72,8 @@ func TestBranchResizeCmd(t *testing.T) {
 			args: []string{"branch", "resize", "br-12345", "--cpu", "2000"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "br-12345", req2000).
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", req2000).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to resize branch: connection refused",
@@ -85,8 +85,8 @@ func TestBranchResizeCmd(t *testing.T) {
 			args: []string{"branch", "resize", "br-12345", "--cpu", "2000"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "br-12345", req2000).
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", req2000).
 					Return(&api.ResizeBranchResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
 			wantErr: "empty response from API",

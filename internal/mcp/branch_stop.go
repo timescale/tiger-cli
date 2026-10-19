@@ -76,11 +76,16 @@ func (s *Server) handleBranchStop(ctx context.Context, req *mcp.CallToolRequest,
 		return nil, BranchStopOutput{}, err
 	}
 
+	resolved, err := resolveBranchByID(ctx, client, projectID, input.BranchID)
+	if err != nil {
+		return nil, BranchStopOutput{}, err
+	}
+
 	s.logger.Info("MCP: Stopping branch",
 		slog.String("project_id", projectID),
 		slog.String("branch_id", input.BranchID))
 
-	resp, err := client.StopBranchWithResponse(ctx, projectID, input.BranchID)
+	resp, err := client.StopBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID)
 	if err != nil {
 		return nil, BranchStopOutput{}, fmt.Errorf("failed to stop branch: %w", err)
 	}
@@ -97,7 +102,8 @@ func (s *Server) handleBranchStop(ctx context.Context, req *mcp.CallToolRequest,
 		if err := common.WaitForBranch(ctx, common.WaitForBranchArgs{
 			Client:       client,
 			ProjectID:    projectID,
-			BranchID:     input.BranchID,
+			ServiceID:    resolved.ServiceID,
+			BranchID:     resolved.ID,
 			Branch:       &branch,
 			TargetStatus: api.DeployStatusPAUSED,
 			Timeout:      waitTimeout,

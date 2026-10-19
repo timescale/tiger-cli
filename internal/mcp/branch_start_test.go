@@ -15,7 +15,8 @@ func TestBranchStartTool(t *testing.T) {
 	expectStart := func(status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			branch := sampleBranch(branchStatus(status))
-			m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "br4nch1d9x").
+			expectResolveBranch(m, sampleBranch())
+			m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
 				Return(&api.StartBranchResponse{
 					HTTPResponse: httpResponse(http.StatusAccepted),
 					JSON202:      &branch,
@@ -55,7 +56,8 @@ func TestBranchStartTool(t *testing.T) {
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "br4nch1d9x").
+				expectResolveBranch(m, sampleBranch())
+				m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to start branch: connection refused",

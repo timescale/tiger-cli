@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -19,9 +18,8 @@ import (
 var errServiceRequired = errors.New("service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
 
 // serviceRef is what the user gave to identify a service, and where it came
-// from. The two resolve differently: an argument may be an ID, a read replica
-// set ID, or a name, and the API matches all of them together, while a
-// configured default must be an ID. A stored name would stop working the
+// from. The two resolve differently: an argument may be an ID or a name, and
+// the API matches both together, while a configured default must be an ID. A stored name would stop working the
 // moment someone renamed the service, and unlike an argument typed fresh each
 // time, nobody is watching when it does.
 type serviceRef struct {
@@ -66,57 +64,42 @@ func defaultServiceSource(cmd *cobra.Command) string {
 	return "the service_id config value"
 }
 
-// resolveService resolves a ref to the service it names, through the ref
-// filter on the service list: a match is a one-item list, and no match is an
-// empty one rather than a 404.
+// resolveService resolves a ref to the service it names, through the API's
+// resolve endpoint restricted to services. Read replica sets and branches
+// aren't services there, so their IDs and names don't match.
 func resolveService(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, ref serviceRef) (*api.Service, error) {
-	resp, err := client.GetServicesWithResponse(ctx, projectID, &api.GetServicesParams{Ref: &ref.ref})
+	resolved, err := common.Resolve(ctx, client, projectID, ref.ref, new(api.ResolveTypeSERVICE))
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve service '%s': %w", ref.ref, err)
+		return nil, withAmbiguousRefHint(err, "Run 'tiger service list' to find the ID you want")
 	}
-	if resp.StatusCode() != http.StatusOK {
-		err := common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-		// The backend's only validation error on this path is the refusal of
-		// a ref matching more than one service, so a 400 here means that.
-		// The server's message doesn't name the candidates, so point at the
-		// command that lists them.
-		if resp.StatusCode() == http.StatusBadRequest {
-			return nil, fmt.Errorf("%w\nRun 'tiger service list' to find the ID you want", err)
-		}
+	if err := checkDefaultIsID(resolved.Service.ServiceID, ref); err != nil {
 		return nil, err
 	}
-	if resp.JSON200 == nil {
-		return nil, errors.New("empty response from API")
-	}
+	return resolved.Service, nil
+}
 
-	services := *resp.JSON200
-	if len(services) == 0 {
-		return nil, common.ExitWithCode(common.ExitServiceNotFound, fmt.Errorf("service '%s' not found", ref.ref))
+// withAmbiguousRefHint adds hint to a resolve error that refused a ref
+// matching more than one resource. The resolve endpoint's only validation
+// error is that refusal, so a 400 means it. The server's message doesn't name
+// the candidates, so the hint points at the command that lists them.
+func withAmbiguousRefHint(err error, hint string) error {
+	if exitErr, ok := errors.AsType[common.ExitCodeError](err); ok && exitErr.ExitCode() == common.ExitInvalidParameters {
+		return fmt.Errorf("%w\n%s", err, hint)
 	}
-	// The API refuses an ambiguous ref with a 400 instead, so this means the
-	// filter was ignored; picking one would act on the wrong service.
-	if len(services) > 1 {
-		return nil, fmt.Errorf("expected one service for '%s', got %d", ref.ref, len(services))
-	}
-
-	service := services[0]
-	if err := checkDefaultIsID(service, ref); err != nil {
-		return nil, err
-	}
-	return &service, nil
+	return err
 }
 
 // checkDefaultIsID refuses a configured default that turned out to be a name
-// (see serviceRef for why). A ref equal to the service's own ID matched by ID
-// or replica set ID; anything else matched by name. Checking after the lookup
-// rather than before is what lets the error name the ID to store instead.
-func checkDefaultIsID(service api.Service, ref serviceRef) error {
-	if ref.source == "" || service.ServiceID == ref.ref {
+// (see serviceRef for why). A ref equal to the resolved ID matched by ID;
+// anything else matched by name. Checking after the lookup rather than before
+// is what lets the error name the ID to store instead.
+func checkDefaultIsID(id string, ref serviceRef) error {
+	if ref.source == "" || id == ref.ref {
 		return nil
 	}
 	return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf(
 		"the default service must be an ID, but %s is set to the name '%s'. Set it to %s, or pass the name as an argument",
-		ref.source, ref.ref, service.ServiceID))
+		ref.source, ref.ref, id))
 }
 
 // serviceLabel identifies a service in status output by name and ID together.

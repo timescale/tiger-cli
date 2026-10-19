@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/timescale/tiger-cli/internal/util"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -466,25 +469,22 @@ func sampleService(overrides ...func(*api.Service)) api.Service {
 	return svc
 }
 
-// sampleReplica returns a paused standby read replica of sampleService, shaped
-// the way GetService returns it when given a read replica set ID. A replica
-// connects to its own endpoint but borrows the parent primary's credentials,
-// so resolving one fetches both services.
-func sampleReplica(overrides ...func(*api.Service)) api.Service {
-	svc := sampleService(func(s *api.Service) {
-		s.ServiceID = "u8me885b93"
-		s.Name = "replica-service"
-		s.Status = api.DeployStatusPAUSED
-		s.ForkedFrom = &api.ForkSpec{
-			IsStandby: new(true),
-			ProjectID: new(testProjectID),
-			ServiceID: new("e6ue9697jf"),
-		}
-	})
-	for _, o := range overrides {
-		o(&svc)
+// sampleReplica returns a still-creating read replica set of sampleService, as
+// the resolve endpoint returns it. A replica connects to its own endpoint but
+// borrows the parent primary's credentials, so resolving one fetches the
+// parent too.
+func sampleReplica(overrides ...func(*api.ReadReplicaSet)) api.ReadReplicaSet {
+	replica := api.ReadReplicaSet{
+		ID:        "u8me885b93",
+		ServiceID: "e6ue9697jf",
+		Name:      "replica-service",
+		Status:    api.ReadReplicaSetStatusCreating,
+		Nodes:     1,
 	}
-	return svc
+	for _, o := range overrides {
+		o(&replica)
+	}
+	return replica
 }
 
 // The readiness errors handleDatabaseError returns before a tool connects,
@@ -558,25 +558,74 @@ func branchStatus(status api.DeployStatus) func(*api.Branch) {
 	return func(b *api.Branch) { b.Status = status }
 }
 
-// expectGetBranch expects one GetBranch call for branch's ID, returning
-// branch. The call is returned so a caller can adjust its cardinality (a wait
-// loop's poll).
+// expectResolve expects resolving ref through the resolve endpoint,
+// restricted to resolveType (nil for none), answered with v: an api.Service,
+// api.Branch, or api.ReadReplicaSet, whose Go type picks the discriminator.
+// The call is returned so a caller can adjust its cardinality.
+func expectResolve(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, v any) *gomock.Call {
+	return m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(&api.ResolveRefResponse{
+			HTTPResponse: httpResponse(http.StatusOK),
+			JSON200:      resolveResult(v),
+		}, nil)
+}
+
+// expectResolveStatus expects a resolve answered with status. A nil apiErr
+// stands in for a response with no body.
+func expectResolveStatus(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, status int, apiErr *api.ClientError) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(&api.ResolveRefResponse{
+			HTTPResponse: httpResponse(status),
+			JSON4XX:      apiErr,
+		}, nil)
+}
+
+// resolveResult encodes v as the resolve endpoint's union, discriminated by
+// v's Go type. Each member is its plain type plus the discriminator.
+func resolveResult(v any) *api.ResolveResult {
+	var resolveType api.ResolveType
+	switch v.(type) {
+	case api.Service:
+		resolveType = api.ResolveTypeSERVICE
+	case api.Branch:
+		resolveType = api.ResolveTypeBRANCH
+	case api.ReadReplicaSet:
+		resolveType = api.ResolveTypeREADREPLICASET
+	default:
+		panic(fmt.Sprintf("resolveResult: unsupported type %T", v))
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(util.Must(json.Marshal(v)), &body); err != nil {
+		panic(err)
+	}
+	body["type"] = resolveType
+
+	var result api.ResolveResult
+	if err := result.UnmarshalJSON(util.Must(json.Marshal(body))); err != nil {
+		panic(err)
+	}
+	return &result
+}
+
+// branchType is the resolve type every branch tool restricts its lookup to.
+var branchType = new(api.ResolveTypeBRANCH)
+
+// expectResolveBranch expects resolving branch's ID as a branch, which every
+// branch tool but branch_create and branch_list does first.
+func expectResolveBranch(m *mocks.MockClientWithResponsesInterface, branch api.Branch) {
+	expectResolve(m, branch.ID, branchType, branch)
+}
+
+// expectGetBranch expects one GetBranch call for branch, through its parent,
+// returning branch. The call is returned so a caller can adjust its
+// cardinality (a wait loop's poll).
 func expectGetBranch(m *mocks.MockClientWithResponsesInterface, branch api.Branch) *gomock.Call {
-	return m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, branch.ID).
+	return m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, branch.ServiceID, branch.ID).
 		Return(&api.GetBranchResponse{
 			HTTPResponse: httpResponse(http.StatusOK),
 			JSON200:      &branch,
 		}, nil)
-}
-
-// withStoredPassword seeds a password for svc in the mock keyring before the
-// tool runs.
-func withStoredPassword(svc api.Service, password string) runOption {
-	return withSetup(func(t *testing.T) {
-		if err := (&common.KeyringStorage{}).Save(svc, password, "tsdbadmin"); err != nil {
-			t.Fatalf("failed to seed password: %v", err)
-		}
-	})
 }
 
 // checkStoredPassword returns a check asserting the password stored in the

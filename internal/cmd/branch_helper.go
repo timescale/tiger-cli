@@ -9,6 +9,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // branchCPUMemoryHelp is the table of CPU/Memory configurations a branch can
@@ -32,9 +33,9 @@ func newBranchCreateCmd(app *common.App, use, commandPath string) *cobra.Command
 		Long: `Create a branch of a Fluid Service.
 
 A branch is a lightweight, ephemeral copy of a service, sharing the service's
-storage as of the moment it is created and getting its own compute. It has the
-same users and passwords as the service it was created from, and its password
-is copied from the service's saved password.
+storage as of the moment it is created and getting its own compute. The
+tsdbadmin user gets a new password, which is saved the same way as a new
+service's.
 
 By default:
 - The name is auto-generated
@@ -91,7 +92,7 @@ service from your configuration. Branching from a branch isn't supported.
 				cmd.PrintErrf("Creating branch from service %s...\n", serviceLabel(*parent))
 			}
 
-			createReq := api.BranchCreate{ServiceID: parent.ServiceID}
+			var createReq api.BranchCreate
 			if name != "" {
 				createReq.Name = &name
 			}
@@ -100,7 +101,7 @@ service from your configuration. Branching from a branch isn't supported.
 				createReq.MemoryGbs = &cpuMemoryCfg.MemoryGBs
 			}
 
-			resp, err := client.CreateBranchWithResponse(cmd.Context(), projectID, createReq)
+			resp, err := client.CreateBranchWithResponse(cmd.Context(), projectID, parent.ServiceID, createReq)
 			if err != nil {
 				return fmt.Errorf("failed to create branch: %w", err)
 			}
@@ -113,17 +114,11 @@ service from your configuration. Branching from a branch isn't supported.
 			branch := *resp.JSON202
 
 			cmd.PrintErrf("Branch ID: %s\n", branch.ID)
-			cmd.PrintErrf("Users and passwords are the same as service %s.\n", serviceLabel(*parent))
 
-			// Copied before any waiting, so the password is stored even if the
+			// Saved before any waiting, so the password is stored even if the
 			// wait fails or is interrupted.
-			// TODO: with pgpass storage this needs the branch's endpoint, which
-			// the create response may not carry yet.
-			result, _ := common.CopyParentPassword(cfg, *parent, branch, "tsdbadmin")
-			printPasswordStorageResult(cmd, result)
+			passwordSaved := handlePasswordSaving(cmd, cfg, common.BranchAsService(branch), util.Deref(branch.InitialPassword))
 
-			// TODO: print "Connect with: tiger db psql" once the db commands
-			// can connect to a branch.
 			var waitErr error
 			if noWait {
 				cmd.PrintErrf("Branch is being created. Use 'tiger branch get %s' to check branch status.\n", branch.ID)
@@ -132,6 +127,7 @@ service from your configuration. Branching from a branch isn't supported.
 				if waitErr = common.WaitForBranch(cmd.Context(), common.WaitForBranchArgs{
 					Client:       client,
 					ProjectID:    projectID,
+					ServiceID:    parent.ServiceID,
 					BranchID:     branch.ID,
 					Branch:       &branch,
 					TargetStatus: api.DeployStatusREADY,
@@ -143,6 +139,8 @@ service from your configuration. Branching from a branch isn't supported.
 					cmd.PrintErrf("Error: %s\n", waitErr)
 				} else {
 					cmd.PrintErrln("Branch is ready.")
+					// A branch is never the default, so the command names it.
+					printConnectMessage(cmd, passwordSaved, true, branch.ID)
 				}
 			}
 

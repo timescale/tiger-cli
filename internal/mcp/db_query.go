@@ -34,10 +34,10 @@ type DBQueryInput struct {
 	Pooled         bool     `json:"pooled,omitempty"`
 }
 
-func (DBQueryInput) Schema() *jsonschema.Schema {
+func (DBQueryInput) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBQueryInput](nil))
 
-	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service."
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service." + branchIDHelp(experimental, "runs the query against that branch")
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
@@ -112,7 +112,7 @@ func (DBQueryOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newDBQueryTool() *mcp.Tool {
+func newDBQueryTool(experimental bool) *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolDBQuery,
 		Title: "Execute SQL Query",
@@ -125,7 +125,7 @@ Multi-statement queries (semicolon-separated) are supported when no parameters a
 Process data in the database, not in your context: aggregate, filter, sort/limit, and join in SQL rather than fetching raw rows.
 
 WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
-		InputSchema:  DBQueryInput{}.Schema(),
+		InputSchema:  DBQueryInput{}.Schema(experimental),
 		OutputSchema: DBQueryOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
@@ -162,8 +162,9 @@ func (s *Server) handleDBQuery(ctx context.Context, req *mcp.CallToolRequest, in
 		slog.String("read_only", string(cfg.ReadOnly)),
 	)
 
-	// service_id may name a service or one of its read replicas.
-	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID)
+	// service_id may name a service, one of its read replicas, or (behind the
+	// experimental gate) a branch.
+	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID, s.app.Experimental)
 	if err != nil {
 		return nil, DBQueryOutput{}, err
 	}
@@ -192,7 +193,7 @@ func (s *Server) handleDBQuery(ctx context.Context, req *mcp.CallToolRequest, in
 		MaxBytes:   mcpMaxResponseBytes,
 	})
 	if err != nil {
-		return nil, DBQueryOutput{}, handleDatabaseError(err)
+		return nil, DBQueryOutput{}, handleDatabaseError(err, target)
 	}
 
 	output := DBQueryOutput{

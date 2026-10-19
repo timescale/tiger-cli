@@ -80,8 +80,9 @@ func (s *Server) handleBranchUpdatePassword(ctx context.Context, req *mcp.CallTo
 		return nil, BranchUpdatePasswordOutput{}, err
 	}
 
-	// The branch is needed to save the new password under it.
-	branch, err := common.GetBranch(ctx, client, projectID, input.BranchID)
+	// The branch is needed to save the new password under it, and its parent
+	// for the API call.
+	branch, err := resolveBranchByID(ctx, client, projectID, input.BranchID)
 	if err != nil {
 		return nil, BranchUpdatePasswordOutput{}, err
 	}
@@ -95,7 +96,7 @@ func (s *Server) handleBranchUpdatePassword(ctx context.Context, req *mcp.CallTo
 		slog.String("project_id", projectID),
 		slog.String("branch_id", input.BranchID))
 
-	resp, err := client.UpdateBranchPasswordWithResponse(ctx, projectID, input.BranchID, api.UpdatePasswordInput{Password: password})
+	resp, err := client.UpdateBranchPasswordWithResponse(ctx, projectID, branch.ServiceID, branch.ID, api.UpdatePasswordInput{Password: password})
 	if err != nil {
 		return nil, BranchUpdatePasswordOutput{}, fmt.Errorf("failed to update branch password: %w", err)
 	}

@@ -20,12 +20,13 @@ func buildBranchResizeCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:   "resize <branch-id>",
+		Use:   "resize <name-or-id>",
 		Short: "Resize a branch",
 		Long: `Resize a branch by changing its CPU and memory allocation. A branch's storage is
 shared with its parent service and isn't resized.
 
-The branch may be temporarily unavailable during the resize.
+The branch can be given by ID or name. It may be temporarily unavailable
+during the resize.
 
 ` + branchCPUMemoryHelp + `
 
@@ -38,16 +39,15 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
   # Resize without waiting for completion
   tiger branch resize br-12345 --cpu 2000 --no-wait`,
-		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: branchIDCompletion(app),
-		SilenceUsage:      true,
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			branchID, err := getBranchID(args)
+			branchRef, err := getBranchRef(args)
 			if err != nil {
 				return err
 			}
@@ -60,14 +60,14 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			resolved, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchID)
+			resolved, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchRef)
 			if err != nil {
 				return err
 			}
 
 			cmd.PrintErrf("Resizing branch %s to %s...\n", branchLabel(*resolved), cpuMemoryCfg)
 
-			resp, err := client.ResizeBranchWithResponse(cmd.Context(), projectID, resolved.ID, api.ResizeInput{
+			resp, err := client.ResizeBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID, api.BranchResizeInput{
 				CPUMillis: *cpuMemoryCfg.CPUMillisString(),
 				MemoryGbs: *cpuMemoryCfg.MemoryGBsString(),
 			})
@@ -93,6 +93,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			if err := common.WaitForBranch(cmd.Context(), common.WaitForBranchArgs{
 				Client:       client,
 				ProjectID:    projectID,
+				ServiceID:    resolved.ServiceID,
 				BranchID:     resolved.ID,
 				Branch:       &branch,
 				TargetStatus: api.DeployStatusREADY,

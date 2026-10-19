@@ -13,9 +13,9 @@ import (
 func TestBranchStartCmd(t *testing.T) {
 	setupStart := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectGetBranch(m, sampleBranch(branchStatus(api.DeployStatusPAUSED)))
+			expectResolveBranch(m, "br-12345", sampleBranch(branchStatus(api.DeployStatusPAUSED)))
 			branch := sampleBranch(branchStatus(status))
-			m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "br-12345").
+			m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
 				Return(&api.StartBranchResponse{
 					HTTPResponse: httpResponse(http.StatusAccepted),
 					JSON202:      &branch,
@@ -38,7 +38,7 @@ func TestBranchStartCmd(t *testing.T) {
 			name:    "missing branch id",
 			args:    []string{"branch", "start"},
 			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
-			wantErr: "branch ID is required",
+			wantErr: "branch name or ID is required",
 		},
 		{
 			name:    "read-only all refuses",
@@ -58,8 +58,8 @@ func TestBranchStartCmd(t *testing.T) {
 			args: []string{"branch", "start", "br-12345"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "br-12345").
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to start branch: connection refused",
@@ -69,8 +69,8 @@ func TestBranchStartCmd(t *testing.T) {
 			args: []string{"branch", "start", "br-12345"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "br-12345").
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
 					Return(&api.StartBranchResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
 			wantErr: "empty response from API",

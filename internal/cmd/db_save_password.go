@@ -56,15 +56,10 @@ The password will be saved according to your --password-storage setting
 				return err
 			}
 
-			resolved, err := resolveService(cmd.Context(), client, projectID, serviceRef)
-			if err != nil {
-				return err
-			}
-
-			// Resolve the target so a read replica id stores the password against
+			// Resolve the target so a read replica stores the password against
 			// its parent primary: replicas share the primary's credentials, and
 			// psql/ping look the password up against the primary.
-			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *resolved)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
 			if err != nil {
 				return err
 			}
@@ -112,8 +107,11 @@ The password will be saved according to your --password-storage setting
 				cmd.PrintErrf("Read replicas share the primary's credentials; saving against primary %s.\n",
 					serviceLabel(service))
 			}
-			cmd.PrintErrf("Password saved for service %s, role %s\n",
-				serviceLabel(service), role)
+			kind := "service"
+			if target.IsBranch {
+				kind = "branch"
+			}
+			cmd.PrintErrf("Password saved for %s %s, role %s\n", kind, serviceLabel(service), role)
 			return nil
 		},
 	}

@@ -12,12 +12,12 @@ import (
 
 func TestBranchDeleteCmd(t *testing.T) {
 	setupDelete := func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetBranch(m, sampleBranch())
-		m.EXPECT().DeleteBranchWithResponse(validCtx, testProjectID, "br-12345").
+		expectResolveBranch(m, "br-12345", sampleBranch())
+		m.EXPECT().DeleteBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
 			Return(&api.DeleteBranchResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 	}
 	getOnly := func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetBranch(m, sampleBranch())
+		expectResolveBranch(m, "br-12345", sampleBranch())
 	}
 	prompt := "Are you sure you want to delete branch 'test-branch' (br-12345)? This operation cannot be undone.\n" +
 		"Type the branch ID 'br-12345' to confirm: "
@@ -28,7 +28,7 @@ func TestBranchDeleteCmd(t *testing.T) {
 			name:    "missing branch id",
 			args:    []string{"branch", "delete"},
 			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
-			wantErr: "branch ID is required",
+			wantErr: "branch name or ID is required",
 		},
 		{
 			name:    "not logged in",
@@ -56,7 +56,7 @@ func TestBranchDeleteCmd(t *testing.T) {
 			args: []string{"branch", "delete", "br-12345", "--confirm"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranchStatus(m, "br-12345", http.StatusNotFound, &api.Error{Message: new("branch not found")})
+				expectResolveBranchStatus(m, "br-12345", http.StatusNotFound, &api.ClientError{Message: new("branch not found")})
 			},
 			wantErr: "branch 'br-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
@@ -87,8 +87,8 @@ func TestBranchDeleteCmd(t *testing.T) {
 			args: []string{"branch", "delete", "br-12345", "--confirm"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().DeleteBranchWithResponse(validCtx, testProjectID, "br-12345").
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().DeleteBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to delete branch: connection refused",
@@ -98,11 +98,11 @@ func TestBranchDeleteCmd(t *testing.T) {
 			args: []string{"branch", "delete", "br-12345", "--confirm"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().DeleteBranchWithResponse(validCtx, testProjectID, "br-12345").
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().DeleteBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
 					Return(&api.DeleteBranchResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
-						JSON4XX:      &api.Error{Message: new("branch is busy")},
+						JSON4XX:      &api.ClientError{Message: new("branch is busy")},
 					}, nil)
 			},
 			wantErr: "branch is busy",

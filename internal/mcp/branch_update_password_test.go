@@ -14,8 +14,8 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 	args := map[string]any{"branch_id": "br4nch1d9x"}
 	generated := withGenerateSecurePassword(32, "generated-pw", nil)
 	expectUpdate := func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetBranch(m, sampleBranch())
-		m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "br4nch1d9x", api.UpdatePasswordInput{Password: "generated-pw"}).
+		expectResolveBranch(m, sampleBranch())
+		m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.UpdatePasswordInput{Password: "generated-pw"}).
 			Return(&api.UpdateBranchPasswordResponse{HTTPResponse: httpResponse(http.StatusNoContent)}, nil)
 	}
 	storedPassword := map[string]any{
@@ -57,13 +57,9 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, "br4nch1d9x").
-					Return(&api.GetBranchResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.ClientError{Message: new("branch not found")},
-					}, nil)
+				expectResolveStatus(m, "br4nch1d9x", branchType, http.StatusNotFound, &api.ClientError{Message: new("resource not found")})
 			},
-			wantErr: "branch not found",
+			wantErr: "branch 'br4nch1d9x' not found",
 		},
 		{
 			name: "network error",
@@ -71,8 +67,8 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			args: args,
 			opts: []runOption{experimental, generated},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "br4nch1d9x", api.UpdatePasswordInput{Password: "generated-pw"}).
+				expectResolveBranch(m, sampleBranch())
+				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.UpdatePasswordInput{Password: "generated-pw"}).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to update branch password: connection refused",

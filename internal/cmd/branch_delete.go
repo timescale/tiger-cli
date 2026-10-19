@@ -15,14 +15,17 @@ func buildBranchDeleteCmd(app *common.App) *cobra.Command {
 	var confirm bool
 
 	cmd := &cobra.Command{
-		Use:     "delete <branch-id>",
+		Use:     "delete <name-or-id>",
 		Aliases: []string{"rm"},
 		Short:   "Delete a branch",
 		Long: `Delete a branch permanently, along with any changes made on it. The parent
 service is not affected.
 
+The branch can be given by ID or name.
+
 This operation is irreversible. By default, you will be prompted to type the
-branch ID to confirm deletion, unless you use the --confirm flag.
+branch ID to confirm deletion — the ID, not the name — unless you use the
+--confirm flag.
 
 Note for AI agents: Always confirm with the user before performing this destructive operation.`,
 		Example: `  # Delete a branch (with confirmation prompt)
@@ -30,11 +33,10 @@ Note for AI agents: Always confirm with the user before performing this destruct
 
   # Delete a branch without confirmation prompt
   tiger branch delete br-12345 --confirm`,
-		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: branchIDCompletion(app),
-		SilenceUsage:      true,
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			branchID, err := getBranchID(args)
+			branchRef, err := getBranchRef(args)
 			if err != nil {
 				return err
 			}
@@ -46,7 +48,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 
 			// Gated here, ahead of the confirmation prompt, so read-only mode
 			// refuses without first asking the user to type the branch ID.
-			branch, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchID)
+			branch, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchRef)
 			if err != nil {
 				return err
 			}
@@ -67,7 +69,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				}
 			}
 
-			resp, err := client.DeleteBranchWithResponse(cmd.Context(), projectID, branch.ID)
+			resp, err := client.DeleteBranchWithResponse(cmd.Context(), projectID, branch.ServiceID, branch.ID)
 			if err != nil {
 				return fmt.Errorf("failed to delete branch: %w", err)
 			}

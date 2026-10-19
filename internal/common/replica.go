@@ -10,14 +10,17 @@ import (
 )
 
 // ConnectionTarget is the service to connect to plus the service whose
-// credentials to use. They're the same for a primary; for a read replica the
-// CredentialService is the parent primary, whose credentials it shares.
+// credentials to use. They're the same for a primary or a branch; for a read
+// replica the CredentialService is the parent primary, whose credentials it
+// shares. A branch is carried in service form (see BranchAsService).
 type ConnectionTarget struct {
 	// ConnectionService alone decides a session's read-only verdict, so a replica
-	// is judged on its own environment tag rather than its primary's.
+	// is judged on its own environment tag rather than its primary's, and a
+	// branch, which has none, counts as DEV.
 	ConnectionService api.Service
 	CredentialService api.Service
 	IsReplica         bool
+	IsBranch          bool
 }
 
 // Details builds the target's connection details. A requested-but-unavailable
@@ -40,16 +43,56 @@ func IsReadReplica(service api.Service) bool {
 	return service.ForkedFrom != nil && util.Deref(service.ForkedFrom.IsStandby)
 }
 
-// ResolveConnectionTargetByID fetches the service named by id — which may be a
-// primary service ID or a read replica set ID, both of which GetService
-// resolves — and works out which service holds its credentials. Callers that
-// already hold the service use NewConnectionTarget instead.
-func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*ConnectionTarget, error) {
-	service, err := GetService(ctx, client, projectID, id)
+// ResolveConnectionTarget resolves ref, an ID or a name, to the service,
+// branch, or read replica set it names and works out which service holds its
+// credentials. Branches are a preview, so unless allowBranches is set a ref
+// naming one is reported as not found.
+func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string, allowBranches bool) (*ConnectionTarget, error) {
+	kind := connectionTargetKind(allowBranches)
+	resolved, err := resolve(ctx, client, projectID, ref, nil, kind)
 	if err != nil {
 		return nil, err
 	}
-	return NewConnectionTarget(ctx, client, projectID, *service)
+
+	switch {
+	case resolved.Branch != nil:
+		if !allowBranches {
+			return nil, ExitWithCode(ExitServiceNotFound, fmt.Errorf("%s '%s' not found", kind, ref))
+		}
+		branch := BranchAsService(*resolved.Branch)
+		return &ConnectionTarget{ConnectionService: branch, CredentialService: branch, IsBranch: true}, nil
+	case resolved.ReadReplicaSet != nil:
+		replica := *resolved.ReadReplicaSet
+		parent, err := GetService(ctx, client, projectID, replica.ServiceID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", replica.ServiceID, err)
+		}
+		return NewReplicaConnectionTarget(*parent, replica), nil
+	default:
+		return NewConnectionTarget(ctx, client, projectID, *resolved.Service)
+	}
+}
+
+// ResolveConnectionTargetByID is ResolveConnectionTarget for a caller that
+// takes only IDs: a ref that matched by name is reported as not found.
+func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string, allowBranches bool) (*ConnectionTarget, error) {
+	target, err := ResolveConnectionTarget(ctx, client, projectID, id, allowBranches)
+	if err != nil {
+		return nil, err
+	}
+	if target.ConnectionService.ServiceID != id {
+		return nil, ExitWithCode(ExitServiceNotFound, fmt.Errorf("%s '%s' not found", connectionTargetKind(allowBranches), id))
+	}
+	return target, nil
+}
+
+// connectionTargetKind names what ResolveConnectionTarget looks for, in its
+// errors. Branches are left out unless they are allowed.
+func connectionTargetKind(allowBranches bool) string {
+	if allowBranches {
+		return resolveKind(nil)
+	}
+	return "service or read replica set"
 }
 
 // NewConnectionTarget works out which service holds the credentials for an

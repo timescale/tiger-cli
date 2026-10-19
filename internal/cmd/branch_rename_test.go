@@ -12,9 +12,9 @@ import (
 
 func TestBranchRenameCmd(t *testing.T) {
 	setupRename := func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetBranch(m, sampleBranch())
+		expectResolveBranch(m, "br-12345", sampleBranch())
 		renamed := sampleBranch(func(b *api.Branch) { b.Name = "feature/rbac" })
-		m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "br-12345", api.BranchRename{Name: "feature/rbac"}).
+		m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", api.BranchRename{Name: "feature/rbac"}).
 			Return(&api.RenameBranchResponse{
 				HTTPResponse: httpResponse(http.StatusOK),
 				JSON200:      &renamed,
@@ -59,8 +59,8 @@ func TestBranchRenameCmd(t *testing.T) {
 			args: []string{"branch", "rename", "br-12345", "feature/rbac"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "br-12345", api.BranchRename{Name: "feature/rbac"}).
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", api.BranchRename{Name: "feature/rbac"}).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to rename branch: connection refused",
@@ -70,11 +70,11 @@ func TestBranchRenameCmd(t *testing.T) {
 			args: []string{"branch", "rename", "br-12345", "feature/rbac"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "br-12345", api.BranchRename{Name: "feature/rbac"}).
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", api.BranchRename{Name: "feature/rbac"}).
 					Return(&api.RenameBranchResponse{
 						HTTPResponse: httpResponse(http.StatusConflict),
-						JSON4XX:      &api.Error{Message: new("a branch named feature/rbac already exists")},
+						JSON4XX:      &api.ClientError{Message: new("a branch named feature/rbac already exists")},
 					}, nil)
 			},
 			wantErr: "a branch named feature/rbac already exists",
@@ -84,8 +84,8 @@ func TestBranchRenameCmd(t *testing.T) {
 			args: []string{"branch", "rename", "br-12345", "feature/rbac"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "br-12345", api.BranchRename{Name: "feature/rbac"}).
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", api.BranchRename{Name: "feature/rbac"}).
 					Return(&api.RenameBranchResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
 			},
 			wantErr: "empty response from API",

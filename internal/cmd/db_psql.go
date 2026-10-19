@@ -98,12 +98,7 @@ skipping the prompt. Read replicas share the primary's credentials.`,
 				return err
 			}
 
-			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
-			if err != nil {
-				return err
-			}
-
-			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *service)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
 			if err != nil {
 				return err
 			}
@@ -130,9 +125,7 @@ skipping the prompt. Read replicas share the primary's credentials.`,
 				return nil
 			}
 
-			// Read replicas share the primary's credentials, so password storage
-			// and recovery always operate on the credential service.
-			return connectWithPasswordMenu(cmd.Context(), cmd, app, target.CredentialService, details, psqlPath, psqlFlags)
+			return connectWithPasswordMenu(cmd.Context(), cmd, app, target, details, psqlPath, psqlFlags)
 		},
 	}
 
@@ -186,7 +179,8 @@ func selectConnection(
 	chosen := target
 
 	// Offer the replica menu only for a primary on an interactive terminal.
-	if !target.IsReplica && !noReplicaPrompt && util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr()) {
+	// Branches have no read replicas.
+	if !target.IsReplica && !target.IsBranch && !noReplicaPrompt && util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr()) {
 		primary := target.ConnectionService
 		replicas, err := fetchReplicaSets(ctx, client, projectID, primary.ServiceID)
 		if err != nil {
@@ -374,7 +368,7 @@ func connectWithPasswordMenu(
 	ctx context.Context,
 	cmd *cobra.Command,
 	app *common.App,
-	service api.Service,
+	target *common.ConnectionTarget,
 	details *common.ConnectionDetails,
 	psqlPath string,
 	psqlFlags []string,
@@ -383,6 +377,10 @@ func connectWithPasswordMenu(
 	if err != nil {
 		return err
 	}
+
+	// Read replicas share the primary's credentials, so password storage and
+	// recovery always operate on the credential service.
+	service := target.CredentialService
 
 	// Interactive mode: Get stored password (if any)
 	storage := common.GetPasswordStorage(cfg)
@@ -414,7 +412,10 @@ func connectWithPasswordMenu(
 	// Password reset is admin-only, and rotating the master password is a
 	// control-plane write, so read-only mode hides the option rather than
 	// offering what it would refuse.
-	canResetPassword := details.Role == "tsdbadmin" &&
+	//
+	// TODO: offer it for branches too, through the branch password endpoint.
+	// The reset below goes through the service one, which refuses a branch.
+	canResetPassword := details.Role == "tsdbadmin" && !target.IsBranch &&
 		common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)) == nil
 
 	// Interactive recovery loop

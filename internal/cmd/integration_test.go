@@ -472,7 +472,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to build API client: %v", err)
 		}
-		target, err := common.ResolveConnectionTargetByID(t.Context(), client, projectID, serviceID)
+		target, err := common.ResolveConnectionTargetByID(t.Context(), client, projectID, serviceID, false)
 		if err != nil {
 			t.Fatalf("failed to resolve connection target: %v", err)
 		}

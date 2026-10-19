@@ -24,8 +24,8 @@ The service can be given by ID or name as an argument, or will use the default
 service from your configuration. This command updates the master password for
 the 'tsdbadmin' user used to authenticate to the database service.
 
-A read replica ID is rejected — read replicas share the primary's credentials,
-so update the password on the primary instead.`,
+Read replicas share the primary's credentials, so update the password on the
+primary instead.`,
 		Example: `  # Update password for default service, interactively prompts
   tiger service update-password
 
@@ -73,19 +73,13 @@ so update the password on the primary instead.`,
 
 			ctx := cmd.Context()
 
-			// Gated here, ahead of any prompt or write. Resolving returns the
-			// whole service, so the replica check below needs no second fetch.
+			// Gated here, ahead of any prompt or write. A read replica set
+			// doesn't resolve as a service, so it is never updated here.
 			resolved, err := resolveServiceForWrite(ctx, cfg, client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}
 			service := *resolved
-
-			// A read replica has no separate password to rotate.
-			if common.IsReadReplica(service) {
-				return fmt.Errorf("'%s' is a read replica; update the password on its primary service '%s' instead",
-					service.ServiceID, util.DerefStr(service.ForkedFrom.ServiceID))
-			}
 
 			if autoGenerate {
 				// Auto-generate password using existing function

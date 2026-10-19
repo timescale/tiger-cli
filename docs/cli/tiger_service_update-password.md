@@ -10,8 +10,8 @@ The service can be given by ID or name as an argument, or will use the default
 service from your configuration. This command updates the master password for
 the 'tsdbadmin' user used to authenticate to the database service.
 
-A read replica ID is rejected — read replicas share the primary's credentials,
-so update the password on the primary instead.
+Read replicas share the primary's credentials, so update the password on the
+primary instead.
 
 ```
 tiger service update-password [name-or-id] [flags]

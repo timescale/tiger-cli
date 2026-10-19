@@ -62,6 +62,7 @@ func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
 type WaitForBranchArgs struct {
 	Client    api.ClientWithResponsesInterface
 	ProjectID string
+	ServiceID string // the branch's parent
 	BranchID  string
 
 	// Branch is the branch as last returned by the API. Unlike
@@ -92,7 +93,7 @@ func WaitForBranch(ctx context.Context, args WaitForBranchArgs) error {
 		timeout:      args.Timeout,
 		timeoutMsg:   args.TimeoutMsg,
 		poll: func(ctx context.Context) (int, string, *api.DeployStatus, error) {
-			resp, err := args.Client.GetBranchWithResponse(ctx, args.ProjectID, args.BranchID)
+			resp, err := args.Client.GetBranchWithResponse(ctx, args.ProjectID, args.ServiceID, args.BranchID)
 			if err != nil {
 				return 0, "", nil, err
 			}

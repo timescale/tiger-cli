@@ -17,38 +17,39 @@ func buildBranchStopCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "stop <branch-id>",
+		Use:     "stop <name-or-id>",
 		Aliases: []string{"pause"},
 		Short:   "Stop a running branch",
 		Long: `Stop a running branch.
 
 A stopped branch no longer accepts connections and stops charging for compute,
-but keeps the changes made on it, whose storage is still billed.`,
+but keeps the changes made on it, whose storage is still billed.
+
+The branch can be given by ID or name.`,
 		Example: `  # Stop a branch (waits for completion by default)
   tiger branch stop br-12345
 
   # Stop a branch without waiting for completion
   tiger branch stop br-12345 --no-wait`,
-		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: branchIDCompletion(app),
-		SilenceUsage:      true,
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			branchID, err := getBranchID(args)
+			branchRef, err := getBranchRef(args)
 			if err != nil {
 				return err
 			}
 
-			resolved, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchID)
+			resolved, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchRef)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.StopBranchWithResponse(cmd.Context(), projectID, resolved.ID)
+			resp, err := client.StopBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID)
 			if err != nil {
 				return fmt.Errorf("failed to stop branch: %w", err)
 			}
@@ -71,6 +72,7 @@ but keeps the changes made on it, whose storage is still billed.`,
 			if err := common.WaitForBranch(cmd.Context(), common.WaitForBranchArgs{
 				Client:       client,
 				ProjectID:    projectID,
+				ServiceID:    resolved.ServiceID,
 				BranchID:     resolved.ID,
 				Branch:       &branch,
 				TargetStatus: api.DeployStatusPAUSED,

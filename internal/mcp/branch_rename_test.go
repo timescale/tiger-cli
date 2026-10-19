@@ -14,7 +14,8 @@ func TestBranchRenameTool(t *testing.T) {
 	args := map[string]any{"branch_id": "br4nch1d9x", "name": "feature/rbac"}
 	expectRename := func(m *mocks.MockClientWithResponsesInterface) {
 		renamed := sampleBranch(func(b *api.Branch) { b.Name = "feature/rbac" })
-		m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "br4nch1d9x", api.BranchRename{Name: "feature/rbac"}).
+		expectResolveBranch(m, sampleBranch())
+		m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.BranchRename{Name: "feature/rbac"}).
 			Return(&api.RenameBranchResponse{
 				HTTPResponse: httpResponse(http.StatusOK),
 				JSON200:      &renamed,
@@ -61,7 +62,8 @@ func TestBranchRenameTool(t *testing.T) {
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "br4nch1d9x", api.BranchRename{Name: "feature/rbac"}).
+				expectResolveBranch(m, sampleBranch())
+				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.BranchRename{Name: "feature/rbac"}).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to rename branch: connection refused",
@@ -72,7 +74,8 @@ func TestBranchRenameTool(t *testing.T) {
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "br4nch1d9x", api.BranchRename{Name: "feature/rbac"}).
+				expectResolveBranch(m, sampleBranch())
+				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.BranchRename{Name: "feature/rbac"}).
 					Return(&api.RenameBranchResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
 			},
 			wantErr: "empty response from API",

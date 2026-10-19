@@ -15,24 +15,24 @@ import (
 // buildBranchRenameCmd creates the rename subcommand
 func buildBranchRenameCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rename <branch-id> <new-name>",
+		Use:   "rename <name-or-id> <new-name>",
 		Short: "Rename a branch",
 		Long: `Rename a branch.
 
 Only the branch's name changes: its ID, endpoint, and data are untouched, so
 existing connections and connection strings keep working.
 
-Both the branch ID and the new name are required.`,
+Both the branch and the new name are required. The branch can be given by ID
+or by its current name.`,
 		Example: `  # Rename a branch
   tiger branch rename br-12345 feature/rbac`,
-		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: branchIDCompletion(app),
-		SilenceUsage:      true,
+		Args:         cobra.ExactArgs(2),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			branchID, newName := args[0], strings.TrimSpace(args[1])
+			branchRef, newName := args[0], strings.TrimSpace(args[1])
 
-			if branchID == "" {
-				return errors.New("branch ID is required")
+			if branchRef == "" {
+				return errBranchRequired
 			}
 			if newName == "" {
 				return errors.New("new name cannot be empty")
@@ -43,12 +43,12 @@ Both the branch ID and the new name are required.`,
 				return err
 			}
 
-			branch, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchID)
+			branch, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchRef)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.RenameBranchWithResponse(cmd.Context(), projectID, branch.ID, api.BranchRename{Name: newName})
+			resp, err := client.RenameBranchWithResponse(cmd.Context(), projectID, branch.ServiceID, branch.ID, api.BranchRename{Name: newName})
 			if err != nil {
 				return fmt.Errorf("failed to rename branch: %w", err)
 			}

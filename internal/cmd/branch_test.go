@@ -83,22 +83,29 @@ func branchStatus(status api.DeployStatus) func(*api.Branch) {
 	return func(b *api.Branch) { b.Status = status }
 }
 
-// expectGetBranch registers the lookup of branch's ID, answered with branch.
+// branchType is the resolve type every `tiger branch` command restricts its
+// lookup to.
+var branchType = new(api.ResolveTypeBRANCH)
+
+// expectResolveBranch registers resolving ref as a branch, answered with
+// branch.
+func expectResolveBranch(m *mocks.MockClientWithResponsesInterface, ref string, branch api.Branch) {
+	expectResolve(m, ref, branchType, branch)
+}
+
+// expectResolveBranchStatus registers resolving ref as a branch, answered with
+// status. A nil apiErr stands in for a response with no body.
+func expectResolveBranchStatus(m *mocks.MockClientWithResponsesInterface, ref string, status int, apiErr *api.ClientError) {
+	expectResolveStatus(m, ref, branchType, status, apiErr)
+}
+
+// expectGetBranch registers one fetch of branch, through its parent, as a
+// wait loop's poll makes it.
 func expectGetBranch(m *mocks.MockClientWithResponsesInterface, branch api.Branch) {
-	m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, branch.ID).
+	m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, branch.ServiceID, branch.ID).
 		Return(&api.GetBranchResponse{
 			HTTPResponse: httpResponse(http.StatusOK),
 			JSON200:      &branch,
-		}, nil)
-}
-
-// expectGetBranchStatus registers a lookup of id answered with status. A nil
-// apiErr stands in for a response with no body.
-func expectGetBranchStatus(m *mocks.MockClientWithResponsesInterface, id string, status int, apiErr *api.Error) {
-	m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, id).
-		Return(&api.GetBranchResponse{
-			HTTPResponse: httpResponse(status),
-			JSON4XX:      apiErr,
 		}, nil)
 }
 

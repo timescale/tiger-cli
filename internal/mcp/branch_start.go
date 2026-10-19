@@ -76,11 +76,16 @@ func (s *Server) handleBranchStart(ctx context.Context, req *mcp.CallToolRequest
 		return nil, BranchStartOutput{}, err
 	}
 
+	resolved, err := resolveBranchByID(ctx, client, projectID, input.BranchID)
+	if err != nil {
+		return nil, BranchStartOutput{}, err
+	}
+
 	s.logger.Info("MCP: Starting branch",
 		slog.String("project_id", projectID),
 		slog.String("branch_id", input.BranchID))
 
-	resp, err := client.StartBranchWithResponse(ctx, projectID, input.BranchID)
+	resp, err := client.StartBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID)
 	if err != nil {
 		return nil, BranchStartOutput{}, fmt.Errorf("failed to start branch: %w", err)
 	}
@@ -97,7 +102,8 @@ func (s *Server) handleBranchStart(ctx context.Context, req *mcp.CallToolRequest
 		if err := common.WaitForBranch(ctx, common.WaitForBranchArgs{
 			Client:       client,
 			ProjectID:    projectID,
-			BranchID:     input.BranchID,
+			ServiceID:    resolved.ServiceID,
+			BranchID:     resolved.ID,
 			Branch:       &branch,
 			TargetStatus: api.DeployStatusREADY,
 			Timeout:      waitTimeout,

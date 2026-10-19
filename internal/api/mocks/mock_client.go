@@ -283,9 +283,9 @@ func (mr *MockClientInterfaceMockRecorder) CreateBackupRegionWithBody(ctx, proje
 }
 
 // CreateBranch mocks base method.
-func (m *MockClientInterface) CreateBranch(ctx context.Context, projectID api.ProjectID, body api.CreateBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) CreateBranch(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, body api.CreateBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, body}
+	varargs := []any{ctx, projectID, serviceID, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -296,16 +296,16 @@ func (m *MockClientInterface) CreateBranch(ctx context.Context, projectID api.Pr
 }
 
 // CreateBranch indicates an expected call of CreateBranch.
-func (mr *MockClientInterfaceMockRecorder) CreateBranch(ctx, projectID, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) CreateBranch(ctx, projectID, serviceID, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBranch", reflect.TypeOf((*MockClientInterface)(nil).CreateBranch), varargs...)
 }
 
 // CreateBranchWithBody mocks base method.
-func (m *MockClientInterface) CreateBranchWithBody(ctx context.Context, projectID api.ProjectID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) CreateBranchWithBody(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, contentType, body}
+	varargs := []any{ctx, projectID, serviceID, contentType, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -316,9 +316,9 @@ func (m *MockClientInterface) CreateBranchWithBody(ctx context.Context, projectI
 }
 
 // CreateBranchWithBody indicates an expected call of CreateBranchWithBody.
-func (mr *MockClientInterfaceMockRecorder) CreateBranchWithBody(ctx, projectID, contentType, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) CreateBranchWithBody(ctx, projectID, serviceID, contentType, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, contentType, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBranchWithBody", reflect.TypeOf((*MockClientInterface)(nil).CreateBranchWithBody), varargs...)
 }
 
@@ -563,9 +563,9 @@ func (mr *MockClientInterfaceMockRecorder) DeleteBackupRegion(ctx, projectID, se
 }
 
 // DeleteBranch mocks base method.
-func (m *MockClientInterface) DeleteBranch(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) DeleteBranch(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID}
+	varargs := []any{ctx, projectID, serviceID, branchID}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -576,9 +576,9 @@ func (m *MockClientInterface) DeleteBranch(ctx context.Context, projectID api.Pr
 }
 
 // DeleteBranch indicates an expected call of DeleteBranch.
-func (mr *MockClientInterfaceMockRecorder) DeleteBranch(ctx, projectID, branchID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) DeleteBranch(ctx, projectID, serviceID, branchID any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBranch", reflect.TypeOf((*MockClientInterface)(nil).DeleteBranch), varargs...)
 }
 
@@ -1063,9 +1063,9 @@ func (mr *MockClientInterfaceMockRecorder) GetBackups(ctx, projectID, serviceID 
 }
 
 // GetBranch mocks base method.
-func (m *MockClientInterface) GetBranch(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) GetBranch(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID}
+	varargs := []any{ctx, projectID, serviceID, branchID}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -1076,16 +1076,16 @@ func (m *MockClientInterface) GetBranch(ctx context.Context, projectID api.Proje
 }
 
 // GetBranch indicates an expected call of GetBranch.
-func (mr *MockClientInterfaceMockRecorder) GetBranch(ctx, projectID, branchID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) GetBranch(ctx, projectID, serviceID, branchID any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBranch", reflect.TypeOf((*MockClientInterface)(nil).GetBranch), varargs...)
 }
 
 // GetBranches mocks base method.
-func (m *MockClientInterface) GetBranches(ctx context.Context, projectID api.ProjectID, params *api.GetBranchesParams, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) GetBranches(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, params *api.GetBranchesParams, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, params}
+	varargs := []any{ctx, projectID, serviceID, params}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -1096,9 +1096,9 @@ func (m *MockClientInterface) GetBranches(ctx context.Context, projectID api.Pro
 }
 
 // GetBranches indicates an expected call of GetBranches.
-func (mr *MockClientInterfaceMockRecorder) GetBranches(ctx, projectID, params any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) GetBranches(ctx, projectID, serviceID, params any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, params}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, params}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBranches", reflect.TypeOf((*MockClientInterface)(nil).GetBranches), varargs...)
 }
 
@@ -1483,9 +1483,9 @@ func (mr *MockClientInterfaceMockRecorder) LogoutWithBody(ctx, contentType, body
 }
 
 // RenameBranch mocks base method.
-func (m *MockClientInterface) RenameBranch(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, body api.RenameBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) RenameBranch(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, body api.RenameBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -1496,16 +1496,16 @@ func (m *MockClientInterface) RenameBranch(ctx context.Context, projectID api.Pr
 }
 
 // RenameBranch indicates an expected call of RenameBranch.
-func (mr *MockClientInterfaceMockRecorder) RenameBranch(ctx, projectID, branchID, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) RenameBranch(ctx, projectID, serviceID, branchID, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameBranch", reflect.TypeOf((*MockClientInterface)(nil).RenameBranch), varargs...)
 }
 
 // RenameBranchWithBody mocks base method.
-func (m *MockClientInterface) RenameBranchWithBody(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) RenameBranchWithBody(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, contentType, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, contentType, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -1516,9 +1516,9 @@ func (m *MockClientInterface) RenameBranchWithBody(ctx context.Context, projectI
 }
 
 // RenameBranchWithBody indicates an expected call of RenameBranchWithBody.
-func (mr *MockClientInterfaceMockRecorder) RenameBranchWithBody(ctx, projectID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) RenameBranchWithBody(ctx, projectID, serviceID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, contentType, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameBranchWithBody", reflect.TypeOf((*MockClientInterface)(nil).RenameBranchWithBody), varargs...)
 }
 
@@ -1603,9 +1603,9 @@ func (mr *MockClientInterfaceMockRecorder) RenameVPCWithBody(ctx, projectID, vpc
 }
 
 // ResizeBranch mocks base method.
-func (m *MockClientInterface) ResizeBranch(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, body api.ResizeBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) ResizeBranch(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, body api.ResizeBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -1616,16 +1616,16 @@ func (m *MockClientInterface) ResizeBranch(ctx context.Context, projectID api.Pr
 }
 
 // ResizeBranch indicates an expected call of ResizeBranch.
-func (mr *MockClientInterfaceMockRecorder) ResizeBranch(ctx, projectID, branchID, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) ResizeBranch(ctx, projectID, serviceID, branchID, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeBranch", reflect.TypeOf((*MockClientInterface)(nil).ResizeBranch), varargs...)
 }
 
 // ResizeBranchWithBody mocks base method.
-func (m *MockClientInterface) ResizeBranchWithBody(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) ResizeBranchWithBody(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, contentType, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, contentType, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -1636,9 +1636,9 @@ func (m *MockClientInterface) ResizeBranchWithBody(ctx context.Context, projectI
 }
 
 // ResizeBranchWithBody indicates an expected call of ResizeBranchWithBody.
-func (mr *MockClientInterfaceMockRecorder) ResizeBranchWithBody(ctx, projectID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) ResizeBranchWithBody(ctx, projectID, serviceID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, contentType, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeBranchWithBody", reflect.TypeOf((*MockClientInterface)(nil).ResizeBranchWithBody), varargs...)
 }
 
@@ -1720,6 +1720,26 @@ func (mr *MockClientInterfaceMockRecorder) ResizeServiceWithBody(ctx, projectID,
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectID, serviceID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeServiceWithBody", reflect.TypeOf((*MockClientInterface)(nil).ResizeServiceWithBody), varargs...)
+}
+
+// ResolveRef mocks base method.
+func (m *MockClientInterface) ResolveRef(ctx context.Context, projectID api.ProjectID, params *api.ResolveRefParams, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, params}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ResolveRef", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResolveRef indicates an expected call of ResolveRef.
+func (mr *MockClientInterfaceMockRecorder) ResolveRef(ctx, projectID, params any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, params}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveRef", reflect.TypeOf((*MockClientInterface)(nil).ResolveRef), varargs...)
 }
 
 // SetBackupRetention mocks base method.
@@ -1883,9 +1903,9 @@ func (mr *MockClientInterfaceMockRecorder) SetReplicaEnvironmentWithBody(ctx, pr
 }
 
 // StartBranch mocks base method.
-func (m *MockClientInterface) StartBranch(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) StartBranch(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID}
+	varargs := []any{ctx, projectID, serviceID, branchID}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -1896,9 +1916,9 @@ func (m *MockClientInterface) StartBranch(ctx context.Context, projectID api.Pro
 }
 
 // StartBranch indicates an expected call of StartBranch.
-func (mr *MockClientInterfaceMockRecorder) StartBranch(ctx, projectID, branchID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) StartBranch(ctx, projectID, serviceID, branchID any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartBranch", reflect.TypeOf((*MockClientInterface)(nil).StartBranch), varargs...)
 }
 
@@ -1923,9 +1943,9 @@ func (mr *MockClientInterfaceMockRecorder) StartService(ctx, projectID, serviceI
 }
 
 // StopBranch mocks base method.
-func (m *MockClientInterface) StopBranch(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) StopBranch(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID}
+	varargs := []any{ctx, projectID, serviceID, branchID}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -1936,9 +1956,9 @@ func (m *MockClientInterface) StopBranch(ctx context.Context, projectID api.Proj
 }
 
 // StopBranch indicates an expected call of StopBranch.
-func (mr *MockClientInterfaceMockRecorder) StopBranch(ctx, projectID, branchID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) StopBranch(ctx, projectID, serviceID, branchID any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopBranch", reflect.TypeOf((*MockClientInterface)(nil).StopBranch), varargs...)
 }
 
@@ -2083,9 +2103,9 @@ func (mr *MockClientInterfaceMockRecorder) UpdateAllowListWithBody(ctx, projectI
 }
 
 // UpdateBranchPassword mocks base method.
-func (m *MockClientInterface) UpdateBranchPassword(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, body api.UpdateBranchPasswordJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) UpdateBranchPassword(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, body api.UpdateBranchPasswordJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -2096,16 +2116,16 @@ func (m *MockClientInterface) UpdateBranchPassword(ctx context.Context, projectI
 }
 
 // UpdateBranchPassword indicates an expected call of UpdateBranchPassword.
-func (mr *MockClientInterfaceMockRecorder) UpdateBranchPassword(ctx, projectID, branchID, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) UpdateBranchPassword(ctx, projectID, serviceID, branchID, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBranchPassword", reflect.TypeOf((*MockClientInterface)(nil).UpdateBranchPassword), varargs...)
 }
 
 // UpdateBranchPasswordWithBody mocks base method.
-func (m *MockClientInterface) UpdateBranchPasswordWithBody(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) UpdateBranchPasswordWithBody(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, contentType, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, contentType, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -2116,9 +2136,9 @@ func (m *MockClientInterface) UpdateBranchPasswordWithBody(ctx context.Context, 
 }
 
 // UpdateBranchPasswordWithBody indicates an expected call of UpdateBranchPasswordWithBody.
-func (mr *MockClientInterfaceMockRecorder) UpdateBranchPasswordWithBody(ctx, projectID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) UpdateBranchPasswordWithBody(ctx, projectID, serviceID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, contentType, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBranchPasswordWithBody", reflect.TypeOf((*MockClientInterface)(nil).UpdateBranchPasswordWithBody), varargs...)
 }
 
@@ -2427,9 +2447,9 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) CreateBackupRegionWithRe
 }
 
 // CreateBranchWithBodyWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) CreateBranchWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.CreateBranchResponse, error) {
+func (m *MockClientWithResponsesInterface) CreateBranchWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.CreateBranchResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, contentType, body}
+	varargs := []any{ctx, projectID, serviceID, contentType, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -2440,16 +2460,16 @@ func (m *MockClientWithResponsesInterface) CreateBranchWithBodyWithResponse(ctx 
 }
 
 // CreateBranchWithBodyWithResponse indicates an expected call of CreateBranchWithBodyWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) CreateBranchWithBodyWithResponse(ctx, projectID, contentType, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) CreateBranchWithBodyWithResponse(ctx, projectID, serviceID, contentType, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, contentType, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBranchWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).CreateBranchWithBodyWithResponse), varargs...)
 }
 
 // CreateBranchWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) CreateBranchWithResponse(ctx context.Context, projectID api.ProjectID, body api.CreateBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.CreateBranchResponse, error) {
+func (m *MockClientWithResponsesInterface) CreateBranchWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, body api.CreateBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.CreateBranchResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, body}
+	varargs := []any{ctx, projectID, serviceID, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -2460,9 +2480,9 @@ func (m *MockClientWithResponsesInterface) CreateBranchWithResponse(ctx context.
 }
 
 // CreateBranchWithResponse indicates an expected call of CreateBranchWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) CreateBranchWithResponse(ctx, projectID, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) CreateBranchWithResponse(ctx, projectID, serviceID, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBranchWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).CreateBranchWithResponse), varargs...)
 }
 
@@ -2707,9 +2727,9 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) DeleteBackupRegionWithRe
 }
 
 // DeleteBranchWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) DeleteBranchWithResponse(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*api.DeleteBranchResponse, error) {
+func (m *MockClientWithResponsesInterface) DeleteBranchWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*api.DeleteBranchResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID}
+	varargs := []any{ctx, projectID, serviceID, branchID}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -2720,9 +2740,9 @@ func (m *MockClientWithResponsesInterface) DeleteBranchWithResponse(ctx context.
 }
 
 // DeleteBranchWithResponse indicates an expected call of DeleteBranchWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) DeleteBranchWithResponse(ctx, projectID, branchID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) DeleteBranchWithResponse(ctx, projectID, serviceID, branchID any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBranchWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).DeleteBranchWithResponse), varargs...)
 }
 
@@ -3207,9 +3227,9 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetBackupsWithResponse(c
 }
 
 // GetBranchWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) GetBranchWithResponse(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*api.GetBranchResponse, error) {
+func (m *MockClientWithResponsesInterface) GetBranchWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*api.GetBranchResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID}
+	varargs := []any{ctx, projectID, serviceID, branchID}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -3220,16 +3240,16 @@ func (m *MockClientWithResponsesInterface) GetBranchWithResponse(ctx context.Con
 }
 
 // GetBranchWithResponse indicates an expected call of GetBranchWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) GetBranchWithResponse(ctx, projectID, branchID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetBranchWithResponse(ctx, projectID, serviceID, branchID any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBranchWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetBranchWithResponse), varargs...)
 }
 
 // GetBranchesWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) GetBranchesWithResponse(ctx context.Context, projectID api.ProjectID, params *api.GetBranchesParams, reqEditors ...api.RequestEditorFn) (*api.GetBranchesResponse, error) {
+func (m *MockClientWithResponsesInterface) GetBranchesWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, params *api.GetBranchesParams, reqEditors ...api.RequestEditorFn) (*api.GetBranchesResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, params}
+	varargs := []any{ctx, projectID, serviceID, params}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -3240,9 +3260,9 @@ func (m *MockClientWithResponsesInterface) GetBranchesWithResponse(ctx context.C
 }
 
 // GetBranchesWithResponse indicates an expected call of GetBranchesWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) GetBranchesWithResponse(ctx, projectID, params any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetBranchesWithResponse(ctx, projectID, serviceID, params any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, params}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, params}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBranchesWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetBranchesWithResponse), varargs...)
 }
 
@@ -3627,9 +3647,9 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) LogoutWithResponse(ctx, 
 }
 
 // RenameBranchWithBodyWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) RenameBranchWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.RenameBranchResponse, error) {
+func (m *MockClientWithResponsesInterface) RenameBranchWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.RenameBranchResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, contentType, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, contentType, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -3640,16 +3660,16 @@ func (m *MockClientWithResponsesInterface) RenameBranchWithBodyWithResponse(ctx 
 }
 
 // RenameBranchWithBodyWithResponse indicates an expected call of RenameBranchWithBodyWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) RenameBranchWithBodyWithResponse(ctx, projectID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) RenameBranchWithBodyWithResponse(ctx, projectID, serviceID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, contentType, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameBranchWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).RenameBranchWithBodyWithResponse), varargs...)
 }
 
 // RenameBranchWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) RenameBranchWithResponse(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, body api.RenameBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.RenameBranchResponse, error) {
+func (m *MockClientWithResponsesInterface) RenameBranchWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, body api.RenameBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.RenameBranchResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -3660,9 +3680,9 @@ func (m *MockClientWithResponsesInterface) RenameBranchWithResponse(ctx context.
 }
 
 // RenameBranchWithResponse indicates an expected call of RenameBranchWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) RenameBranchWithResponse(ctx, projectID, branchID, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) RenameBranchWithResponse(ctx, projectID, serviceID, branchID, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameBranchWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).RenameBranchWithResponse), varargs...)
 }
 
@@ -3747,9 +3767,9 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) RenameVPCWithResponse(ct
 }
 
 // ResizeBranchWithBodyWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) ResizeBranchWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.ResizeBranchResponse, error) {
+func (m *MockClientWithResponsesInterface) ResizeBranchWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.ResizeBranchResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, contentType, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, contentType, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -3760,16 +3780,16 @@ func (m *MockClientWithResponsesInterface) ResizeBranchWithBodyWithResponse(ctx 
 }
 
 // ResizeBranchWithBodyWithResponse indicates an expected call of ResizeBranchWithBodyWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) ResizeBranchWithBodyWithResponse(ctx, projectID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) ResizeBranchWithBodyWithResponse(ctx, projectID, serviceID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, contentType, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeBranchWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).ResizeBranchWithBodyWithResponse), varargs...)
 }
 
 // ResizeBranchWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) ResizeBranchWithResponse(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, body api.ResizeBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.ResizeBranchResponse, error) {
+func (m *MockClientWithResponsesInterface) ResizeBranchWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, body api.ResizeBranchJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.ResizeBranchResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -3780,9 +3800,9 @@ func (m *MockClientWithResponsesInterface) ResizeBranchWithResponse(ctx context.
 }
 
 // ResizeBranchWithResponse indicates an expected call of ResizeBranchWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) ResizeBranchWithResponse(ctx, projectID, branchID, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) ResizeBranchWithResponse(ctx, projectID, serviceID, branchID, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeBranchWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).ResizeBranchWithResponse), varargs...)
 }
 
@@ -3864,6 +3884,26 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) ResizeServiceWithRespons
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectID, serviceID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeServiceWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).ResizeServiceWithResponse), varargs...)
+}
+
+// ResolveRefWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) ResolveRefWithResponse(ctx context.Context, projectID api.ProjectID, params *api.ResolveRefParams, reqEditors ...api.RequestEditorFn) (*api.ResolveRefResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, params}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ResolveRefWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.ResolveRefResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResolveRefWithResponse indicates an expected call of ResolveRefWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) ResolveRefWithResponse(ctx, projectID, params any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, params}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveRefWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).ResolveRefWithResponse), varargs...)
 }
 
 // SetBackupRetentionWithBodyWithResponse mocks base method.
@@ -4027,9 +4067,9 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) SetReplicaEnvironmentWit
 }
 
 // StartBranchWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) StartBranchWithResponse(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*api.StartBranchResponse, error) {
+func (m *MockClientWithResponsesInterface) StartBranchWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*api.StartBranchResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID}
+	varargs := []any{ctx, projectID, serviceID, branchID}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -4040,9 +4080,9 @@ func (m *MockClientWithResponsesInterface) StartBranchWithResponse(ctx context.C
 }
 
 // StartBranchWithResponse indicates an expected call of StartBranchWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) StartBranchWithResponse(ctx, projectID, branchID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) StartBranchWithResponse(ctx, projectID, serviceID, branchID any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartBranchWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).StartBranchWithResponse), varargs...)
 }
 
@@ -4067,9 +4107,9 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) StartServiceWithResponse
 }
 
 // StopBranchWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) StopBranchWithResponse(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*api.StopBranchResponse, error) {
+func (m *MockClientWithResponsesInterface) StopBranchWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, reqEditors ...api.RequestEditorFn) (*api.StopBranchResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID}
+	varargs := []any{ctx, projectID, serviceID, branchID}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -4080,9 +4120,9 @@ func (m *MockClientWithResponsesInterface) StopBranchWithResponse(ctx context.Co
 }
 
 // StopBranchWithResponse indicates an expected call of StopBranchWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) StopBranchWithResponse(ctx, projectID, branchID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) StopBranchWithResponse(ctx, projectID, serviceID, branchID any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopBranchWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).StopBranchWithResponse), varargs...)
 }
 
@@ -4227,9 +4267,9 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) UpdateAllowListWithRespo
 }
 
 // UpdateBranchPasswordWithBodyWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) UpdateBranchPasswordWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.UpdateBranchPasswordResponse, error) {
+func (m *MockClientWithResponsesInterface) UpdateBranchPasswordWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.UpdateBranchPasswordResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, contentType, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, contentType, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -4240,16 +4280,16 @@ func (m *MockClientWithResponsesInterface) UpdateBranchPasswordWithBodyWithRespo
 }
 
 // UpdateBranchPasswordWithBodyWithResponse indicates an expected call of UpdateBranchPasswordWithBodyWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) UpdateBranchPasswordWithBodyWithResponse(ctx, projectID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) UpdateBranchPasswordWithBodyWithResponse(ctx, projectID, serviceID, branchID, contentType, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, contentType, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBranchPasswordWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).UpdateBranchPasswordWithBodyWithResponse), varargs...)
 }
 
 // UpdateBranchPasswordWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) UpdateBranchPasswordWithResponse(ctx context.Context, projectID api.ProjectID, branchID api.BranchID, body api.UpdateBranchPasswordJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.UpdateBranchPasswordResponse, error) {
+func (m *MockClientWithResponsesInterface) UpdateBranchPasswordWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, body api.UpdateBranchPasswordJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.UpdateBranchPasswordResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, branchID, body}
+	varargs := []any{ctx, projectID, serviceID, branchID, body}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -4260,9 +4300,9 @@ func (m *MockClientWithResponsesInterface) UpdateBranchPasswordWithResponse(ctx 
 }
 
 // UpdateBranchPasswordWithResponse indicates an expected call of UpdateBranchPasswordWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) UpdateBranchPasswordWithResponse(ctx, projectID, branchID, body any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) UpdateBranchPasswordWithResponse(ctx, projectID, serviceID, branchID, body any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, branchID, body}, reqEditors...)
+	varargs := append([]any{ctx, projectID, serviceID, branchID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBranchPasswordWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).UpdateBranchPasswordWithResponse), varargs...)
 }
 

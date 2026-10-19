@@ -63,9 +63,7 @@ func (s *Server) handleBranchList(ctx context.Context, req *mcp.CallToolRequest,
 		slog.String("project_id", projectID),
 		slog.String("service_id", input.ServiceID))
 
-	// TODO: the API lists every branch in the project, so the service's are
-	// picked out here. Filter server-side if the API gains a service filter.
-	resp, err := client.GetBranchesWithResponse(ctx, projectID, nil)
+	resp, err := client.GetBranchesWithResponse(ctx, projectID, input.ServiceID, nil)
 	if err != nil {
 		return nil, BranchListOutput{}, fmt.Errorf("failed to list branches: %w", err)
 	}
@@ -76,11 +74,9 @@ func (s *Server) handleBranchList(ctx context.Context, req *mcp.CallToolRequest,
 		return nil, BranchListOutput{}, fmt.Errorf("empty response from API")
 	}
 
-	branches := []BranchDetail{}
-	for _, branch := range *resp.JSON200 {
-		if branch.ServiceID == input.ServiceID {
-			branches = append(branches, s.convertToBranchDetail(cfg, branch))
-		}
+	branches := make([]BranchDetail, len(*resp.JSON200))
+	for i, branch := range *resp.JSON200 {
+		branches[i] = s.convertToBranchDetail(cfg, branch)
 	}
 
 	return nil, BranchListOutput{Branches: branches}, nil

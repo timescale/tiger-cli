@@ -83,6 +83,11 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchResizeOutput{}, err
 	}
 
+	resolved, err := resolveBranchByID(ctx, client, projectID, input.BranchID)
+	if err != nil {
+		return nil, BranchResizeOutput{}, err
+	}
+
 	cpuMemoryCfg, err := parseBranchCPUMemory(input.CPUMemory)
 	if err != nil {
 		return nil, BranchResizeOutput{}, err
@@ -94,7 +99,7 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 		slog.String("cpu_memory", input.CPUMemory),
 	)
 
-	resp, err := client.ResizeBranchWithResponse(ctx, projectID, input.BranchID, api.ResizeInput{
+	resp, err := client.ResizeBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID, api.BranchResizeInput{
 		CPUMillis: strconv.Itoa(cpuMemoryCfg.CPUMillis),
 		MemoryGbs: strconv.Itoa(cpuMemoryCfg.MemoryGBs),
 	})
@@ -114,7 +119,8 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 		if err := common.WaitForBranch(ctx, common.WaitForBranchArgs{
 			Client:       client,
 			ProjectID:    projectID,
-			BranchID:     input.BranchID,
+			ServiceID:    resolved.ServiceID,
+			BranchID:     resolved.ID,
 			Branch:       &branch,
 			TargetStatus: api.DeployStatusREADY,
 			Timeout:      waitTimeout,

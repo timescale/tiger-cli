@@ -15,20 +15,48 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// serviceTestClient builds an API client backed by an httptest server that
-// serves the getService endpoint from services keyed by service ID (404 when
-// absent).
-func serviceTestClient(t *testing.T, services map[string]api.Service) *api.ClientWithResponses {
+// resolveTestClient builds an API client backed by an httptest server that
+// answers the resolve endpoint from resolved, keyed by ref, and the getService
+// endpoint from services, keyed by service ID (404 when absent). Each resolved
+// value is a service, branch, or read replica set, encoded with the given
+// discriminator.
+func resolveTestClient(t *testing.T, resolved map[string]resolvedFixture, services map[string]api.Service) *api.ClientWithResponses {
 	t.Helper()
+
+	notFound := func(w http.ResponseWriter) {
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "not found"})
+	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-		id := parts[len(parts)-1]
-		svc, ok := services[id]
+		last := parts[len(parts)-1]
+
+		if last == "resolve" {
+			fixture, ok := resolved[r.URL.Query().Get("ref")]
+			if !ok {
+				notFound(w)
+				return
+			}
+			raw, err := json.Marshal(fixture.value)
+			if err != nil {
+				t.Errorf("failed to encode fixture: %v", err)
+				return
+			}
+			var body map[string]any
+			if err := json.Unmarshal(raw, &body); err != nil {
+				t.Errorf("failed to decode fixture: %v", err)
+				return
+			}
+			body["type"] = fixture.typ
+			_ = json.NewEncoder(w).Encode(body)
+			return
+		}
+
+		svc, ok := services[last]
 		if !ok {
-			w.WriteHeader(http.StatusNotFound)
-			_ = json.NewEncoder(w).Encode(map[string]string{"message": "service not found"})
+			notFound(w)
 			return
 		}
 		_ = json.NewEncoder(w).Encode(svc)
@@ -40,6 +68,12 @@ func serviceTestClient(t *testing.T, services map[string]api.Service) *api.Clien
 		t.Fatalf("failed to build client: %v", err)
 	}
 	return client
+}
+
+// resolvedFixture is one answer of the resolve endpoint in resolveTestClient.
+type resolvedFixture struct {
+	typ   api.ResolveType
+	value any
 }
 
 func primaryService() api.Service {
@@ -69,33 +103,87 @@ func replicaService() api.Service {
 	}
 }
 
+// TestResolveConnectionTargetByID is helper-level because the MCP db tools
+// that call it can't reach the branch and replica cases without a live
+// connection past it.
 func TestResolveConnectionTargetByID(t *testing.T) {
 	primary := primaryService()
-	replica := replicaService()
-	client := serviceTestClient(t, map[string]api.Service{"svcprimary": primary, "rep1234567": replica})
+	replicaHost := "replica.example.com"
+	replica := api.ReadReplicaSet{
+		ID:        "rep1234567",
+		ServiceID: "svcprimary",
+		Name:      "reporting-replica",
+		Status:    api.ReadReplicaSetStatusActive,
+		Endpoint:  &api.Endpoint{Host: &replicaHost, Port: new(5432)},
+	}
+	branch := api.Branch{
+		ID:        "br12345678",
+		ProjectID: "proj1",
+		ServiceID: "svcprimary",
+		Name:      "my-branch",
+		Status:    api.DeployStatusREADY,
+		Endpoint:  &api.Endpoint{Host: new("br12345678.example.com"), Port: new(5432)},
+	}
+	client := resolveTestClient(t, map[string]resolvedFixture{
+		"svcprimary": {api.ResolveTypeSERVICE, primary},
+		"my-db":      {api.ResolveTypeSERVICE, primary},
+		"rep1234567": {api.ResolveTypeREADREPLICASET, replica},
+		"br12345678": {api.ResolveTypeBRANCH, branch},
+	}, map[string]api.Service{"svcprimary": primary})
+	ctx := context.Background()
 
 	// Primary ID → primary target.
-	target, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "svcprimary")
+	target, err := ResolveConnectionTargetByID(ctx, client, "proj1", "svcprimary", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if target.IsReplica {
-		t.Error("expected primary target for a primary ID")
+	if target.IsReplica || target.IsBranch || target.ConnectionService.ServiceID != "svcprimary" {
+		t.Errorf("expected primary target for a primary ID, got %+v", target)
 	}
 
-	// Replica ID → replica target with parent credentials.
-	target, err = ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567")
+	// Replica set ID → replica target with the parent's credentials.
+	target, err = ResolveConnectionTargetByID(ctx, client, "proj1", "rep1234567", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !target.IsReplica || target.CredentialService.ServiceID != "svcprimary" {
+	if !target.IsReplica || target.ConnectionService.ServiceID != "rep1234567" || target.CredentialService.ServiceID != "svcprimary" {
 		t.Errorf("expected replica target with parent credentials, got %+v", target)
 	}
 
-	// Unknown ID → error.
-	if _, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "missing9999"); err == nil {
-		t.Error("expected an error for an unknown ID, got nil")
+	// Branch ID → branch target with its own credentials, when allowed.
+	target, err = ResolveConnectionTargetByID(ctx, client, "proj1", "br12345678", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
+	if !target.IsBranch || target.ConnectionService.ServiceID != "br12345678" || target.CredentialService.ServiceID != "br12345678" {
+		t.Errorf("expected branch target with its own credentials, got %+v", target)
+	}
+
+	// Branch ID without branches allowed → not found, without naming branches.
+	_, err = ResolveConnectionTargetByID(ctx, client, "proj1", "br12345678", false)
+	if diff := cmp.Diff("service or read replica set 'br12345678' not found", errString(err)); diff != "" {
+		t.Errorf("gated branch error mismatch (-want +got):\n%s", diff)
+	}
+
+	// A name resolves, but isn't an ID.
+	_, err = ResolveConnectionTargetByID(ctx, client, "proj1", "my-db", true)
+	if diff := cmp.Diff("service, branch, or read replica set 'my-db' not found", errString(err)); diff != "" {
+		t.Errorf("name match error mismatch (-want +got):\n%s", diff)
+	}
+
+	// Unknown ID → not found.
+	_, err = ResolveConnectionTargetByID(ctx, client, "proj1", "missing999", true)
+	if diff := cmp.Diff("service, branch, or read replica set 'missing999' not found", errString(err)); diff != "" {
+		t.Errorf("unknown ID error mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// errString returns err's message, or "" for nil.
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func TestNewReplicaConnectionTarget(t *testing.T) {
@@ -309,22 +397,25 @@ func TestReplicaPoolerWarning(t *testing.T) {
 }
 
 func TestResolveConnectionTargetByID_ReplicaParentFetchFails(t *testing.T) {
-	// The replica itself resolves, but its parent is absent from the server.
-	client := serviceTestClient(t, map[string]api.Service{"rep1234567": replicaService()})
+	// The replica set itself resolves, but its parent is absent from the server.
+	replica := api.ReadReplicaSet{ID: "rep1234567", ServiceID: "svcprimary", Name: "reporting-replica"}
+	client := resolveTestClient(t, map[string]resolvedFixture{
+		"rep1234567": {api.ResolveTypeREADREPLICASET, replica},
+	}, nil)
 
-	if _, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567"); err == nil {
+	if _, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567", false); err == nil {
 		t.Fatal("expected an error when the parent service can't be fetched, got nil")
 	}
 }
 
-func TestResolveConnectionTargetByID_ReplicaWithoutParentID(t *testing.T) {
+func TestNewConnectionTarget_ReplicaWithoutParentID(t *testing.T) {
 	// A standby with no parent recorded has nowhere else to look for
-	// credentials, so it stands in as its own credential service.
+	// credentials, so it stands in as its own credential service, and no
+	// parent is fetched.
 	replica := replicaService()
 	replica.ForkedFrom.ServiceID = nil
-	client := serviceTestClient(t, map[string]api.Service{"rep1234567": replica})
 
-	target, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567")
+	target, err := NewConnectionTarget(context.Background(), nil, "proj1", replica)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

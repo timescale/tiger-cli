@@ -48,10 +48,7 @@ service from your configuration.`,
 				return err
 			}
 
-			// TODO: the API lists every branch in the project, so the service's
-			// are picked out here. Filter server-side if the API gains a
-			// service filter.
-			resp, err := client.GetBranchesWithResponse(cmd.Context(), projectID, nil)
+			resp, err := client.GetBranchesWithResponse(cmd.Context(), projectID, service.ServiceID, nil)
 			if err != nil {
 				return fmt.Errorf("failed to list branches: %w", err)
 			}
@@ -62,12 +59,7 @@ service from your configuration.`,
 				return fmt.Errorf("empty response from API")
 			}
 
-			var branches []api.Branch
-			for _, branch := range *resp.JSON200 {
-				if branch.ServiceID == service.ServiceID {
-					branches = append(branches, branch)
-				}
-			}
+			branches := *resp.JSON200
 
 			if len(branches) == 0 {
 				cmd.PrintErrf("No branches found for service %s.\n", serviceLabel(*service))

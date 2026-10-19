@@ -137,13 +137,13 @@ Further conventions:
 
 ### Service Refs
 
-A command that identifies a service takes a **ref** — its ID, a read replica set ID, or its name — and hands it to the `ref` filter on the API's service list through the helpers in `service_ref_helper.go`, which also return the whole service. Never try to tell an ID from a name in the CLI.
+A command that identifies a service takes a **ref** — its ID or its name — and hands it to the API's resolve endpoint through `common.Resolve`, which returns the whole resource. Never try to tell an ID from a name in the CLI. The endpoint's `type` parameter decides what a ref can name: `tiger service` commands resolve only services (`resolveService` in `service_ref_helper.go`), `tiger branch` commands only branches (`resolveBranch` in `branch.go`), and `tiger db` commands anything they can connect to — a service, a read replica set, or a branch (`resolveConnectionTarget` in `db.go`, over `common.ResolveConnectionTarget`).
 
 - A command that changes the service it resolves uses `resolveServiceForWrite`, which carries the read-only gate; everything else uses `resolveService`.
 - Help text shows `[name-or-id]` and says the service "can be given by ID or name". Shell completion offers names, falling back to IDs when what is typed matches an ID instead.
 - A name is accepted only as an argument. A configured default must be an ID, and one that resolves by name is refused. The `--service-id` flag completion only offers IDs.
 - Destructive commands accept a name, but their confirmation prompt takes only the ID.
-- MCP tools stay IDs-only — an intentional divergence, documented at `setServiceIDSchemaProperties`.
+- MCP tools stay IDs-only — an intentional divergence, documented at `setServiceIDSchemaProperties`. A tool that goes through the resolve endpoint (the branch tools, `db_query`, `db_schema`) refuses a match by name.
 
 ## Output
 

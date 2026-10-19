@@ -139,15 +139,15 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
-			name: "read replica rejected",
+			// The lookup is restricted to services, so a read replica set ID
+			// doesn't resolve, and its password is never updated here.
+			name: "read replica set ID not found",
 			args: []string{"service", "update-password", "rep1234567", "--new-password", "newpass123"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "rep1234567", sampleService(func(s *api.Service) {
-					s.ServiceID = "rep1234567"
-					s.ForkedFrom = &api.ForkSpec{IsStandby: new(true), ServiceID: new("svcprimary")}
-				}))
+				expectResolveRefNotFound(m, "rep1234567")
 			},
-			wantErr: `'rep1234567' is a read replica; update the password on its primary service 'svcprimary' instead`,
+			wantErr: "service 'rep1234567' not found",
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name:    "non-interactive without password",

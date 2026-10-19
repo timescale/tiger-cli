@@ -15,7 +15,8 @@ func TestBranchStopTool(t *testing.T) {
 	expectStop := func(status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			branch := sampleBranch(branchStatus(status))
-			m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "br4nch1d9x").
+			expectResolveBranch(m, sampleBranch())
+			m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
 				Return(&api.StopBranchResponse{
 					HTTPResponse: httpResponse(http.StatusAccepted),
 					JSON202:      &branch,
@@ -62,7 +63,8 @@ func TestBranchStopTool(t *testing.T) {
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "br4nch1d9x").
+				expectResolveBranch(m, sampleBranch())
+				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to stop branch: connection refused",
@@ -73,7 +75,8 @@ func TestBranchStopTool(t *testing.T) {
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "br4nch1d9x").
+				expectResolveBranch(m, sampleBranch())
+				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
 					Return(&api.StopBranchResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
 			wantErr: "empty response from API",

@@ -19,13 +19,14 @@ func buildBranchUpdatePasswordCmd(app *common.App) *cobra.Command {
 	var autoGenerate bool
 
 	cmd := &cobra.Command{
-		Use:   "update-password <branch-id>",
+		Use:   "update-password <name-or-id>",
 		Short: "Update the master password for a branch",
 		Long: `Update the master password for the 'tsdbadmin' user of a branch.
 
-A branch starts with its parent service's password. Changing it here affects
-only the branch, and changing the parent's password doesn't change the
-branch's.`,
+A branch gets its own password when it is created, independent of its parent
+service's, so changing one doesn't change the other.
+
+The branch can be given by ID or name.`,
 		Example: `  # Update a branch's password, interactively prompts
   tiger branch update-password br-12345
 
@@ -38,9 +39,8 @@ branch's.`,
 
   # Auto-generate a secure password
   tiger branch update-password br-12345 --auto-generate`,
-		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: branchIDCompletion(app),
-		SilenceUsage:      true,
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
@@ -56,7 +56,7 @@ branch's.`,
 				return errors.New("cannot use --auto-generate and --new-password together")
 			}
 
-			branchID, err := getBranchID(args)
+			branchRef, err := getBranchRef(args)
 			if err != nil {
 				return err
 			}
@@ -65,7 +65,7 @@ branch's.`,
 
 			// Gated here, ahead of any prompt or write. The branch is needed
 			// to save the new password under it.
-			branch, err := resolveBranchForWrite(ctx, cfg, client, projectID, branchID)
+			branch, err := resolveBranchForWrite(ctx, cfg, client, projectID, branchRef)
 			if err != nil {
 				return err
 			}
@@ -87,7 +87,7 @@ branch's.`,
 				}
 			}
 
-			resp, err := client.UpdateBranchPasswordWithResponse(ctx, projectID, branch.ID, api.UpdatePasswordInput{Password: password})
+			resp, err := client.UpdateBranchPasswordWithResponse(ctx, projectID, branch.ServiceID, branch.ID, api.UpdatePasswordInput{Password: password})
 			if err != nil {
 				return fmt.Errorf("failed to update password: %w", err)
 			}

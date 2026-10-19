@@ -17,37 +17,38 @@ func buildBranchStartCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "start <branch-id>",
+		Use:     "start <name-or-id>",
 		Aliases: []string{"resume"},
 		Short:   "Start a stopped branch",
 		Long: `Start a stopped branch.
 
-Starting a branch resumes charging for its compute.`,
+Starting a branch resumes charging for its compute.
+
+The branch can be given by ID or name.`,
 		Example: `  # Start a branch (waits for completion by default)
   tiger branch start br-12345
 
   # Start a branch without waiting for completion
   tiger branch start br-12345 --no-wait`,
-		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: branchIDCompletion(app),
-		SilenceUsage:      true,
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			branchID, err := getBranchID(args)
+			branchRef, err := getBranchRef(args)
 			if err != nil {
 				return err
 			}
 
-			resolved, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchID)
+			resolved, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchRef)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.StartBranchWithResponse(cmd.Context(), projectID, resolved.ID)
+			resp, err := client.StartBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID)
 			if err != nil {
 				return fmt.Errorf("failed to start branch: %w", err)
 			}
@@ -70,6 +71,7 @@ Starting a branch resumes charging for its compute.`,
 			if err := common.WaitForBranch(cmd.Context(), common.WaitForBranchArgs{
 				Client:       client,
 				ProjectID:    projectID,
+				ServiceID:    resolved.ServiceID,
 				BranchID:     resolved.ID,
 				Branch:       &branch,
 				TargetStatus: api.DeployStatusREADY,

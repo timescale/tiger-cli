@@ -73,7 +73,7 @@ func selectResult() *common.QueryResult {
 
 func TestDbQueryCmd(t *testing.T) {
 	setupGetService := func(m *mocks.MockClientWithResponsesInterface) {
-		expectResolveRef(m, "svc-12345", sampleService())
+		expectResolveTarget(m, "svc-12345", sampleService())
 	}
 
 	sqlDir := t.TempDir()
@@ -165,7 +165,7 @@ func TestDbQueryCmd(t *testing.T) {
 		{
 			name: "read_only prod, PROD service",
 			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			mock: expectTaggedService("PROD"),
+			mock: expectTaggedTarget("PROD"),
 			opts: []runOption{
 				withConfig(map[string]any{"read_only": "prod"}),
 				withExecuteQuery(common.ExecuteQueryArgs{
@@ -179,7 +179,7 @@ func TestDbQueryCmd(t *testing.T) {
 			// prod mode leaves DEV services writable.
 			name: "read_only prod, DEV service",
 			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			mock: expectTaggedService("DEV"),
+			mock: expectTaggedTarget("DEV"),
 			opts: []runOption{
 				withConfig(map[string]any{"read_only": "prod"}),
 				withExecuteQuery(common.ExecuteQueryArgs{
@@ -192,24 +192,24 @@ func TestDbQueryCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
+				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service not found",
 			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefNotFound(m, "svc-12345")
+				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service 'svc-12345' not found",
+			wantErr: "service or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "ambiguous name refused",
 			args: []string{"db", "query", "my-api-db", "-c", "SELECT 1"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+				expectResolveTargetStatus(m, "my-api-db", http.StatusBadRequest, &api.ClientError{Message: new("ambiguous service name matches multiple services")})
 			},
 			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
@@ -223,6 +223,17 @@ func TestDbQueryCmd(t *testing.T) {
 				Role:  "tsdbadmin",
 			}, nil, common.ErrPaused)},
 			wantErr: pausedMsg("svc-12345"),
+		},
+		{
+			// A branch is started through `tiger branch`, not `tiger service`.
+			name: "branch paused",
+			args: []string{"db", "query", "br-12345", "-c", "SELECT 1"},
+			opts: []runOption{withExperimental(), withExecuteQuery(common.ExecuteQueryArgs{
+				Query: "SELECT 1",
+				Role:  "tsdbadmin",
+			}, nil, common.ErrPaused)},
+			mock:    func(m *mocks.MockClientWithResponsesInterface) { expectResolveTarget(m, "br-12345", sampleBranch()) },
+			wantErr: "service is paused — start it with 'tiger branch start br-12345'",
 		},
 		{
 			// A bare pgx auth failure says nothing about which password is

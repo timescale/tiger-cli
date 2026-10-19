@@ -12,7 +12,7 @@ import (
 
 func TestBranchGetCmd(t *testing.T) {
 	getSample := func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetBranch(m, sampleBranch())
+		expectResolveBranch(m, "br-12345", sampleBranch())
 	}
 
 	runCmdTests(t, []cmdTest{
@@ -28,15 +28,14 @@ func TestBranchGetCmd(t *testing.T) {
 			name:    "missing branch id",
 			args:    []string{"branch", "get"},
 			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
-			wantErr: "branch ID is required",
+			wantErr: "branch name or ID is required",
 		},
 		{
 			name: "network error",
 			args: []string{"branch", "get", "br-12345"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, "br-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveError(m, "br-12345", branchType, errors.New("connection refused"))
 			},
 			wantErr: "failed to resolve branch 'br-12345': connection refused",
 		},
@@ -45,17 +44,27 @@ func TestBranchGetCmd(t *testing.T) {
 			args: []string{"branch", "get", "br-12345"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranchStatus(m, "br-12345", http.StatusNotFound, &api.Error{Message: new("branch not found")})
+				expectResolveBranchStatus(m, "br-12345", http.StatusNotFound, &api.ClientError{Message: new("branch not found")})
 			},
 			wantErr: "branch 'br-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"branch", "get", "ci-4821"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranchStatus(m, "ci-4821", http.StatusBadRequest, &api.ClientError{Message: new("ref matches multiple branches")})
+			},
+			wantErr: "ref matches multiple branches\nRun 'tiger branch list' on the branch's service to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "API error",
 			args: []string{"branch", "get", "br-12345"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranchStatus(m, "br-12345", http.StatusForbidden, &api.Error{Message: new("forbidden")})
+				expectResolveBranchStatus(m, "br-12345", http.StatusForbidden, &api.ClientError{Message: new("forbidden")})
 			},
 			wantErr: "forbidden",
 			checks:  []checkFunc{checkExitCode(common.ExitPermissionDenied)},
@@ -65,7 +74,7 @@ func TestBranchGetCmd(t *testing.T) {
 			args: []string{"branch", "get", "br-12345"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranchStatus(m, "br-12345", http.StatusOK, nil)
+				expectResolveBranchStatus(m, "br-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -142,6 +151,13 @@ status: READY
   "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345/branches/br-12345"
 }
 `,
+		},
+		{
+			name:       "by name",
+			args:       []string{"branch", "get", "test-branch", "-o", "env"},
+			opts:       []runOption{withExperimental()},
+			mock:       func(m *mocks.MockClientWithResponsesInterface) { expectResolveBranch(m, "test-branch", sampleBranch()) },
+			wantStdout: sampleBranchEnv,
 		},
 		{
 			name:       "describe alias",

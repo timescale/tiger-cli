@@ -633,6 +633,99 @@ func (e ReadReplicaSetStatus) Valid() bool {
 	}
 }
 
+// Defines values for ResolveType.
+const (
+	ResolveTypeBRANCH         ResolveType = "BRANCH"
+	ResolveTypeREADREPLICASET ResolveType = "READ_REPLICA_SET"
+	ResolveTypeSERVICE        ResolveType = "SERVICE"
+)
+
+// Valid indicates whether the value is a known member of the ResolveType enum.
+func (e ResolveType) Valid() bool {
+	switch e {
+	case ResolveTypeBRANCH:
+		return true
+	case ResolveTypeREADREPLICASET:
+		return true
+	case ResolveTypeSERVICE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResolvedBranchType.
+const (
+	ResolvedBranchTypeBRANCH ResolvedBranchType = "BRANCH"
+)
+
+// Valid indicates whether the value is a known member of the ResolvedBranchType enum.
+func (e ResolvedBranchType) Valid() bool {
+	switch e {
+	case ResolvedBranchTypeBRANCH:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResolvedReadReplicaSetStatus.
+const (
+	ResolvedReadReplicaSetStatusActive   ResolvedReadReplicaSetStatus = "active"
+	ResolvedReadReplicaSetStatusCreating ResolvedReadReplicaSetStatus = "creating"
+	ResolvedReadReplicaSetStatusDeleting ResolvedReadReplicaSetStatus = "deleting"
+	ResolvedReadReplicaSetStatusError    ResolvedReadReplicaSetStatus = "error"
+	ResolvedReadReplicaSetStatusResizing ResolvedReadReplicaSetStatus = "resizing"
+)
+
+// Valid indicates whether the value is a known member of the ResolvedReadReplicaSetStatus enum.
+func (e ResolvedReadReplicaSetStatus) Valid() bool {
+	switch e {
+	case ResolvedReadReplicaSetStatusActive:
+		return true
+	case ResolvedReadReplicaSetStatusCreating:
+		return true
+	case ResolvedReadReplicaSetStatusDeleting:
+		return true
+	case ResolvedReadReplicaSetStatusError:
+		return true
+	case ResolvedReadReplicaSetStatusResizing:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResolvedReadReplicaSetType.
+const (
+	ResolvedReadReplicaSetTypeREADREPLICASET ResolvedReadReplicaSetType = "READ_REPLICA_SET"
+)
+
+// Valid indicates whether the value is a known member of the ResolvedReadReplicaSetType enum.
+func (e ResolvedReadReplicaSetType) Valid() bool {
+	switch e {
+	case ResolvedReadReplicaSetTypeREADREPLICASET:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResolvedServiceType.
+const (
+	ResolvedServiceTypeSERVICE ResolvedServiceType = "SERVICE"
+)
+
+// Valid indicates whether the value is a known member of the ResolvedServiceType enum.
+func (e ResolvedServiceType) Valid() bool {
+	switch e {
+	case ResolvedServiceTypeSERVICE:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ServiceCreateAddons.
 const (
 	ServiceCreateAddonsAi         ServiceCreateAddons = "ai"
@@ -1203,7 +1296,7 @@ type BackupRetentionByTimeType string
 // - `UNKNOWN`: a type this version of the API does not name.
 type BackupType string
 
-// Branch A branch, addressed independently of its parent service.
+// Branch A branch of a Fluid Service.
 type Branch struct {
 	// CPUMillis CPU allocation in milli-cores.
 	//
@@ -1223,6 +1316,16 @@ type Branch struct {
 	// Example: br4nch1d9x
 	ID string `json:"id"`
 
+	// InitialPassword The initial password for the branch.
+	//
+	// Example: a-very-secure-initial-password
+	InitialPassword *string `json:"initial_password,omitempty"`
+
+	// Iops Provisioned IOPS for the storage volume.
+	//
+	// Example: 3000
+	Iops *int `json:"iops,omitempty"`
+
 	// MemoryGbs Memory allocation in gigabytes.
 	//
 	// Example: 4
@@ -1238,21 +1341,26 @@ type Branch struct {
 	// Example: rp1pz7uyae
 	ProjectID string `json:"project_id"`
 
-	// ServiceID The ID of the parent service this branch was created from.
+	// ServiceID The service this branch was created from.
 	//
-	// Example: d1k5vk7hf2
+	// Example: 4rwj1h3fd0
 	ServiceID string `json:"service_id"`
 
 	// Status Current status of the branch.
 	Status DeployStatus `json:"status"`
 }
 
-// BranchCreate Parameters for creating a branch.
+// BranchCreate Parameters for creating a branch of the service identified by `service_id` in the path.
 type BranchCreate struct {
 	// CPUMillis The initial CPU allocation in milli-cores. Defaults to 500 if not provided.
 	//
 	// Example: 500
 	CPUMillis *int `json:"cpu_millis,omitempty"`
+
+	// Iops Requested provisioned IOPS for the branch's storage.
+	//
+	// Example: 4000
+	Iops *int `json:"iops,omitempty"`
 
 	// MemoryGbs The initial memory allocation in gigabytes. Defaults to 4 if not provided.
 	//
@@ -1263,11 +1371,6 @@ type BranchCreate struct {
 	//
 	// Example: my-production-db-pr-412
 	Name *string `json:"name,omitempty"`
-
-	// ServiceID The ID of the service to branch from.
-	//
-	// Example: d1k5vk7hf2
-	ServiceID string `json:"service_id"`
 }
 
 // BranchRename Parameters for renaming a branch.
@@ -1276,6 +1379,24 @@ type BranchRename struct {
 	//
 	// Example: my-production-db-pr-412
 	Name string `json:"name"`
+}
+
+// BranchResizeInput Parameters for resizing a branch.
+type BranchResizeInput struct {
+	// CPUMillis The new CPU allocation in milli-cores.
+	//
+	// Example: 1000
+	CPUMillis string `json:"cpu_millis"`
+
+	// Iops The new provisioned IOPS for the branch's storage.
+	//
+	// Example: 4000
+	Iops *int `json:"iops,omitempty"`
+
+	// MemoryGbs The new memory allocation in gigabytes.
+	//
+	// Example: 4
+	MemoryGbs string `json:"memory_gbs"`
 }
 
 // CloudWatchLogsConfig Where a CloudWatch logs exporter writes, and how it authenticates.
@@ -2440,6 +2561,11 @@ type ReadReplicaSet struct {
 	// Example: 2
 	Nodes int `json:"nodes"`
 
+	// ServiceID The ID of the parent service this read replica set was created from.
+	//
+	// Example: d1k5vk7hf2
+	ServiceID string `json:"service_id"`
+
 	// Status The current status of the read replica set:
 	// - creating: the replica set is being provisioned
 	// - active: the replica set is provisioned and serving traffic
@@ -2505,6 +2631,244 @@ type ResizeInput struct {
 	// Example: 4
 	MemoryGbs string `json:"memory_gbs"`
 }
+
+// ResolveResult A service, branch, or read replica set resolved by ref. `type` determines which.
+type ResolveResult struct {
+	union json.RawMessage
+}
+
+// ResolveType What kind of resource a resolved ref is, or should be restricted to.
+type ResolveType string
+
+// ResolvedBranch A Branch resolved by ref.
+type ResolvedBranch struct {
+	// CPUMillis CPU allocation in milli-cores.
+	//
+	// Example: 500
+	CPUMillis int `json:"cpu_millis"`
+
+	// Created Creation timestamp.
+	//
+	// Example: 2026-09-01T09:30:00Z
+	Created time.Time `json:"created"`
+
+	// Endpoint A network endpoint for connecting to a service.
+	Endpoint *Endpoint `json:"endpoint,omitempty"`
+
+	// ID The unique identifier for the branch.
+	//
+	// Example: br4nch1d9x
+	ID string `json:"id"`
+
+	// InitialPassword The initial password for the branch.
+	//
+	// Example: a-very-secure-initial-password
+	InitialPassword *string `json:"initial_password,omitempty"`
+
+	// Iops Provisioned IOPS for the storage volume.
+	//
+	// Example: 3000
+	Iops *int `json:"iops,omitempty"`
+
+	// MemoryGbs Memory allocation in gigabytes.
+	//
+	// Example: 4
+	MemoryGbs int `json:"memory_gbs"`
+
+	// Name The name of the branch.
+	//
+	// Example: my-production-db-pr-412
+	Name string `json:"name"`
+
+	// ProjectID The project this branch belongs to.
+	//
+	// Example: rp1pz7uyae
+	ProjectID string `json:"project_id"`
+
+	// ServiceID The service this branch was created from.
+	//
+	// Example: 4rwj1h3fd0
+	ServiceID string `json:"service_id"`
+
+	// Status Current status of the branch.
+	Status DeployStatus `json:"status"`
+
+	// Type Always "BRANCH" for a resolved Branch.
+	Type ResolvedBranchType `json:"type"`
+}
+
+// ResolvedBranchType Always "BRANCH" for a resolved Branch.
+type ResolvedBranchType string
+
+// ResolvedReadReplicaSet A ReadReplicaSet resolved by ref.
+type ResolvedReadReplicaSet struct {
+	// ConnectionPooler Connection pooler configuration for a service.
+	ConnectionPooler *ConnectionPooler `json:"connection_pooler,omitempty"`
+
+	// CPUMillis CPU allocation in milli-cores.
+	//
+	// Example: 250
+	CPUMillis int `json:"cpu_millis"`
+
+	// Endpoint A network endpoint for connecting to a service.
+	Endpoint *Endpoint `json:"endpoint,omitempty"`
+
+	// ID The unique identifier for the read replica set.
+	//
+	// Example: alb8jicdpr
+	ID string `json:"id"`
+
+	// MemoryGbs Memory allocation in gigabytes.
+	//
+	// Example: 1
+	MemoryGbs int `json:"memory_gbs"`
+
+	// Metadata Additional metadata for the read replica set.
+	Metadata *ReplicaSetMetadata `json:"metadata,omitempty"`
+
+	// Name The name of the read replica set.
+	//
+	// Example: reporting-replica-1
+	Name string `json:"name"`
+
+	// Nodes Number of nodes in the replica set.
+	//
+	// Example: 2
+	Nodes int `json:"nodes"`
+
+	// ServiceID The ID of the parent service this read replica set was created from.
+	//
+	// Example: d1k5vk7hf2
+	ServiceID string `json:"service_id"`
+
+	// Status The current status of the read replica set:
+	// - creating: the replica set is being provisioned
+	// - active: the replica set is provisioned and serving traffic
+	// - resizing: the replica set is being resized
+	// - deleting: the replica set is being deleted
+	// - error: the replica set is in an error state
+	//
+	//
+	// Example: active
+	Status ResolvedReadReplicaSetStatus `json:"status"`
+
+	// Type Always "READ_REPLICA_SET" for a resolved ReadReplicaSet.
+	Type ResolvedReadReplicaSetType `json:"type"`
+}
+
+// ResolvedReadReplicaSetStatus The current status of the read replica set:
+// - creating: the replica set is being provisioned
+// - active: the replica set is provisioned and serving traffic
+// - resizing: the replica set is being resized
+// - deleting: the replica set is being deleted
+// - error: the replica set is in an error state
+//
+// Example: active
+type ResolvedReadReplicaSetStatus string
+
+// ResolvedReadReplicaSetType Always "READ_REPLICA_SET" for a resolved ReadReplicaSet.
+type ResolvedReadReplicaSetType string
+
+// ResolvedService A Service resolved by ref.
+type ResolvedService struct {
+	// ConnectionPooler Connection pooler configuration for a service.
+	ConnectionPooler *ConnectionPooler `json:"connection_pooler,omitempty"`
+
+	// Created Creation timestamp.
+	//
+	// Example: 2025-01-15T09:30:00Z
+	Created time.Time `json:"created"`
+
+	// DataTiering Data tiering configuration for a service.
+	DataTiering *DataTiering `json:"data_tiering,omitempty"`
+
+	// Endpoint A network endpoint for connecting to a service.
+	Endpoint *Endpoint `json:"endpoint,omitempty"`
+
+	// ForkedFrom The service this service was forked from.
+	ForkedFrom *ForkSpec `json:"forked_from,omitempty"`
+
+	// HaReplicas High-availability replica configuration for a service.
+	HaReplicas *HAReplica `json:"ha_replicas,omitempty"`
+
+	// InitialPassword The initial password for the service.
+	//
+	// Example: a-very-secure-initial-password
+	InitialPassword *string `json:"initial_password,omitempty"`
+
+	// LogExporterID The exporter this service sends its logs to. Absent when the
+	// service is not attached to a log exporter. Change it with the
+	// attach and detach operations.
+	//
+	// A newly attached log exporter only starts carrying logs once the
+	// service has restarted.
+	//
+	//
+	// Example: 9b2e4d61-7a30-4c58-8f0d-6e1a3c9b4d27
+	LogExporterID *openapi_types.UUID `json:"log_exporter_id,omitempty"`
+
+	// Metadata Additional metadata for the service.
+	Metadata *ServiceMetadata `json:"metadata,omitempty"`
+
+	// MetricExporterID The exporter this service sends its metrics to. Absent when the
+	// service is not attached to a metric exporter. Change it with the
+	// attach and detach operations.
+	//
+	//
+	// Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
+	MetricExporterID *openapi_types.UUID `json:"metric_exporter_id,omitempty"`
+
+	// Metrics Resource usage metrics for the service.
+	Metrics *ServiceMetrics `json:"metrics,omitempty"`
+
+	// Name The name of the service.
+	//
+	// Example: my-production-db
+	Name string `json:"name"`
+
+	// Platform The storage platform the service runs on.
+	Platform *ServicePlatform `json:"platform,omitempty"`
+
+	// ProjectID The project this service belongs to.
+	//
+	// Example: rp1pz7uyae
+	ProjectID string `json:"project_id"`
+
+	// ReadReplicaSets The read replica sets attached to the service.
+	ReadReplicaSets *[]ReadReplicaSet `json:"read_replica_sets,omitempty"`
+
+	// RegionCode The cloud region where the service is hosted.
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Resources List of resources allocated to the service.
+	Resources []Resource `json:"resources"`
+
+	// ServiceID The unique identifier for the service.
+	//
+	// Example: kd9w2xp4mz
+	ServiceID string `json:"service_id"`
+
+	// ServiceType The type of the service.
+	ServiceType ServiceType `json:"service_type"`
+
+	// Status Current status of the service.
+	Status DeployStatus `json:"status"`
+
+	// Type Always "SERVICE" for a resolved Service.
+	Type ResolvedServiceType `json:"type"`
+
+	// VpcEndpointDeprecated Deprecated. Use `vpc_endpoint` instead.
+	// Deprecated: Use `vpc_endpoint` instead.
+	VpcEndpointDeprecated *VPCEndpoint `json:"vpcEndpoint,omitempty"`
+
+	// VpcEndpoint VPC endpoint configuration if available.
+	VpcEndpoint *VPCEndpoint `json:"vpc_endpoint,omitempty"`
+}
+
+// ResolvedServiceType Always "SERVICE" for a resolved Service.
+type ResolvedServiceType string
 
 // Resource A resource allocated to the service.
 type Resource struct {
@@ -3007,13 +3371,14 @@ type SubmitFeedbackJSONBody struct {
 // SubmitFeedbackJSONBodySource defines parameters for SubmitFeedback.
 type SubmitFeedbackJSONBodySource string
 
-// GetBranchesParams defines parameters for GetBranches.
-type GetBranchesParams struct {
-	// Ref Returns only the branch this reference matches: one whose ID
-	// equals it, or whose name equals it, exactly and case-sensitively,
-	// with no precedence between the two. A reference matching nothing,
-	// or matching a service that isn't a branch, returns an empty list.
-	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
+// ResolveRefParams defines parameters for ResolveRef.
+type ResolveRefParams struct {
+	// Ref The ID or name to resolve, exactly and case-sensitively. A ref
+	// matching more than one resource is an error.
+	Ref string `form:"ref" json:"ref"`
+
+	// Type Only match resources of this kind.
+	Type *ResolveType `form:"type,omitempty" json:"type,omitempty"`
 }
 
 // GetServicesParams defines parameters for GetServices.
@@ -3025,6 +3390,15 @@ type GetServicesParams struct {
 	// are returned at the top level. A reference matching nothing returns
 	// an empty list; one matching more than one service is refused rather
 	// than resolved.
+	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
+}
+
+// GetBranchesParams defines parameters for GetBranches.
+type GetBranchesParams struct {
+	// Ref Returns only the branch this reference matches: one whose ID
+	// equals it, or whose name equals it, exactly and case-sensitively,
+	// with no precedence between the two. A reference matching nothing
+	// returns an empty list.
 	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
 }
 
@@ -3070,18 +3444,6 @@ type CreateAllowListJSONRequestBody = AllowListCreate
 // UpdateAllowListJSONRequestBody defines body for UpdateAllowList for application/json ContentType.
 type UpdateAllowListJSONRequestBody = AllowListUpdate
 
-// CreateBranchJSONRequestBody defines body for CreateBranch for application/json ContentType.
-type CreateBranchJSONRequestBody = BranchCreate
-
-// RenameBranchJSONRequestBody defines body for RenameBranch for application/json ContentType.
-type RenameBranchJSONRequestBody = BranchRename
-
-// ResizeBranchJSONRequestBody defines body for ResizeBranch for application/json ContentType.
-type ResizeBranchJSONRequestBody = ResizeInput
-
-// UpdateBranchPasswordJSONRequestBody defines body for UpdateBranchPassword for application/json ContentType.
-type UpdateBranchPasswordJSONRequestBody = UpdatePasswordInput
-
 // CreateExporterJSONRequestBody defines body for CreateExporter for application/json ContentType.
 type CreateExporterJSONRequestBody = ExporterCreate
 
@@ -3105,6 +3467,18 @@ type CreateBackupRegionJSONRequestBody = BackupRegionCreate
 
 // SetBackupRetentionJSONRequestBody defines body for SetBackupRetention for application/json ContentType.
 type SetBackupRetentionJSONRequestBody = BackupRetentionByTime
+
+// CreateBranchJSONRequestBody defines body for CreateBranch for application/json ContentType.
+type CreateBranchJSONRequestBody = BranchCreate
+
+// RenameBranchJSONRequestBody defines body for RenameBranch for application/json ContentType.
+type RenameBranchJSONRequestBody = BranchRename
+
+// ResizeBranchJSONRequestBody defines body for ResizeBranch for application/json ContentType.
+type ResizeBranchJSONRequestBody = BranchResizeInput
+
+// UpdateBranchPasswordJSONRequestBody defines body for UpdateBranchPassword for application/json ContentType.
+type UpdateBranchPasswordJSONRequestBody = UpdatePasswordInput
 
 // DetachServiceFromAllowListJSONRequestBody defines body for DetachServiceFromAllowList for application/json ContentType.
 type DetachServiceFromAllowListJSONRequestBody = ServiceAllowListInput
@@ -3979,6 +4353,143 @@ func (t ExporterUpdate) MarshalJSON() ([]byte, error) {
 }
 
 func (t *ExporterUpdate) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsResolvedService returns the union data inside the ResolveResult as a ResolvedService
+func (t ResolveResult) AsResolvedService() (ResolvedService, error) {
+	var body ResolvedService
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromResolvedService overwrites any union data inside the ResolveResult as the provided ResolvedService
+func (t *ResolveResult) FromResolvedService(v ResolvedService) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"SERVICE"}`))
+	t.union = b
+	return err
+}
+
+// MergeResolvedService performs a merge with any union data inside the ResolveResult, using the provided ResolvedService
+func (t *ResolveResult) MergeResolvedService(v ResolvedService) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"SERVICE"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsResolvedBranch returns the union data inside the ResolveResult as a ResolvedBranch
+func (t ResolveResult) AsResolvedBranch() (ResolvedBranch, error) {
+	var body ResolvedBranch
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromResolvedBranch overwrites any union data inside the ResolveResult as the provided ResolvedBranch
+func (t *ResolveResult) FromResolvedBranch(v ResolvedBranch) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"BRANCH"}`))
+	t.union = b
+	return err
+}
+
+// MergeResolvedBranch performs a merge with any union data inside the ResolveResult, using the provided ResolvedBranch
+func (t *ResolveResult) MergeResolvedBranch(v ResolvedBranch) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"BRANCH"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsResolvedReadReplicaSet returns the union data inside the ResolveResult as a ResolvedReadReplicaSet
+func (t ResolveResult) AsResolvedReadReplicaSet() (ResolvedReadReplicaSet, error) {
+	var body ResolvedReadReplicaSet
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromResolvedReadReplicaSet overwrites any union data inside the ResolveResult as the provided ResolvedReadReplicaSet
+func (t *ResolveResult) FromResolvedReadReplicaSet(v ResolvedReadReplicaSet) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"READ_REPLICA_SET"}`))
+	t.union = b
+	return err
+}
+
+// MergeResolvedReadReplicaSet performs a merge with any union data inside the ResolveResult, using the provided ResolvedReadReplicaSet
+func (t *ResolveResult) MergeResolvedReadReplicaSet(v ResolvedReadReplicaSet) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"READ_REPLICA_SET"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ResolveResult) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t ResolveResult) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "BRANCH":
+		return t.AsResolvedBranch()
+	case "READ_REPLICA_SET":
+		return t.AsResolvedReadReplicaSet()
+	case "SERVICE":
+		return t.AsResolvedService()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t ResolveResult) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ResolveResult) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

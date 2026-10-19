@@ -7,7 +7,6 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -60,7 +59,7 @@ func (s *Server) handleBranchGet(ctx context.Context, req *mcp.CallToolRequest, 
 		slog.String("project_id", projectID),
 		slog.String("branch_id", input.BranchID))
 
-	branch, err := common.GetBranch(ctx, client, projectID, input.BranchID)
+	branch, err := resolveBranchByID(ctx, client, projectID, input.BranchID)
 	if err != nil {
 		return nil, BranchGetOutput{}, err
 	}

@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -611,15 +612,69 @@ func httpResponse(statusCode int) *http.Response {
 	return &http.Response{StatusCode: statusCode}
 }
 
-// expectResolveRef registers the resolve call a command makes for its service
-// ref — the ref filter on the service list — answered with svc as the one
-// match.
-func expectResolveRef(m *mocks.MockClientWithResponsesInterface, ref string, svc api.Service) {
-	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
-		Return(&api.GetServicesResponse{
+// serviceType is the resolve type every `tiger service` command restricts its
+// lookup to.
+var serviceType = new(api.ResolveTypeSERVICE)
+
+// expectResolve registers resolving ref through the resolve endpoint,
+// restricted to resolveType (nil for none), answered with v: an api.Service,
+// api.Branch, or api.ReadReplicaSet, whose Go type picks the discriminator.
+func expectResolve(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, v any) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(&api.ResolveRefResponse{
 			HTTPResponse: httpResponse(http.StatusOK),
-			JSON200:      &[]api.Service{svc},
+			JSON200:      resolveResult(v),
 		}, nil)
+}
+
+// expectResolveStatus registers a resolve answered with status. A nil apiErr
+// stands in for a response with no body.
+func expectResolveStatus(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, status int, apiErr *api.ClientError) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(&api.ResolveRefResponse{
+			HTTPResponse: httpResponse(status),
+			JSON4XX:      apiErr,
+		}, nil)
+}
+
+// expectResolveError registers a resolve that never reaches the API.
+func expectResolveError(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, err error) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(nil, err)
+}
+
+// resolveResult encodes v as the resolve endpoint's union, discriminated by
+// v's Go type. Each member is its plain type plus the discriminator.
+func resolveResult(v any) *api.ResolveResult {
+	var resolveType api.ResolveType
+	switch v.(type) {
+	case api.Service:
+		resolveType = api.ResolveTypeSERVICE
+	case api.Branch:
+		resolveType = api.ResolveTypeBRANCH
+	case api.ReadReplicaSet:
+		resolveType = api.ResolveTypeREADREPLICASET
+	default:
+		panic(fmt.Sprintf("resolveResult: unsupported type %T", v))
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(util.Must(json.Marshal(v)), &body); err != nil {
+		panic(err)
+	}
+	body["type"] = resolveType
+
+	var result api.ResolveResult
+	if err := result.UnmarshalJSON(util.Must(json.Marshal(body))); err != nil {
+		panic(err)
+	}
+	return &result
+}
+
+// expectResolveRef registers the resolve call a `tiger service` command makes
+// for its service ref, answered with svc as the match.
+func expectResolveRef(m *mocks.MockClientWithResponsesInterface, ref string, svc api.Service) {
+	expectResolve(m, ref, serviceType, svc)
 }
 
 // expectResolveRefID registers the resolution of an ID onto itself: a bare
@@ -628,30 +683,22 @@ func expectResolveRefID(m *mocks.MockClientWithResponsesInterface, ref string) {
 	expectResolveRef(m, ref, api.Service{ServiceID: ref})
 }
 
-// expectResolveRefNotFound registers a ref that matches no service, which the
-// ref filter answers with an empty list rather than a 404.
+// expectResolveRefNotFound registers a service ref that matches nothing,
+// which the resolve endpoint answers with a 404.
 func expectResolveRefNotFound(m *mocks.MockClientWithResponsesInterface, ref string) {
-	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
-		Return(&api.GetServicesResponse{
-			HTTPResponse: httpResponse(http.StatusOK),
-			JSON200:      &[]api.Service{},
-		}, nil)
+	expectResolveStatus(m, ref, serviceType, http.StatusNotFound, &api.ClientError{Message: new("resource not found")})
 }
 
-// expectResolveRefError registers a ref resolution that never reaches the API.
+// expectResolveRefError registers a service ref resolution that never reaches
+// the API.
 func expectResolveRefError(m *mocks.MockClientWithResponsesInterface, ref string, err error) {
-	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
-		Return(nil, err)
+	expectResolveError(m, ref, serviceType, err)
 }
 
-// expectResolveRefStatus registers a ref resolution answered with status. A nil
-// apiErr stands in for a 200 with no body.
-func expectResolveRefStatus(m *mocks.MockClientWithResponsesInterface, ref string, status int, apiErr *api.Error) {
-	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
-		Return(&api.GetServicesResponse{
-			HTTPResponse: httpResponse(status),
-			JSON4XX:      apiErr,
-		}, nil)
+// expectResolveRefStatus registers a service ref resolution answered with
+// status. A nil apiErr stands in for a response with no body.
+func expectResolveRefStatus(m *mocks.MockClientWithResponsesInterface, ref string, status int, apiErr *api.ClientError) {
+	expectResolveStatus(m, ref, serviceType, status, apiErr)
 }
 
 // sampleService returns an api.Service with reasonable defaults. It carries a

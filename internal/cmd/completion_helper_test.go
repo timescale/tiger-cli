@@ -286,34 +286,6 @@ func TestCompletion(t *testing.T) {
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
-			name: "branch argument lists branch IDs with their names",
-			args: []string{"__complete", "branch", "get", "br-6"},
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				branches := []api.Branch{
-					sampleBranch(),
-					sampleBranch(func(b *api.Branch) {
-						b.ID = "br-67890"
-						b.Name = "other-branch"
-					}),
-				}
-				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, nil).
-					Return(&api.GetBranchesResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      &branches,
-					}, nil)
-			},
-			wantStdout: "br-67890\tother-branch\n" + noFileComp,
-			wantStderr: directive,
-		},
-		{
-			name:       "branch argument offers nothing past the first",
-			args:       []string{"__complete", "branch", "get", "br-12345", ""},
-			opts:       []runOption{withExperimental()},
-			wantStdout: noFileComp,
-			wantStderr: directive,
-		},
-		{
 			name:       "--password-storage flag values",
 			args:       []string{"__complete", "service", "get", "--password-storage", ""},
 			wantStdout: "keyring\npgpass\nnone\n" + noFileComp,

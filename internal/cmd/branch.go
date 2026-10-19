@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
@@ -18,7 +17,7 @@ import (
 )
 
 // errBranchRequired is returned when no argument identifies a branch.
-var errBranchRequired = errors.New("branch ID is required")
+var errBranchRequired = errors.New("branch name or ID is required")
 
 // buildBranchCmd creates the branch command with all subcommands. Branches are
 // backed by gateway endpoints marked `x-tigerdata-preview: true`, so the whole
@@ -57,45 +56,35 @@ type OutputBranch struct {
 	ConsoleURL       string `json:"console_url,omitempty"`
 }
 
-// getBranchID returns the branch ID given as an argument. There is no default
-// branch: the service_id default only ever holds a service ID.
-//
-// TODO: accept branch names once there's a way to resolve them to IDs.
-func getBranchID(args []string) (string, error) {
+// getBranchRef returns the branch ref, an ID or a name, given as an argument.
+// There is no default branch: the service_id default only ever holds a
+// service ID.
+func getBranchRef(args []string) (string, error) {
 	if len(args) == 0 || args[0] == "" {
 		return "", errBranchRequired
 	}
 	return args[0], nil
 }
 
-// resolveBranch looks up the branch an ID names. It is the single place a
-// branch argument turns into a branch, so name resolution can be added here
-// without touching the commands.
-func resolveBranch(ctx context.Context, client api.ClientWithResponsesInterface, projectID, branchID string) (*api.Branch, error) {
-	resp, err := client.GetBranchWithResponse(ctx, projectID, branchID)
+// resolveBranch resolves a branch ref to the branch it names, through the
+// API's resolve endpoint restricted to branches. The branch carries its
+// parent's ID, which every other branch endpoint needs.
+func resolveBranch(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string) (*api.Branch, error) {
+	branch, err := common.ResolveBranch(ctx, client, projectID, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve branch '%s': %w", branchID, err)
+		return nil, withAmbiguousRefHint(err, "Run 'tiger branch list' on the branch's service to find the ID you want")
 	}
-	if resp.StatusCode() == http.StatusNotFound {
-		return nil, common.ExitWithCode(common.ExitServiceNotFound, fmt.Errorf("branch '%s' not found", branchID))
-	}
-	if resp.StatusCode() != http.StatusOK {
-		return nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON200 == nil {
-		return nil, errors.New("empty response from API")
-	}
-	return resp.JSON200, nil
+	return branch, nil
 }
 
 // resolveBranchForWrite is resolveBranch for a command that changes the branch
 // it resolves. A branch always counts as DEV (see common.BranchEnvironmentTag),
 // so the gate needs nothing off the branch and runs before the lookup.
-func resolveBranchForWrite(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface, projectID, branchID string) (*api.Branch, error) {
+func resolveBranchForWrite(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface, projectID, ref string) (*api.Branch, error) {
 	if err := common.CheckReadOnly(cfg, common.BranchEnvironmentTag); err != nil {
 		return nil, err
 	}
-	return resolveBranch(ctx, client, projectID, branchID)
+	return resolveBranch(ctx, client, projectID, ref)
 }
 
 // branchLabel identifies a branch in status output by name and ID together.
@@ -121,8 +110,7 @@ func outputBranch(cmd *cobra.Command, cfg *config.Config, branch api.Branch, for
 }
 
 // outputBranchEnv outputs branch connection details in environment variable
-// format. Branch commands never output a password (the platform doesn't store
-// one to return), so PGPASSWORD is never set.
+// format. Branch commands never output a password, so PGPASSWORD is never set.
 func outputBranchEnv(cmd *cobra.Command, branch OutputBranch) error {
 	cmd.Printf("PGHOST=%s\n", branch.Host)
 	cmd.Printf("PGPORT=%d\n", branch.Port)
@@ -142,6 +130,9 @@ func outputBranchTable(branch OutputBranch, output io.Writer) error {
 	table.Append("Status", string(branch.Status))
 	table.Append("CPU", fmt.Sprintf("%s cores (%dm)", common.FormatCPUCores(branch.CPUMillis), branch.CPUMillis))
 	table.Append("Memory", fmt.Sprintf("%d GB", branch.MemoryGbs))
+	if branch.Iops != nil {
+		table.Append("IOPS", fmt.Sprintf("%d", *branch.Iops))
+	}
 	if branch.Endpoint != nil && branch.Endpoint.Host != nil {
 		port := "5432"
 		if branch.Endpoint.Port != nil {
@@ -164,6 +155,7 @@ func outputBranchTable(branch OutputBranch, output io.Writer) error {
 // in which case the connection-details warning is dropped rather than printed.
 func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.Branch) OutputBranch {
 	outputBr := OutputBranch{Branch: branch}
+	outputBr.Branch.InitialPassword = nil
 
 	// A branch that's still provisioning may have no endpoint yet, which
 	// isn't worth a warning.

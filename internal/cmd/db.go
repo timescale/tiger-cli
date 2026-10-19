@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
 
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
@@ -33,19 +35,45 @@ func buildDbCmd(app *common.App) *cobra.Command {
 // which otherwise arrives as a bare pgx error saying nothing about the password
 // it was rejected for. Every other error passes through unchanged.
 func handleDatabaseError(err error, target *common.ConnectionTarget) error {
+	// A branch is managed through `tiger branch`, everything else through
+	// `tiger service`.
+	group := "service"
+	if target.IsBranch {
+		group = "branch"
+	}
+
 	switch {
 	case errors.Is(err, common.ErrPaused):
-		return fmt.Errorf("%w — start it with 'tiger service start %s'", common.ErrPaused, target.ConnectionService.ServiceID)
+		return fmt.Errorf("%w — start it with 'tiger %s start %s'", common.ErrPaused, group, target.ConnectionService.ServiceID)
 	case errors.Is(err, common.ErrNotReady):
-		return fmt.Errorf("%w — check its status with 'tiger service get %s' and try again", common.ErrNotReady, target.ConnectionService.ServiceID)
+		return fmt.Errorf("%w — check its status with 'tiger %s get %s' and try again", common.ErrNotReady, group, target.ConnectionService.ServiceID)
 	case isPostgresAuthenticationError(err):
 		// A read replica shares its primary's credentials, so the password
 		// belongs to the credential service rather than the one connected to.
 		serviceID := target.CredentialService.ServiceID
-		return fmt.Errorf("%w\n\nThe stored password is missing or invalid. Save the current one with 'tiger db save-password %s', or reset it with 'tiger service update-password %s'",
-			err, serviceID, serviceID)
+		return fmt.Errorf("%w\n\nThe stored password is missing or invalid. Save the current one with 'tiger db save-password %s', or reset it with 'tiger %s update-password %s'",
+			err, serviceID, group, serviceID)
 	}
 	return err
+}
+
+// resolveConnectionTarget resolves the ref a db command was given to what it
+// connects to: a service, a read replica set, or (behind the experimental
+// gate) a branch, by ID or name.
+func resolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, ref serviceRef, experimental bool) (*common.ConnectionTarget, error) {
+	hint := "Run 'tiger service list' to find the ID you want"
+	if experimental {
+		hint = "Run 'tiger service list' or 'tiger branch list' to find the ID you want"
+	}
+
+	target, err := common.ResolveConnectionTarget(ctx, client, projectID, ref.ref, experimental)
+	if err != nil {
+		return nil, withAmbiguousRefHint(err, hint)
+	}
+	if err := checkDefaultIsID(target.ConnectionService.ServiceID, ref); err != nil {
+		return nil, err
+	}
+	return target, nil
 }
 
 // isPostgresAuthenticationError checks if the error is a PostgreSQL authentication failure

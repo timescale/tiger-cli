@@ -102,3 +102,27 @@ func printPasswordStorageResult(cmd *cobra.Command, result common.PasswordStorag
 	}
 	return false
 }
+
+// handlePasswordSaving handles saving password using the configured storage
+// method and displaying appropriate messages. Returns true if the password was
+// successfully saved, or false if not.
+func handlePasswordSaving(cmd *cobra.Command, cfg *config.Config, service api.Service, initialPassword string) bool {
+	// Note: We don't fail the service creation if password saving fails
+	// The error is handled by displaying the appropriate message below
+	result, _ := common.SavePasswordWithResult(cfg, service, initialPassword, "tsdbadmin")
+	return printPasswordStorageResult(cmd, result)
+}
+
+// printConnectMessage tells the user how to connect to a new service or branch.
+func printConnectMessage(cmd *cobra.Command, passwordSaved, noSetDefault bool, serviceID string) {
+	if !passwordSaved {
+		// We can't connect if no password was saved, so don't show message
+		return
+	} else if noSetDefault {
+		// If the service wasn't set as the default, include the serviceID in the command
+		cmd.PrintErrf("Connect with: tiger db psql %s\n", serviceID)
+	} else {
+		// If the service was set as the default, no need to include the serviceID in the command
+		cmd.PrintErrf("Connect with: tiger db psql\n")
+	}
+}

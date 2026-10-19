@@ -29,8 +29,8 @@ func withGenerateSecurePassword(password string) runOption {
 func TestBranchUpdatePasswordCmd(t *testing.T) {
 	setupUpdate := func(password string) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectGetBranch(m, sampleBranch())
-			m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "br-12345", api.UpdatePasswordInput{Password: password}).
+			expectResolveBranch(m, "br-12345", sampleBranch())
+			m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", api.UpdatePasswordInput{Password: password}).
 				Return(&api.UpdateBranchPasswordResponse{HTTPResponse: httpResponse(http.StatusNoContent)}, nil)
 		}
 	}
@@ -55,7 +55,7 @@ func TestBranchUpdatePasswordCmd(t *testing.T) {
 			name:    "missing branch id",
 			args:    []string{"branch", "update-password", "--new-password", "secret"},
 			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
-			wantErr: "branch ID is required",
+			wantErr: "branch name or ID is required",
 		},
 		{
 			name:    "read-only all refuses",
@@ -74,7 +74,7 @@ func TestBranchUpdatePasswordCmd(t *testing.T) {
 			name:    "non-TTY without password",
 			args:    []string{"branch", "update-password", "br-12345"},
 			opts:    []runOption{withExperimental()},
-			mock:    func(m *mocks.MockClientWithResponsesInterface) { expectGetBranch(m, sampleBranch()) },
+			mock:    func(m *mocks.MockClientWithResponsesInterface) { expectResolveBranch(m, "br-12345", sampleBranch()) },
 			wantErr: "TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable",
 		},
 		{
@@ -82,8 +82,8 @@ func TestBranchUpdatePasswordCmd(t *testing.T) {
 			args: []string{"branch", "update-password", "br-12345", "--new-password", "secret"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "br-12345", api.UpdatePasswordInput{Password: "secret"}).
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", api.UpdatePasswordInput{Password: "secret"}).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to update password: connection refused",
@@ -93,11 +93,11 @@ func TestBranchUpdatePasswordCmd(t *testing.T) {
 			args: []string{"branch", "update-password", "br-12345", "--new-password", "secret"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetBranch(m, sampleBranch())
-				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "br-12345", api.UpdatePasswordInput{Password: "secret"}).
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", api.UpdatePasswordInput{Password: "secret"}).
 					Return(&api.UpdateBranchPasswordResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
-						JSON4XX:      &api.Error{Message: new("password too short")},
+						JSON4XX:      &api.ClientError{Message: new("password too short")},
 					}, nil)
 			},
 			wantErr: "password too short",

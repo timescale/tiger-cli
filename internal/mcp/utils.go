@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -241,8 +242,19 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	return detail
 }
 
+// branchIDHelp is the sentence a db tool's service_id description gains for
+// branches, saying what passing a branch ID does. Branches are a preview, so
+// it is empty without the experimental gate.
+func branchIDHelp(experimental bool, does string) string {
+	if !experimental {
+		return ""
+	}
+	return " A branch ID is also accepted — passing one " + does + " instead. Use branch_list to find branch IDs."
+}
+
 // setBranchIDSchemaProperties sets common branch_id schema properties. Like
-// service_id, branch_id is IDs-only (see setServiceIDSchemaProperties).
+// service_id, branch_id is IDs-only (see setServiceIDSchemaProperties), which
+// resolveBranchByID enforces.
 //
 // TODO: confirm the branch ID format with the API. The pattern assumes branch
 // IDs look like service IDs, which branches are on the platform side.
@@ -259,6 +271,21 @@ func setBranchCPUMemorySchemaProperties(schema *jsonschema.Schema, description s
 	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.BranchCPUMemoryConfigs().Strings())
 }
 
+// resolveBranchByID looks up the branch with the given ID, through the API's
+// resolve endpoint, which also matches names. A match by name is reported as
+// not found, keeping the tools IDs-only. The branch carries its parent's ID,
+// which every other branch endpoint needs.
+func resolveBranchByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*api.Branch, error) {
+	branch, err := common.ResolveBranch(ctx, client, projectID, id)
+	if err != nil {
+		return nil, err
+	}
+	if branch.ID != id {
+		return nil, common.ExitWithCode(common.ExitServiceNotFound, fmt.Errorf("branch '%s' not found", id))
+	}
+	return branch, nil
+}
+
 // BranchDetail represents detailed branch information
 type BranchDetail struct {
 	BranchID         string        `json:"id"`
@@ -267,6 +294,7 @@ type BranchDetail struct {
 	Status           string        `json:"status"`
 	Created          string        `json:"created,omitempty"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
+	IOPS             *int          `json:"iops,omitempty"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
 	ConnectionString string        `json:"connection_string,omitempty"`
 }
@@ -283,8 +311,10 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 
 	setResourceInfoSchemaProperties(schema.Properties["resources"])
 
+	schema.Properties["iops"].Description = "Provisioned IOPS for the branch's storage"
+
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint (absent while the branch is still provisioning)"
-	schema.Properties["connection_string"].Description = "PostgreSQL connection string, without a password. The branch has the same users and passwords as its parent service had when the branch was created."
+	schema.Properties["connection_string"].Description = "PostgreSQL connection string, without a password"
 
 	return schema
 }
@@ -301,6 +331,7 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch) Br
 			CPU:    common.FormatCPUCores(branch.CPUMillis) + " cores",
 			Memory: fmt.Sprintf("%d GB", branch.MemoryGbs),
 		},
+		IOPS: branch.Iops,
 	}
 
 	// A branch that's still provisioning may have no endpoint yet.

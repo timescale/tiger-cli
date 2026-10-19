@@ -58,12 +58,7 @@ large and may embed implementation details.`,
 				return err
 			}
 
-			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
-			if err != nil {
-				return err
-			}
-
-			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *service)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
 			if err != nil {
 				return err
 			}

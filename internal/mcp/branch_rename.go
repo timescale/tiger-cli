@@ -82,11 +82,16 @@ func (s *Server) handleBranchRename(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchRenameOutput{}, errors.New("new name cannot be empty")
 	}
 
+	resolved, err := resolveBranchByID(ctx, client, projectID, input.BranchID)
+	if err != nil {
+		return nil, BranchRenameOutput{}, err
+	}
+
 	s.logger.Info("MCP: Renaming branch",
 		slog.String("project_id", projectID),
 		slog.String("branch_id", input.BranchID))
 
-	resp, err := client.RenameBranchWithResponse(ctx, projectID, input.BranchID, api.BranchRename{Name: name})
+	resp, err := client.RenameBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID, api.BranchRename{Name: name})
 	if err != nil {
 		return nil, BranchRenameOutput{}, fmt.Errorf("failed to rename branch: %w", err)
 	}

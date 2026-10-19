@@ -52,7 +52,7 @@ func (BranchCreateOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[BranchCreateOutput](nil))
 	schema.Properties["branch"] = BranchDetail{}.Schema()
 	schema.Properties["message"].Description = "Human-readable outcome of the operation"
-	schema.Properties["password_storage"].Description = "Whether the parent service's saved password was copied for the branch, and where"
+	schema.Properties["password_storage"].Description = "Where the branch's new tsdbadmin password was saved locally, and whether saving it succeeded"
 	return schema
 }
 
@@ -62,7 +62,7 @@ func newBranchCreateTool() *mcp.Tool {
 		Title: "Create Branch",
 		Description: `Create a branch of a Fluid Service.
 
-A branch is a lightweight, ephemeral copy of a service for development, testing, CI/CD, and agent workflows. It shares the parent's storage as of the moment it is created and gets its own compute. It has the same users and passwords as the parent service, and the parent's saved password is copied for the branch. Branches are always treated as DEV, so under read-only mode for production services a PROD service can still be branched.
+A branch is a lightweight, ephemeral copy of a service for development, testing, CI/CD, and agent workflows. It shares the parent's storage as of the moment it is created and gets its own compute. The tsdbadmin user gets a new password, which is saved to the configured password storage. Branches are always treated as DEV, so under read-only mode for production services a PROD service can still be branched.
 
 By default:
 - The name is auto-generated
@@ -94,7 +94,7 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchCreateOutput{}, err
 	}
 
-	createReq := api.BranchCreate{ServiceID: input.ServiceID}
+	var createReq api.BranchCreate
 	if input.Name != "" {
 		createReq.Name = &input.Name
 	}
@@ -107,13 +107,6 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 		createReq.MemoryGbs = &cpuMemoryCfg.MemoryGBs
 	}
 
-	// The parent's saved password is copied for the branch, which needs the
-	// parent itself (pgpass storage keys off its endpoint).
-	parent, err := common.GetService(ctx, client, projectID, input.ServiceID)
-	if err != nil {
-		return nil, BranchCreateOutput{}, err
-	}
-
 	s.logger.Info("MCP: Creating branch",
 		slog.String("project_id", projectID),
 		slog.String("service_id", input.ServiceID),
@@ -121,7 +114,7 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 		slog.String("cpu_memory", input.CPUMemory),
 	)
 
-	resp, err := client.CreateBranchWithResponse(ctx, projectID, createReq)
+	resp, err := client.CreateBranchWithResponse(ctx, projectID, input.ServiceID, createReq)
 	if err != nil {
 		return nil, BranchCreateOutput{}, fmt.Errorf("failed to create branch: %w", err)
 	}
@@ -133,11 +126,15 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 	}
 	branch := *resp.JSON202
 
-	// Copied before any waiting, so the password is stored even if the wait
+	// Saved before any waiting, so the password is stored even if the wait
 	// fails or is interrupted.
-	passwordStorage, err := common.CopyParentPassword(cfg, *parent, branch, "tsdbadmin")
-	if err != nil {
-		s.logger.Warn("MCP: Copying the parent's password failed", slog.Any("error", err))
+	var passwordStorage *common.PasswordStorageResult
+	if branch.InitialPassword != nil {
+		result, err := common.SavePasswordWithResult(cfg, common.BranchAsService(branch), *branch.InitialPassword, "tsdbadmin")
+		passwordStorage = &result
+		if err != nil {
+			s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
+		}
 	}
 
 	message := "Branch creation request accepted. The branch may still be provisioning."
@@ -145,6 +142,7 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 		if err := common.WaitForBranch(ctx, common.WaitForBranchArgs{
 			Client:       client,
 			ProjectID:    projectID,
+			ServiceID:    input.ServiceID,
 			BranchID:     branch.ID,
 			Branch:       &branch,
 			TargetStatus: api.DeployStatusREADY,
@@ -156,11 +154,9 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 			message = "Branch is ready."
 		}
 	}
-	message += fmt.Sprintf(" The branch uses the same users and passwords as service %q (%s).", parent.Name, parent.ServiceID)
-
 	return nil, BranchCreateOutput{
 		Branch:          s.convertToBranchDetail(cfg, branch),
 		Message:         message,
-		PasswordStorage: &passwordStorage,
+		PasswordStorage: passwordStorage,
 	}, nil
 }

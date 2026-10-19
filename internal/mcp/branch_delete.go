@@ -67,11 +67,16 @@ func (s *Server) handleBranchDelete(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchDeleteOutput{}, err
 	}
 
+	resolved, err := resolveBranchByID(ctx, client, projectID, input.BranchID)
+	if err != nil {
+		return nil, BranchDeleteOutput{}, err
+	}
+
 	s.logger.Info("MCP: Deleting branch",
 		slog.String("project_id", projectID),
 		slog.String("branch_id", input.BranchID))
 
-	resp, err := client.DeleteBranchWithResponse(ctx, projectID, input.BranchID)
+	resp, err := client.DeleteBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID)
 	if err != nil {
 		return nil, BranchDeleteOutput{}, fmt.Errorf("failed to delete branch: %w", err)
 	}
