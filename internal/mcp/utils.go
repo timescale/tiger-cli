@@ -352,12 +352,8 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch) Br
 	if branch.Endpoint == nil {
 		return detail
 	}
-	if branch.Endpoint.Host != nil {
-		port := "5432"
-		if branch.Endpoint.Port != nil {
-			port = fmt.Sprintf("%d", *branch.Endpoint.Port)
-		}
-		detail.DirectEndpoint = fmt.Sprintf("%s:%s", *branch.Endpoint.Host, port)
+	if branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
+		detail.DirectEndpoint = fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port)
 	}
 	if details, err := common.GetConnectionDetails(cfg, common.BranchAsService(branch), common.ConnectionDetailsOptions{
 		Role:     "tsdbadmin",

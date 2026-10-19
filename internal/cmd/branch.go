@@ -132,12 +132,8 @@ func outputBranchTable(branch OutputBranch, output io.Writer) error {
 	if branch.Iops != nil {
 		table.Append("IOPS", fmt.Sprintf("%d", *branch.Iops))
 	}
-	if branch.Endpoint != nil && branch.Endpoint.Host != nil {
-		port := "5432"
-		if branch.Endpoint.Port != nil {
-			port = fmt.Sprintf("%d", *branch.Endpoint.Port)
-		}
-		table.Append("Direct Endpoint", fmt.Sprintf("%s:%s", *branch.Endpoint.Host, port))
+	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
+		table.Append("Direct Endpoint", fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port))
 	}
 	table.Append("Created", branch.Created.Format("2006-01-02 15:04:05 MST"))
 	if branch.ConnectionString != "" {

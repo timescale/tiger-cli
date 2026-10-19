@@ -104,6 +104,25 @@ func TestBranchGetTool(t *testing.T) {
 			}()},
 		},
 		{
+			// No port is guessed, so without one there's no endpoint to show
+			// or connect to.
+			name: "endpoint without a port",
+			tool: toolBranchGet,
+			args: args,
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, sampleBranch(func(b *api.Branch) { b.Endpoint.Port = nil }))
+			},
+			wantOutput: map[string]any{"branch": map[string]any{
+				"id":         "br4nch1d9x",
+				"name":       "test-branch",
+				"service_id": "e6ue9697jf",
+				"status":     "READY",
+				"created":    "2025-01-16T09:00:00Z",
+				"resources":  map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
+			}},
+		},
+		{
 			name: "provisioning branch without an endpoint",
 			tool: toolBranchGet,
 			args: args,

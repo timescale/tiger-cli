@@ -153,6 +153,30 @@ status: READY
 `,
 		},
 		{
+			// No port is guessed, so without one there's no endpoint to show
+			// or connect to.
+			name: "endpoint without a port",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) { b.Endpoint.Port = nil }))
+			},
+			wantStdout: `┌────────────────┬────────────────────────────────────────────────────────────────────────────────────┐
+│    PROPERTY    │                                       VALUE                                        │
+├────────────────┼────────────────────────────────────────────────────────────────────────────────────┤
+│ Branch ID      │ br-12345                                                                           │
+│ Name           │ test-branch                                                                        │
+│ Parent Service │ svc-12345                                                                          │
+│ Status         │ READY                                                                              │
+│ CPU            │ 0.25 cores (250m)                                                                  │
+│ Memory         │ 2 GB                                                                               │
+│ Created        │ 2025-01-16 09:00:00 UTC                                                            │
+│ Console URL    │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345/branches/br-12345 │
+└────────────────┴────────────────────────────────────────────────────────────────────────────────────┘
+`,
+			wantStderr: "Warning: failed to get connection details: endpoint port not available\n",
+		},
+		{
 			name:       "by name",
 			args:       []string{"branch", "get", "test-branch", "-o", "env"},
 			opts:       []runOption{withExperimental()},
