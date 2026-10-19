@@ -137,7 +137,7 @@ Further conventions:
 
 ### Service Refs
 
-A command that identifies a service takes a **ref** — its ID or its name — and hands it to the API's resolve endpoint through `common.Resolve`, which returns the whole resource. Never try to tell an ID from a name in the CLI. The endpoint's `type` parameter decides what a ref can name: `tiger service` commands resolve only services (`resolveService` in `service_ref_helper.go`), `tiger branch` commands only branches (`resolveBranch` in `branch.go`), and `tiger db` commands anything they can connect to — a service, a read replica set, or a branch (`resolveConnectionTarget` in `db.go`, over `common.ResolveConnectionTarget`).
+A command that identifies a service takes a **ref** — its ID, a read replica set ID, or its name — and resolves it through the API, which also returns the whole resource. Never try to tell an ID from a name in the CLI. `tiger service` commands resolve through the `ref` filter on the API's service list (`resolveService` in `service_ref_helper.go`). `tiger branch` and `tiger db` commands use the API's resolve endpoint through `common.Resolve`, whose `type` parameter decides what a ref can name: only branches for `tiger branch` (`resolveBranch` in `branch.go`), and anything they can connect to — a service, a read replica set, or a branch — for `tiger db` (`resolveConnectionTarget` in `db.go`).
 
 - A command that changes the service it resolves uses `resolveServiceForWrite`, which carries the read-only gate; everything else uses `resolveService`.
 - Help text shows `[name-or-id]` and says the service "can be given by ID or name". Shell completion offers names, falling back to IDs when what is typed matches an ID instead.

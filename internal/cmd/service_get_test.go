@@ -95,14 +95,18 @@ func TestServiceGetCmd(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
-			// The lookup is restricted to services, so anything else means the
-			// filter was ignored; the CLI refuses rather than act on it.
-			name: "a match of another type refused",
+			// An ambiguous ref is refused with a 400, so more than one match
+			// means the filter was ignored; the CLI refuses rather than pick.
+			name: "more than one match refused",
 			args: []string{"service", "get", "my-api-db"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolve(m, "my-api-db", serviceType, api.Branch{ID: "br-12345", Name: "my-api-db"})
+				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: new("my-api-db")}).
+					Return(&api.GetServicesResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &[]api.Service{sampleService(), sampleService()},
+					}, nil)
 			},
-			wantErr: "expected a service for 'my-api-db', got a branch",
+			wantErr: "expected one service for 'my-api-db', got 2",
 		},
 		{
 			// A default must be an ID. The refusal comes after the lookup, so
