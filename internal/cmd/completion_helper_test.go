@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -29,6 +31,12 @@ func TestCompletion(t *testing.T) {
 	// --cpu and --memory values ask the shell to keep their numeric order.
 	const keepOrder = ":36\n"
 	const keepOrderDirective = "Completion ended with directive: ShellCompDirectiveNoFileComp, ShellCompDirectiveKeepOrder\n"
+
+	// --iops values run from 3000 to 256000 in steps of 1000.
+	var iopsValues strings.Builder
+	for v := 3000; v <= 256000; v += 1000 {
+		fmt.Fprintf(&iopsValues, "%d\n", v)
+	}
 
 	listServices := func(m *mocks.MockClientWithResponsesInterface) {
 		services := []api.Service{
@@ -274,6 +282,14 @@ func TestCompletion(t *testing.T) {
 			args:       []string{"__complete", "branch", "create", "--cpu", ""},
 			opts:       []runOption{withExperimental()},
 			wantStdout: "250\n500\n1000\n2000\n4000\n8000\n16000\n32000\n" + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "--iops flag values for branch create",
+			args:       []string{"__complete", "branch", "create", "--iops", ""},
+			opts:       []runOption{withExperimental()},
+			wantStdout: iopsValues.String() + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},

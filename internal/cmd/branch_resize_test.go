@@ -46,7 +46,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			name:    "missing cpu and memory",
 			args:    []string{"branch", "resize", "br-12345"},
 			opts:    []runOption{withExperimental()},
-			wantErr: "must specify at least one of --cpu or --memory",
+			wantErr: "must specify at least one of --cpu, --memory, or --iops",
 		},
 		{
 			name:    "invalid cpu/memory combination",
@@ -92,6 +92,26 @@ func TestBranchResizeCmd(t *testing.T) {
 			wantErr: "empty response from API",
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
 				"Error: empty response from API\n",
+		},
+		{
+			// The endpoint requires CPU and memory, so an IOPS-only resize
+			// sends the branch's current ones.
+			name: "iops only keeps the current cpu and memory",
+			args: []string{"branch", "resize", "br-12345", "--iops", "16000", "--no-wait"},
+			opts: []runOption{withExperimental()},
+			mock: setupResize(api.BranchResizeInput{CPUMillis: "250", MemoryGbs: "2", Iops: new(16000)}, api.DeployStatusCONFIGURING),
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 16000 IOPS...\n" +
+				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
+				"Use 'tiger branch get' to check branch status.\n",
+		},
+		{
+			name: "cpu and iops",
+			args: []string{"branch", "resize", "br-12345", "--cpu", "2000", "--iops", "16000", "--no-wait"},
+			opts: []runOption{withExperimental()},
+			mock: setupResize(api.BranchResizeInput{CPUMillis: "2000", MemoryGbs: "16", Iops: new(16000)}, api.DeployStatusCONFIGURING),
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB, 16000 IOPS...\n" +
+				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
+				"Use 'tiger branch get' to check branch status.\n",
 		},
 		{
 			name:       "no-wait with cpu only",

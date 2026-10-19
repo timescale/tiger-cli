@@ -192,6 +192,14 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			wantStderr: noWaitStderr("Creating branch 'ci-4821' from service 'test-service' (svc-12345)..."),
 		},
 		{
+			name:       "iops",
+			args:       []string{"branch", "create", "svc-12345", "--iops", "16000", "--no-wait", "-o", "env"},
+			opts:       []runOption{withExperimental()},
+			mock:       setupCreate(api.BranchCreate{Iops: new(16000)}, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
 			name: "memory alone sets the matching cpu",
 			args: []string{"branch", "create", "svc-12345", "--memory", "4", "--no-wait", "-o", "env"},
 			opts: []runOption{withExperimental()},

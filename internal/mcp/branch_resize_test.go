@@ -13,7 +13,7 @@ func TestBranchResizeTool(t *testing.T) {
 	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x", "cpu_memory": "2 CPU/16 GB"}
 	req := api.BranchResizeInput{CPUMillis: "2000", MemoryGbs: "16"}
-	expectResize := func(status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
+	expectResizeWith := func(req api.BranchResizeInput, status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			branch := sampleBranch(branchStatus(status))
 			expectResolveBranch(m, sampleBranch())
@@ -23,6 +23,9 @@ func TestBranchResizeTool(t *testing.T) {
 					JSON202:      &branch,
 				}, nil)
 		}
+	}
+	expectResize := func(status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
+		return expectResizeWith(req, status)
 	}
 	// The response's resources are the sample's, since the resize hasn't
 	// landed yet.
@@ -41,11 +44,11 @@ func TestBranchResizeTool(t *testing.T) {
 			wantCallErr: `calling "tools/call": unknown tool "branch_resize"`,
 		},
 		{
-			name:    "missing cpu_memory",
+			name:    "missing cpu_memory and iops",
 			tool:    toolBranchResize,
 			args:    map[string]any{"branch_id": "br4nch1d9x"},
 			opts:    []runOption{experimental},
-			wantErr: `validating "arguments": validating root: required: missing properties: ["cpu_memory"]`,
+			wantErr: "at least one of cpu_memory or iops is required",
 		},
 		{
 			name:    "read-only all refuses without an API call",
@@ -85,6 +88,16 @@ func TestBranchResizeTool(t *testing.T) {
 					Return(&api.ResizeBranchResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
 			wantErr: "empty response from API",
+		},
+		{
+			// The endpoint requires CPU and memory, so an IOPS-only resize
+			// sends the branch's current ones.
+			name:       "iops only keeps the current cpu and memory",
+			tool:       toolBranchResize,
+			args:       map[string]any{"branch_id": "br4nch1d9x", "iops": 16000},
+			opts:       []runOption{experimental},
+			mock:       expectResizeWith(api.BranchResizeInput{CPUMillis: "250", MemoryGbs: "2", Iops: new(16000)}, api.DeployStatusCONFIGURING),
+			wantOutput: accepted,
 		},
 		{
 			name:       "resizes without waiting by default",

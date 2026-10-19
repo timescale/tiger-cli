@@ -24,6 +24,7 @@ func newBranchCreateCmd(app *common.App, use, commandPath string) *cobra.Command
 	var name string
 	var cpu string
 	var memory string
+	var iops int
 	var noWait bool
 	var waitTimeout time.Duration
 
@@ -44,7 +45,11 @@ By default:
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. Branching from a branch isn't supported.
 
-` + branchCPUMemoryHelp,
+` + branchCPUMemoryHelp + `
+
+The allowed --iops values depend on your plan and the branch's CPU/memory
+allocation. See the Tiger Data documentation for details. If --iops is not
+given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 		Example: fmt.Sprintf(`  # Branch a service
   %[1]s svc-12345
 
@@ -53,6 +58,9 @@ service from your configuration. Branching from a branch isn't supported.
 
   # Branch a service with custom compute
   %[1]s svc-12345 --cpu 2000 --memory 16
+
+  # Branch a service with provisioned IOPS
+  %[1]s svc-12345 --cpu 2000 --iops 16000
 
   # Branch for a script
   %[1]s svc-12345 --name ci-4821 -o json`, commandPath),
@@ -99,6 +107,9 @@ service from your configuration. Branching from a branch isn't supported.
 			if cpuMemoryCfg != nil {
 				createReq.CPUMillis = &cpuMemoryCfg.CPUMillis
 				createReq.MemoryGbs = &cpuMemoryCfg.MemoryGBs
+			}
+			if cmd.Flags().Changed("iops") {
+				createReq.Iops = &iops
 			}
 
 			resp, err := client.CreateBranchWithResponse(cmd.Context(), projectID, parent.ServiceID, createReq)
@@ -157,6 +168,7 @@ service from your configuration. Branching from a branch isn't supported.
 	cmd.Flags().StringVar(&name, "name", "", "Name for the branch (auto-generated if not provided)")
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (default 250)")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes (default 2)")
+	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the branch to be ready")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
@@ -164,6 +176,7 @@ service from your configuration. Branching from a branch isn't supported.
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))
 	registerFlagCompletion(cmd, "cpu", branchCPUCompletion)
 	registerFlagCompletion(cmd, "memory", branchMemoryCompletion)
+	registerFlagCompletion(cmd, "iops", iopsCompletion)
 
 	return cmd
 }

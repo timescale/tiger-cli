@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -284,6 +285,19 @@ func resolveBranchByID(ctx context.Context, client api.ClientWithResponsesInterf
 		return nil, common.ExitWithCode(common.ExitServiceNotFound, fmt.Errorf("branch '%s' not found", id))
 	}
 	return branch, nil
+}
+
+// setBranchIOPSSchemaProperties sets a branch tool's iops input property.
+// defaultDescription, if any, says what happens when iops is omitted. As for
+// services, the allowed values aren't listed: they depend on too much to
+// describe, and would go stale. The API validates the value.
+func setBranchIOPSSchemaProperties(schema *jsonschema.Schema, defaultDescription string) {
+	property := schema.Properties["iops"]
+	property.Description = strings.TrimSpace("Provisioned IOPS for the branch's storage. " +
+		"Check the Tiger Data documentation for the allowed values, which depend on the user's plan and the branch's CPU/memory allocation. " +
+		defaultDescription)
+	property.Minimum = new(0.0)
+	property.Examples = []any{16000, 32000}
 }
 
 // BranchDetail represents detailed branch information

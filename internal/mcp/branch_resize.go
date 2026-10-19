@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -19,15 +20,19 @@ import (
 // BranchResizeInput represents input for branch_resize
 type BranchResizeInput struct {
 	BranchID  string `json:"branch_id"`
-	CPUMemory string `json:"cpu_memory"`
+	CPUMemory string `json:"cpu_memory,omitempty"`
+	IOPS      *int   `json:"iops,omitempty"`
 	Wait      bool   `json:"wait,omitempty"`
 }
 
+// Schema leaves both cpu_memory and iops optional; the handler requires at
+// least one of the two.
 func (BranchResizeInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[BranchResizeInput](nil))
 
 	setBranchIDSchemaProperties(schema)
-	setBranchCPUMemorySchemaProperties(schema, "CPU and memory allocation combination.")
+	setBranchCPUMemorySchemaProperties(schema, "CPU and memory allocation combination. If not specified, the branch keeps its current CPU and memory, and at least one of cpu_memory or iops is required.")
+	setBranchIOPSSchemaProperties(schema, "")
 
 	schema.Properties["wait"].Description = "Whether to wait for the branch to be done resizing before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying the branch. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -55,7 +60,7 @@ func newBranchResizeTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolBranchResize,
 		Title: "Resize Branch",
-		Description: `Resize a branch by changing its CPU and memory allocation.
+		Description: `Resize a branch by changing its CPU and memory allocation or its provisioned IOPS.
 
 A branch's storage is shared with its parent service and isn't resized. The branch may be temporarily unavailable during the resize operation.
 
@@ -83,26 +88,39 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchResizeOutput{}, err
 	}
 
+	if input.CPUMemory == "" && input.IOPS == nil {
+		return nil, BranchResizeOutput{}, errors.New("at least one of cpu_memory or iops is required")
+	}
+
 	resolved, err := resolveBranchByID(ctx, client, projectID, input.BranchID)
 	if err != nil {
 		return nil, BranchResizeOutput{}, err
 	}
 
-	cpuMemoryCfg, err := parseBranchCPUMemory(input.CPUMemory)
-	if err != nil {
-		return nil, BranchResizeOutput{}, err
+	// The branch resize endpoint requires CPU and memory, so an IOPS-only
+	// resize sends the branch's current ones.
+	resizeReq := api.BranchResizeInput{
+		CPUMillis: strconv.Itoa(resolved.CPUMillis),
+		MemoryGbs: strconv.Itoa(resolved.MemoryGbs),
+		Iops:      input.IOPS,
+	}
+	if input.CPUMemory != "" {
+		cpuMemoryCfg, err := parseBranchCPUMemory(input.CPUMemory)
+		if err != nil {
+			return nil, BranchResizeOutput{}, err
+		}
+		resizeReq.CPUMillis = strconv.Itoa(cpuMemoryCfg.CPUMillis)
+		resizeReq.MemoryGbs = strconv.Itoa(cpuMemoryCfg.MemoryGBs)
 	}
 
 	s.logger.Info("MCP: Resizing branch",
 		slog.String("project_id", projectID),
 		slog.String("branch_id", input.BranchID),
 		slog.String("cpu_memory", input.CPUMemory),
+		slog.Any("iops", input.IOPS),
 	)
 
-	resp, err := client.ResizeBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID, api.BranchResizeInput{
-		CPUMillis: strconv.Itoa(cpuMemoryCfg.CPUMillis),
-		MemoryGbs: strconv.Itoa(cpuMemoryCfg.MemoryGBs),
-	})
+	resp, err := client.ResizeBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID, resizeReq)
 	if err != nil {
 		return nil, BranchResizeOutput{}, fmt.Errorf("failed to resize branch: %w", err)
 	}

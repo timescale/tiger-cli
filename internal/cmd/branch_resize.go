@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -16,26 +18,35 @@ import (
 func buildBranchResizeCmd(app *common.App) *cobra.Command {
 	var cpu string
 	var memory string
+	var iops int
 	var noWait bool
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
 		Use:   "resize <name-or-id>",
 		Short: "Resize a branch",
-		Long: `Resize a branch by changing its CPU and memory allocation. A branch's storage is
-shared with its parent service and isn't resized.
+		Long: `Resize a branch by changing its CPU, memory, and provisioned IOPS allocation.
+A branch's storage is shared with its parent service and isn't resized.
 
 The branch can be given by ID or name. It may be temporarily unavailable
 during the resize.
 
 ` + branchCPUMemoryHelp + `
 
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
+Note: You can specify both CPU and memory together, or specify only one (the
+other will be automatically configured).
+
+The allowed --iops values depend on your plan and the branch's CPU/memory
+allocation. See the Tiger Data documentation for details. If only --iops is
+given, the branch keeps its current CPU and memory.`,
 		Example: `  # Resize a branch to 2 CPU cores and 16GB memory
   tiger branch resize br-12345 --cpu 2000 --memory 16
 
   # Resize a branch using only CPU (memory will be auto-configured)
   tiger branch resize br-12345 --cpu 2000
+
+  # Change only the provisioned IOPS
+  tiger branch resize br-12345 --iops 16000
 
   # Resize without waiting for completion
   tiger branch resize br-12345 --cpu 2000 --no-wait`,
@@ -52,8 +63,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			if cpu == "" && memory == "" {
-				return errors.New("must specify at least one of --cpu or --memory")
+			iopsSet := cmd.Flags().Changed("iops")
+			if cpu == "" && memory == "" && !iopsSet {
+				return errors.New("must specify at least one of --cpu, --memory, or --iops")
 			}
 			cpuMemoryCfg, err := common.BranchCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
 			if err != nil {
@@ -65,12 +77,27 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			cmd.PrintErrf("Resizing branch %s to %s...\n", branchLabel(*resolved), cpuMemoryCfg)
+			// The branch resize endpoint requires CPU and memory, so an
+			// IOPS-only resize sends the branch's current ones.
+			resizeReq := api.BranchResizeInput{
+				CPUMillis: strconv.Itoa(resolved.CPUMillis),
+				MemoryGbs: strconv.Itoa(resolved.MemoryGbs),
+			}
+			var targets []string
+			if cpuMemoryCfg != nil {
+				resizeReq.CPUMillis = *cpuMemoryCfg.CPUMillisString()
+				resizeReq.MemoryGbs = *cpuMemoryCfg.MemoryGBsString()
+				targets = append(targets, cpuMemoryCfg.String())
+			}
+			if iopsSet {
+				resizeReq.Iops = &iops
+				targets = append(targets, fmt.Sprintf("%d IOPS", iops))
+			}
+			target := strings.Join(targets, ", ")
 
-			resp, err := client.ResizeBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID, api.BranchResizeInput{
-				CPUMillis: *cpuMemoryCfg.CPUMillisString(),
-				MemoryGbs: *cpuMemoryCfg.MemoryGBsString(),
-			})
+			cmd.PrintErrf("Resizing branch %s to %s...\n", branchLabel(*resolved), target)
+
+			resp, err := client.ResizeBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID, resizeReq)
 			if err != nil {
 				return fmt.Errorf("failed to resize branch: %w", err)
 			}
@@ -108,18 +135,20 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			cmd.PrintErrf("Branch resized to %s.\n", cpuMemoryCfg)
+			cmd.PrintErrf("Branch resized to %s.\n", target)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
+	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
 	registerFlagCompletion(cmd, "cpu", branchCPUCompletion)
 	registerFlagCompletion(cmd, "memory", branchMemoryCompletion)
+	registerFlagCompletion(cmd, "iops", iopsCompletion)
 
 	return cmd
 }

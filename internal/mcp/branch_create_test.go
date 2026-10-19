@@ -176,6 +176,18 @@ func TestBranchCreateTool(t *testing.T) {
 			},
 		},
 		{
+			name: "iops",
+			tool: toolBranchCreate,
+			args: map[string]any{"service_id": "e6ue9697jf", "iops": 16000},
+			opts: []runOption{experimental},
+			mock: expectCreate(api.BranchCreate{Iops: new(16000)}, created),
+			wantOutput: map[string]any{
+				"branch":           sampleBranchDetail(api.DeployStatusQUEUED),
+				"message":          acceptedMsg,
+				"password_storage": storedPassword,
+			},
+		},
+		{
 			name:     "wait polls until ready",
 			synctest: true,
 			tool:     toolBranchCreate,

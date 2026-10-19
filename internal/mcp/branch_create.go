@@ -20,6 +20,7 @@ type BranchCreateInput struct {
 	ServiceID string `json:"service_id"`
 	Name      string `json:"name,omitempty"`
 	CPUMemory string `json:"cpu_memory,omitempty"`
+	IOPS      *int   `json:"iops,omitempty"`
 	Wait      bool   `json:"wait,omitempty"`
 }
 
@@ -33,6 +34,7 @@ func (BranchCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].Examples = []any{"ci-4821", "feature/user-auth"}
 
 	setBranchCPUMemorySchemaProperties(schema, "CPU and memory allocation combination. If not specified, the branch gets 0.25 CPU/2 GB, whatever the parent service's size.")
+	setBranchIOPSSchemaProperties(schema, "If not specified, the branch gets the baseline IOPS for the user's plan and its CPU allocation.")
 
 	schema.Properties["wait"].Description = "Whether to wait for the branch to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying the branch. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -66,7 +68,7 @@ A branch is a lightweight, ephemeral copy of a service for development, testing,
 
 By default:
 - The name is auto-generated
-- The branch gets 0.25 CPU and 2 GB of memory
+- The branch gets 0.25 CPU and 2 GB of memory, and the baseline IOPS for that size
 
 WARNING: Creates billable resources.`,
 		InputSchema:  BranchCreateInput{}.Schema(),
@@ -106,12 +108,14 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 		createReq.CPUMillis = &cpuMemoryCfg.CPUMillis
 		createReq.MemoryGbs = &cpuMemoryCfg.MemoryGBs
 	}
+	createReq.Iops = input.IOPS
 
 	s.logger.Info("MCP: Creating branch",
 		slog.String("project_id", projectID),
 		slog.String("service_id", input.ServiceID),
 		slog.String("name", input.Name),
 		slog.String("cpu_memory", input.CPUMemory),
+		slog.Any("iops", input.IOPS),
 	)
 
 	resp, err := client.CreateBranchWithResponse(ctx, projectID, input.ServiceID, createReq)
