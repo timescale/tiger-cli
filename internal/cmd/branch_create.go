@@ -130,7 +130,7 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 
 			// Saved before any waiting, so the password is stored even if the
 			// wait fails or is interrupted.
-			passwordSaved := handlePasswordSaving(cmd, cfg, common.BranchAsService(branch), util.Deref(branch.InitialPassword))
+			passwordSaved := handlePasswordSaving(cmd, cfg, common.BranchPasswordTarget(branch), util.Deref(branch.InitialPassword))
 
 			var waitErr error
 			if noWait {

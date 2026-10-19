@@ -63,7 +63,10 @@ The password will be saved according to your --password-storage setting
 			if err != nil {
 				return err
 			}
-			service := target.CredentialService
+			// Read replicas share the primary's credentials, so this is the
+			// primary's for one.
+			credentials := target.Credentials
+			label := fmt.Sprintf("'%s' (%s)", credentials.Name, credentials.ID)
 
 			// Determine password based on precedence:
 			// 1. --password flag with value
@@ -99,19 +102,18 @@ The password will be saved according to your --password-storage setting
 
 			// Save password using configured storage
 			storage := common.GetPasswordStorage(cfg)
-			if err := storage.Save(service, passwordToSave, role); err != nil {
+			if err := storage.Save(credentials.PasswordTarget, passwordToSave, role); err != nil {
 				return fmt.Errorf("failed to save password: %w", err)
 			}
 
-			if target.IsReplica {
-				cmd.PrintErrf("Read replicas share the primary's credentials; saving against primary %s.\n",
-					serviceLabel(service))
+			if target.Kind == common.TargetReadReplica {
+				cmd.PrintErrf("Read replicas share the primary's credentials; saving against primary %s.\n", label)
 			}
 			kind := "service"
-			if target.IsBranch {
+			if target.Kind == common.TargetBranch {
 				kind = "branch"
 			}
-			cmd.PrintErrf("Password saved for %s %s, role %s\n", kind, serviceLabel(service), role)
+			cmd.PrintErrf("Password saved for %s %s, role %s\n", kind, label, role)
 			return nil
 		},
 	}

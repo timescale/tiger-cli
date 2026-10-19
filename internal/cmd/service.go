@@ -215,7 +215,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 		ReadOnly:        common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)) != nil,
 	}
 
-	if connectionDetails, err := common.GetConnectionDetails(cfg, service, opts); err != nil {
+	if connectionDetails, err := common.GetConnectionDetails(cfg, common.NewServiceConnectionTarget(service), opts); err != nil {
 		if cmd != nil {
 			cmd.PrintErrf("Warning: Failed to get connection details: %v\n", err)
 		}

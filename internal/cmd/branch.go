@@ -163,7 +163,7 @@ func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.B
 			Role:     "tsdbadmin",
 			ReadOnly: common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
 		}
-		if details, err := common.GetConnectionDetails(cfg, common.BranchAsService(branch), opts); err != nil {
+		if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), opts); err != nil {
 			if cmd != nil {
 				cmd.PrintErrf("Warning: failed to get connection details: %v\n", err)
 			}

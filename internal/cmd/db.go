@@ -38,19 +38,19 @@ func handleDatabaseError(err error, target *common.ConnectionTarget) error {
 	// A branch is managed through `tiger branch`, everything else through
 	// `tiger service`.
 	group := "service"
-	if target.IsBranch {
+	if target.Kind == common.TargetBranch {
 		group = "branch"
 	}
 
 	switch {
 	case errors.Is(err, common.ErrPaused):
-		return fmt.Errorf("%w — start it with 'tiger %s start %s'", common.ErrPaused, group, target.ConnectionService.ServiceID)
+		return fmt.Errorf("%w — start it with 'tiger %s start %s'", common.ErrPaused, group, target.ID)
 	case errors.Is(err, common.ErrNotReady):
-		return fmt.Errorf("%w — check its status with 'tiger %s get %s' and try again", common.ErrNotReady, group, target.ConnectionService.ServiceID)
+		return fmt.Errorf("%w — check its status with 'tiger %s get %s' and try again", common.ErrNotReady, group, target.ID)
 	case isPostgresAuthenticationError(err):
 		// A read replica shares its primary's credentials, so the password
-		// belongs to the credential service rather than the one connected to.
-		serviceID := target.CredentialService.ServiceID
+		// belongs to the primary rather than the replica connected to.
+		serviceID := target.Credentials.ID
 		return fmt.Errorf("%w\n\nThe stored password is missing or invalid. Save the current one with 'tiger db save-password %s', or reset it with 'tiger %s update-password %s'",
 			err, serviceID, group, serviceID)
 	}
@@ -70,7 +70,7 @@ func resolveConnectionTarget(ctx context.Context, client api.ClientWithResponses
 	if err != nil {
 		return nil, withAmbiguousRefHint(err, hint)
 	}
-	if err := checkDefaultIsID(target.ConnectionService.ServiceID, ref); err != nil {
+	if err := checkDefaultIsID(target.ID, ref); err != nil {
 		return nil, err
 	}
 	return target, nil

@@ -180,14 +180,13 @@ func selectConnection(
 
 	// Offer the replica menu only for a primary on an interactive terminal.
 	// Branches have no read replicas.
-	if !target.IsReplica && !target.IsBranch && !noReplicaPrompt && util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr()) {
-		primary := target.ConnectionService
-		replicas, err := fetchReplicaSets(ctx, client, projectID, primary.ServiceID)
+	if target.Kind == common.TargetService && !noReplicaPrompt && util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr()) {
+		replicas, err := fetchReplicaSets(ctx, client, projectID, target.ID)
 		if err != nil {
 			// Don't block the connection if we can't list replicas.
 			cmd.PrintErrf("Warning: could not list read replicas: %v\n", err)
 		} else if connectable := connectableReplicas(replicas); len(connectable) > 0 {
-			choice, err := selectConnectTargetOption(cmd, primary, connectable)
+			choice, err := selectConnectTargetOption(cmd, target.ID, connectable)
 			if err != nil {
 				return nil, err
 			}
@@ -195,14 +194,14 @@ func selectConnection(
 			case targetCancel:
 				return nil, nil
 			case targetReplica:
-				chosen = common.NewReplicaConnectionTarget(primary, *choice.replica)
+				chosen = common.NewReplicaConnectionTarget(target, *choice.replica)
 			}
 		}
 	}
 
 	// The target is settled now, so read-only mode can have its say. --read-only
 	// is already in opts and only adds to the restriction.
-	opts.ReadOnly = opts.ReadOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(chosen.ConnectionService)) != nil
+	opts.ReadOnly = opts.ReadOnly || common.CheckReadOnly(cfg, chosen.Environment) != nil
 
 	warnReplicaPooler(cmd, chosen, opts.Pooled)
 
@@ -211,8 +210,8 @@ func selectConnection(
 		return nil, err
 	}
 
-	if chosen.IsReplica {
-		cmd.PrintErrf("Connecting to read replica %s...\n", serviceLabel(chosen.ConnectionService))
+	if chosen.Kind == common.TargetReadReplica {
+		cmd.PrintErrf("Connecting to read replica '%s' (%s)...\n", chosen.Name, chosen.ID)
 	}
 	return details, nil
 }
@@ -269,10 +268,10 @@ type connectTargetModel struct {
 	chosen  connectTargetChoice
 }
 
-func newConnectTargetModel(primary api.Service, replicas []api.ReadReplicaSet) connectTargetModel {
+func newConnectTargetModel(primaryID string, replicas []api.ReadReplicaSet) connectTargetModel {
 	choices := []connectTargetChoice{{
 		kind:  targetPrimary,
-		label: fmt.Sprintf("Connect to primary service (%s)", primary.ServiceID),
+		label: fmt.Sprintf("Connect to primary service (%s)", primaryID),
 	}}
 
 	for i := range replicas {
@@ -346,8 +345,8 @@ func (m connectTargetModel) View() tea.View {
 
 // selectConnectTargetOption shows the interactive menu for choosing a
 // connection target.
-func selectConnectTargetOption(cmd *cobra.Command, primary api.Service, replicas []api.ReadReplicaSet) (connectTargetChoice, error) {
-	model := newConnectTargetModel(primary, replicas)
+func selectConnectTargetOption(cmd *cobra.Command, primaryID string, replicas []api.ReadReplicaSet) (connectTargetChoice, error) {
+	model := newConnectTargetModel(primaryID, replicas)
 
 	program := tea.NewProgram(model,
 		tea.WithInput(cmd.InOrStdin()),
@@ -379,12 +378,12 @@ func connectWithPasswordMenu(
 	}
 
 	// Read replicas share the primary's credentials, so password storage and
-	// recovery always operate on the credential service.
-	service := target.CredentialService
+	// recovery always operate on the credential owner.
+	credentials := target.Credentials
 
 	// Interactive mode: Get stored password (if any)
 	storage := common.GetPasswordStorage(cfg)
-	storedPassword, err := storage.Get(service, details.Role)
+	storedPassword, err := storage.Get(credentials.PasswordTarget, details.Role)
 	if err != nil {
 		cmd.PrintErrf("Warning: could not retrieve stored password: %v\n", err)
 	}
@@ -393,7 +392,7 @@ func connectWithPasswordMenu(
 	err = testConnectionWithPassword(ctx, details, storedPassword)
 	if err == nil {
 		// Password works, launch psql
-		return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)
+		return launchPsql(cfg, details, psqlPath, psqlFlags, credentials.PasswordTarget, cmd)
 	}
 
 	// Check if it's an auth error
@@ -415,8 +414,8 @@ func connectWithPasswordMenu(
 	//
 	// TODO: offer it for branches too, through the branch password endpoint.
 	// The reset below goes through the service one, which refuses a branch.
-	canResetPassword := details.Role == "tsdbadmin" && !target.IsBranch &&
-		common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)) == nil
+	canResetPassword := details.Role == "tsdbadmin" && target.Kind != common.TargetBranch &&
+		common.CheckReadOnly(cfg, credentials.Environment) == nil
 
 	// Interactive recovery loop
 	for {
@@ -441,7 +440,7 @@ func connectWithPasswordMenu(
 
 			// Test, save, and launch
 			details.Password = password
-			if err = testSaveAndLaunchPsqlWithPassword(ctx, cmd, cfg, details, psqlPath, psqlFlags, service); err != nil {
+			if err = testSaveAndLaunchPsqlWithPassword(ctx, cmd, cfg, details, psqlPath, psqlFlags, credentials.PasswordTarget); err != nil {
 				if isPostgresAuthenticationError(err) {
 					cmd.PrintErrf("Password incorrect.\n\n")
 					continue
@@ -452,7 +451,7 @@ func connectWithPasswordMenu(
 
 		case optionResetPassword:
 			// Prompt and reset
-			password, err := promptAndResetPassword(ctx, cmd, cfg, client, service, details.Role)
+			password, err := promptAndResetPassword(ctx, cmd, cfg, client, credentials.PasswordTarget, details.Role)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return nil // user cancelled
@@ -463,7 +462,7 @@ func connectWithPasswordMenu(
 			cmd.PrintErrf("Password updated for %s\n", details.Role)
 			// Launch psql (password is now in storage)
 			details.Password = password
-			return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)
+			return launchPsql(cfg, details, psqlPath, psqlFlags, credentials.PasswordTarget, cmd)
 
 		case optionExit:
 			return nil
@@ -608,7 +607,7 @@ func testSaveAndLaunchPsqlWithPassword(
 	details *common.ConnectionDetails,
 	psqlPath string,
 	psqlFlags []string,
-	service api.Service,
+	credentials common.PasswordTarget,
 ) error {
 	// Test the password
 	if err := testConnectionWithPassword(ctx, details, details.Password); err != nil {
@@ -616,7 +615,7 @@ func testSaveAndLaunchPsqlWithPassword(
 	}
 
 	// Password works! Save it
-	result, saveErr := common.SavePasswordWithResult(cfg, service, details.Password, details.Role)
+	result, saveErr := common.SavePasswordWithResult(cfg, credentials, details.Password, details.Role)
 	if saveErr != nil {
 		cmd.PrintErrf("Warning: could not save password: %v\n", saveErr)
 	} else if result.Success {
@@ -624,13 +623,13 @@ func testSaveAndLaunchPsqlWithPassword(
 	}
 
 	// Launch psql
-	return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)
+	return launchPsql(cfg, details, psqlPath, psqlFlags, credentials, cmd)
 }
 
 // launchPsql launches psql using the connection string and additional flags.
 // It retrieves the password from storage and sets PGPASSWORD environment variable.
-func launchPsql(cfg *config.Config, details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
-	psqlCmd := buildPsqlCommand(cfg, details, psqlPath, additionalFlags, service, cmd)
+func launchPsql(cfg *config.Config, details *common.ConnectionDetails, psqlPath string, additionalFlags []string, credentials common.PasswordTarget, cmd *cobra.Command) error {
+	psqlCmd := buildPsqlCommand(cfg, details, psqlPath, additionalFlags, credentials, cmd)
 	err := psqlCmd.Run()
 	// Propagate psql's own exit code; a signal death (ExitCode() == -1)
 	// falls through to the generic exit code 1.
@@ -642,7 +641,7 @@ func launchPsql(cfg *config.Config, details *common.ConnectionDetails, psqlPath 
 }
 
 // buildPsqlCommand creates the psql command with proper environment setup
-func buildPsqlCommand(cfg *config.Config, details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
+func buildPsqlCommand(cfg *config.Config, details *common.ConnectionDetails, psqlPath string, additionalFlags []string, credentials common.PasswordTarget, cmd *cobra.Command) *exec.Cmd {
 	password := details.Password
 	// Ensure we don't include password in the connection string to make it not show up in process lists
 	// Passwords are passed via PGPASSWORD environment variable (see below)
@@ -668,7 +667,7 @@ func buildPsqlCommand(cfg *config.Config, details *common.ConnectionDetails, psq
 		// Only set PGPASSWORD for keyring storage method
 		// pgpass storage relies on psql automatically reading ~/.pgpass file
 		if _, isKeyring := storage.(*common.KeyringStorage); isKeyring {
-			if storedPassword, err := storage.Get(service, details.Role); err == nil && storedPassword != "" {
+			if storedPassword, err := storage.Get(credentials, details.Role); err == nil && storedPassword != "" {
 				// Set PGPASSWORD environment variable for psql when using keyring
 				psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+storedPassword)
 			}

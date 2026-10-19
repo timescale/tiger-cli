@@ -279,13 +279,13 @@ func TestConnectTargetModel(t *testing.T) {
 
 	t.Run("choices", func(t *testing.T) {
 		// No replicas: primary, cancel.
-		m := newConnectTargetModel(primary, nil)
+		m := newConnectTargetModel(primary.ServiceID, nil)
 		if len(m.choices) != 2 || m.choices[0].kind != targetPrimary || m.choices[1].kind != targetCancel {
 			t.Errorf("expected [primary, cancel] with no replicas, got %+v", m.choices)
 		}
 
 		// Two replicas: primary, replica-a, replica-b, cancel.
-		m = newConnectTargetModel(primary, replicas)
+		m = newConnectTargetModel(primary.ServiceID, replicas)
 		if len(m.choices) != 4 {
 			t.Fatalf("expected 4 choices with two replicas, got %d: %+v", len(m.choices), m.choices)
 		}
@@ -322,7 +322,7 @@ func TestConnectTargetModel(t *testing.T) {
 
 	for _, tt := range keyTests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := newConnectTargetModel(primary, replicas)
+			m := newConnectTargetModel(primary.ServiceID, replicas)
 			updated, _ := m.Update(tt.key)
 			choice := updated.(connectTargetModel).chosen
 			if choice.kind != tt.wantKind {
@@ -354,7 +354,7 @@ func TestBuildPsqlCommand(t *testing.T) {
 		d := details()
 		d.Password = "explicit-pw"
 		flags := []string{"--single-transaction", "-c", "SELECT 1;"}
-		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "keyring"}, d, psqlPath, flags, api.Service{}, discardCmd())
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "keyring"}, d, psqlPath, flags, common.PasswordTarget{}, discardCmd())
 
 		wantArgs := []string{psqlPath, connString, "--single-transaction", "-c", "SELECT 1;"}
 		if !slices.Equal(psqlCmd.Args, wantArgs) {
@@ -368,11 +368,11 @@ func TestBuildPsqlCommand(t *testing.T) {
 	t.Run("keyring password becomes PGPASSWORD", func(t *testing.T) {
 		keyring.MockInit()
 		service := api.Service{ServiceID: "svc-psql", ProjectID: "proj-psql"}
-		if err := (&common.KeyringStorage{}).Save(service, "keyring-pw", "testuser"); err != nil {
+		if err := (&common.KeyringStorage{}).Save(common.ServicePasswordTarget(service), "keyring-pw", "testuser"); err != nil {
 			t.Fatalf("failed to save test password: %v", err)
 		}
 
-		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "keyring"}, details(), psqlPath, nil, service, discardCmd())
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "keyring"}, details(), psqlPath, nil, common.ServicePasswordTarget(service), discardCmd())
 		if !slices.Contains(psqlCmd.Env, "PGPASSWORD=keyring-pw") {
 			t.Errorf("expected PGPASSWORD=keyring-pw in env, got %v", psqlCmd.Env)
 		}
@@ -380,7 +380,7 @@ func TestBuildPsqlCommand(t *testing.T) {
 
 	t.Run("pgpass storage sets no PGPASSWORD", func(t *testing.T) {
 		// psql reads ~/.pgpass itself, so the env var must stay unset.
-		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, api.Service{}, discardCmd())
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
 		for _, env := range psqlCmd.Env {
 			if strings.HasPrefix(env, "PGPASSWORD=") {
 				t.Errorf("expected no PGPASSWORD for pgpass storage, got %s", env)
@@ -403,7 +403,7 @@ func TestLaunchPsql(t *testing.T) {
 		Database: "testdb",
 		Role:     "testuser",
 	}
-	err := launchPsql(&config.Config{PasswordStorage: "none"}, details, "/nonexistent/psql", []string{"--quiet"}, api.Service{}, cmd)
+	err := launchPsql(&config.Config{PasswordStorage: "none"}, details, "/nonexistent/psql", []string{"--quiet"}, common.PasswordTarget{}, cmd)
 	if err == nil {
 		t.Error("expected error for nonexistent psql path")
 	}

@@ -78,7 +78,7 @@ services writable.`,
 				Pooled:       pooled,
 				Role:         role,
 				WithPassword: withPassword,
-				ReadOnly:     readOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)) != nil,
+				ReadOnly:     readOnly || common.CheckReadOnly(cfg, target.Environment) != nil,
 			})
 			if err != nil {
 				return err

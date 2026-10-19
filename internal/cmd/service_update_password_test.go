@@ -42,7 +42,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 	storedPassword := func(t *testing.T) string {
 		t.Helper()
 		storage := &common.KeyringStorage{}
-		password, err := storage.Get(api.Service{ProjectID: testProjectID, ServiceID: "svc-12345"}, "tsdbadmin")
+		password, err := storage.Get(common.PasswordTarget{ProjectID: testProjectID, ID: "svc-12345"}, "tsdbadmin")
 		if err != nil {
 			return ""
 		}

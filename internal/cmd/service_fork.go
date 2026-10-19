@@ -182,7 +182,7 @@ default service from your configuration.`,
 			cmd.PrintErrf("Service ID: %s\n", forkedServiceID)
 
 			// Save password immediately after service fork
-			passwordSaved := handlePasswordSaving(cmd, cfg, forkedService, util.Deref(forkedService.InitialPassword))
+			passwordSaved := handlePasswordSaving(cmd, cfg, common.ServicePasswordTarget(forkedService), util.Deref(forkedService.InitialPassword))
 
 			// Set as default service unless --no-set-default is used
 			if !noSetDefault {

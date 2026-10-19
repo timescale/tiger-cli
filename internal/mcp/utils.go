@@ -219,7 +219,7 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
-	if details, err := common.GetConnectionDetails(cfg, service, common.ConnectionDetailsOptions{
+	if details, err := common.GetConnectionDetails(cfg, common.NewServiceConnectionTarget(service), common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
@@ -349,7 +349,7 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch) Br
 	if branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
 		detail.DirectEndpoint = fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port)
 	}
-	if details, err := common.GetConnectionDetails(cfg, common.BranchAsService(branch), common.ConnectionDetailsOptions{
+	if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), common.ConnectionDetailsOptions{
 		Role:     "tsdbadmin",
 		ReadOnly: common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
 	}); err != nil {

@@ -21,7 +21,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 	checkKeyringPassword := func(role, want string) checkFunc {
 		return func(t *testing.T, result cmdResult) {
 			t.Helper()
-			got, err := (&common.KeyringStorage{}).Get(sampleService(), role)
+			got, err := (&common.KeyringStorage{}).Get(common.ServicePasswordTarget(sampleService()), role)
 			if err != nil {
 				t.Fatalf("failed to read saved password: %v", err)
 			}
@@ -148,7 +148,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			mock:       setupGetService,
 			wantStderr: "Password saved for service 'test-service' (svc-12345), role readonly\n",
 			checks: []checkFunc{checkKeyringPassword("readonly", "readonly-pw"), func(t *testing.T, result cmdResult) {
-				if pw, err := (&common.KeyringStorage{}).Get(sampleService(), "tsdbadmin"); err == nil {
+				if pw, err := (&common.KeyringStorage{}).Get(common.ServicePasswordTarget(sampleService()), "tsdbadmin"); err == nil {
 					t.Errorf("expected no password stored for tsdbadmin, got %q", pw)
 				}
 			}},
@@ -194,7 +194,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			mock:       setupGetService,
 			wantStderr: "Password saved for service 'test-service' (svc-12345), role tsdbadmin\n",
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				if pw, err := (&common.KeyringStorage{}).Get(sampleService(), "tsdbadmin"); err == nil {
+				if pw, err := (&common.KeyringStorage{}).Get(common.ServicePasswordTarget(sampleService()), "tsdbadmin"); err == nil {
 					t.Errorf("expected no stored password, got %q", pw)
 				}
 			}},
@@ -210,7 +210,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				// Stored against the parent primary, matching the connect read path.
 				checkKeyringPassword("tsdbadmin", "replica-pw")(t, result)
-				if pw, err := (&common.KeyringStorage{}).Get(api.Service{ServiceID: "rep-67890", ProjectID: testProjectID}, "tsdbadmin"); err == nil {
+				if pw, err := (&common.KeyringStorage{}).Get(common.PasswordTarget{ID: "rep-67890", ProjectID: testProjectID}, "tsdbadmin"); err == nil {
 					t.Errorf("expected no password stored under the replica ID, got %q", pw)
 				}
 			}},

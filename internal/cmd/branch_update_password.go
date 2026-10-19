@@ -94,7 +94,7 @@ The branch can be given by ID or name.`,
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
-			if result, err := common.SavePasswordWithResult(cfg, common.BranchAsService(*branch), password, "tsdbadmin"); err != nil {
+			if result, err := common.SavePasswordWithResult(cfg, common.BranchPasswordTarget(*branch), password, "tsdbadmin"); err != nil {
 				cmd.PrintErrf("Warning: could not save password: %v\n", err)
 			} else if result.Success {
 				cmd.PrintErrf("%s\n", result.Message)

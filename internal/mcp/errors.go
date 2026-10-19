@@ -12,7 +12,7 @@ import (
 // everything else. Every other error passes through unchanged.
 func handleDatabaseError(err error, target *common.ConnectionTarget) error {
 	group := "service"
-	if target.IsBranch {
+	if target.Kind == common.TargetBranch {
 		group = "branch"
 	}
 

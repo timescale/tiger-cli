@@ -1118,7 +1118,7 @@ ORDER BY n.nspname, c.relname`,
 // It is a var so tests can stub the connection out and reach the callers'
 // success paths, which are otherwise only reachable against a live database.
 var FetchServiceSchema = func(ctx context.Context, cfg *config.Config, target *ConnectionTarget, args FetchServiceSchemaArgs) (*DatabaseSchema, error) {
-	if err := CheckServiceReady(target.ConnectionService); err != nil {
+	if err := target.CheckReady(); err != nil {
 		return nil, err
 	}
 
@@ -1146,8 +1146,8 @@ var FetchServiceSchema = func(ctx context.Context, cfg *config.Config, target *C
 	defer conn.Close(context.Background())
 
 	ident := SchemaIdent{
-		ID:   target.ConnectionService.ServiceID,
-		Name: target.ConnectionService.Name,
+		ID:   target.ID,
+		Name: target.Name,
 	}
 	return fetchSchemaFromConn(ctx, conn, ident, args)
 }

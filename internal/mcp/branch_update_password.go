@@ -104,7 +104,7 @@ func (s *Server) handleBranchUpdatePassword(ctx context.Context, req *mcp.CallTo
 		return nil, BranchUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	storage, err := common.SavePasswordWithResult(cfg, common.BranchAsService(*branch), password, "tsdbadmin")
+	storage, err := common.SavePasswordWithResult(cfg, common.BranchPasswordTarget(*branch), password, "tsdbadmin")
 	if err != nil {
 		s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
 	}

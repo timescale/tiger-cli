@@ -179,7 +179,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Save password immediately after service creation, before any waiting
 			// This ensures users have access even if they interrupt the wait or it fails
-			passwordSaved := handlePasswordSaving(cmd, cfg, service, util.Deref(service.InitialPassword))
+			passwordSaved := handlePasswordSaving(cmd, cfg, common.ServicePasswordTarget(service), util.Deref(service.InitialPassword))
 
 			// Set as default service unless --no-set-default is specified
 			if !noSetDefault {

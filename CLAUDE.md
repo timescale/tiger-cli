@@ -195,7 +195,7 @@ Interactive menus and spinners use BubbleTea v2 (`charm.land/bubbletea/v2`). Alw
 - Cleanup that can fail (closing a reader, removing a temporary directory) is called explicitly on the success path, with its error returned, and also deferred as best-effort cleanup for the error paths, where a more important error is already being returned. This relies on the cleanup being safe to call twice, so use it only for idempotent operations. `writeSkill` in `skills_install.go` is the model.
 - Return errors from `RunE`; never call `os.Exit` in a command. For specific exit codes, wrap with `common.ExitWithCode`, and map API errors to exit codes with `common.ExitWithErrorFromStatusCode`. The exit codes are defined in `internal/common/errors.go`, and `main.go` honors a `common.ExitCodeError` anywhere in the error chain.
 - After checking an API response's status code, nil-check the parsed body (`resp.JSON200`, etc.) before using it — a nil body indicates a bug and should return `errors.New("empty response from API")`.
-- Operations that connect to a service should call `common.CheckServiceReady` first and translate `common.ErrPaused`/`common.ErrNotReady` into actionable messages.
+- Operations that connect to a database should check `ConnectionTarget.CheckReady` first and translate `common.ErrPaused`/`common.ErrNotReady` into actionable messages.
 
 ## HTTP Requests
 

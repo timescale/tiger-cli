@@ -13,19 +13,48 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// buildPasswordKeyringUsername creates a unique keyring username for service passwords
-func buildPasswordKeyringUsername(service api.Service, role string) (string, error) {
-	if service.ServiceID == "" {
+// PasswordTarget is what a stored password belongs to: a service or a branch.
+// The keyring keys a password by project and ID, and ~/.pgpass by the
+// endpoint's host and port.
+type PasswordTarget struct {
+	ProjectID string
+	ID        string
+	Endpoint  *api.Endpoint
+}
+
+// ServicePasswordTarget returns the PasswordTarget of a service's own
+// passwords.
+func ServicePasswordTarget(service api.Service) PasswordTarget {
+	return PasswordTarget{
+		ProjectID: service.ProjectID,
+		ID:        service.ServiceID,
+		Endpoint:  service.Endpoint,
+	}
+}
+
+// BranchPasswordTarget returns the PasswordTarget of a branch's own
+// passwords.
+func BranchPasswordTarget(branch api.Branch) PasswordTarget {
+	return PasswordTarget{
+		ProjectID: branch.ProjectID,
+		ID:        branch.ID,
+		Endpoint:  branch.Endpoint,
+	}
+}
+
+// buildPasswordKeyringUsername creates a unique keyring username for a password
+func buildPasswordKeyringUsername(target PasswordTarget, role string) (string, error) {
+	if target.ID == "" {
 		return "", fmt.Errorf("service ID is required")
 	}
-	if service.ProjectID == "" {
+	if target.ProjectID == "" {
 		return "", fmt.Errorf("project ID is required")
 	}
 	if role == "" {
 		return "", fmt.Errorf("role is required")
 	}
 
-	return fmt.Sprintf("password-%s-%s-%s", service.ProjectID, service.ServiceID, role), nil
+	return fmt.Sprintf("password-%s-%s-%s", target.ProjectID, target.ID, role), nil
 }
 
 // sanitizeErrorMessage removes sensitive information from error messages
@@ -50,17 +79,17 @@ type PasswordStorageResult struct {
 
 // PasswordStorage defines the interface for password storage implementations
 type PasswordStorage interface {
-	Save(service api.Service, password string, role string) error
-	Get(service api.Service, role string) (string, error)
-	Remove(service api.Service, role string) error
+	Save(target PasswordTarget, password string, role string) error
+	Get(target PasswordTarget, role string) (string, error)
+	Remove(target PasswordTarget, role string) error
 	GetStorageResult(err error, password string) PasswordStorageResult
 }
 
 // KeyringStorage implements password storage using system keyring
 type KeyringStorage struct{}
 
-func (k *KeyringStorage) Save(service api.Service, password string, role string) error {
-	username, err := buildPasswordKeyringUsername(service, role)
+func (k *KeyringStorage) Save(target PasswordTarget, password string, role string) error {
+	username, err := buildPasswordKeyringUsername(target, role)
 	if err != nil {
 		return err
 	}
@@ -68,8 +97,8 @@ func (k *KeyringStorage) Save(service api.Service, password string, role string)
 	return keyring.Set(config.KeyringServiceName, username, password)
 }
 
-func (k *KeyringStorage) Get(service api.Service, role string) (string, error) {
-	username, err := buildPasswordKeyringUsername(service, role)
+func (k *KeyringStorage) Get(target PasswordTarget, role string) (string, error) {
+	username, err := buildPasswordKeyringUsername(target, role)
 	if err != nil {
 		return "", err
 	}
@@ -77,8 +106,8 @@ func (k *KeyringStorage) Get(service api.Service, role string) (string, error) {
 	return keyring.Get(config.KeyringServiceName, username)
 }
 
-func (k *KeyringStorage) Remove(service api.Service, role string) error {
-	username, err := buildPasswordKeyringUsername(service, role)
+func (k *KeyringStorage) Remove(target PasswordTarget, role string) error {
+	username, err := buildPasswordKeyringUsername(target, role)
 	if err != nil {
 		return err
 	}
@@ -105,8 +134,8 @@ func (k *KeyringStorage) GetStorageResult(err error, password string) PasswordSt
 // PgpassStorage implements password storage using ~/.pgpass file
 type PgpassStorage struct{}
 
-func (p *PgpassStorage) Save(service api.Service, password string, role string) error {
-	if service.Endpoint == nil || service.Endpoint.Host == nil || service.Endpoint.Port == nil {
+func (p *PgpassStorage) Save(target PasswordTarget, password string, role string) error {
+	if target.Endpoint == nil || target.Endpoint.Host == nil || target.Endpoint.Port == nil {
 		return fmt.Errorf("service endpoint not available")
 	}
 	if role == "" {
@@ -119,8 +148,8 @@ func (p *PgpassStorage) Save(service api.Service, password string, role string) 
 	}
 
 	pgpassPath := filepath.Join(homeDir, ".pgpass")
-	host := *service.Endpoint.Host
-	port := fmt.Sprintf("%d", *service.Endpoint.Port)
+	host := *target.Endpoint.Host
+	port := fmt.Sprintf("%d", *target.Endpoint.Port)
 	database := "tsdb" // TimescaleDB database name
 	username := role   // Use the provided role as username
 
@@ -146,8 +175,8 @@ func (p *PgpassStorage) Save(service api.Service, password string, role string) 
 	return nil
 }
 
-func (p *PgpassStorage) Get(service api.Service, role string) (string, error) {
-	if service.Endpoint == nil || service.Endpoint.Host == nil || service.Endpoint.Port == nil {
+func (p *PgpassStorage) Get(target PasswordTarget, role string) (string, error) {
+	if target.Endpoint == nil || target.Endpoint.Host == nil || target.Endpoint.Port == nil {
 		return "", fmt.Errorf("service endpoint not available")
 	}
 	if role == "" {
@@ -166,8 +195,8 @@ func (p *PgpassStorage) Get(service api.Service, role string) (string, error) {
 		return "", fmt.Errorf("no .pgpass file found")
 	}
 
-	host := *service.Endpoint.Host
-	port := fmt.Sprintf("%d", *service.Endpoint.Port)
+	host := *target.Endpoint.Host
+	port := fmt.Sprintf("%d", *target.Endpoint.Port)
 	username := role
 
 	// Read and parse .pgpass file
@@ -197,8 +226,8 @@ func (p *PgpassStorage) Get(service api.Service, role string) (string, error) {
 	return "", fmt.Errorf("no matching entry found in .pgpass file")
 }
 
-func (p *PgpassStorage) Remove(service api.Service, role string) error {
-	if service.Endpoint == nil || service.Endpoint.Host == nil || service.Endpoint.Port == nil {
+func (p *PgpassStorage) Remove(target PasswordTarget, role string) error {
+	if target.Endpoint == nil || target.Endpoint.Host == nil || target.Endpoint.Port == nil {
 		return fmt.Errorf("service endpoint not available")
 	}
 	if role == "" {
@@ -211,8 +240,8 @@ func (p *PgpassStorage) Remove(service api.Service, role string) error {
 	}
 
 	pgpassPath := filepath.Join(homeDir, ".pgpass")
-	host := *service.Endpoint.Host
-	port := fmt.Sprintf("%d", *service.Endpoint.Port)
+	host := *target.Endpoint.Host
+	port := fmt.Sprintf("%d", *target.Endpoint.Port)
 	username := role
 
 	return p.removeEntry(pgpassPath, host, port, username)
@@ -295,15 +324,15 @@ func (p *PgpassStorage) GetStorageResult(err error, password string) PasswordSto
 // NoStorage implements no password storage (passwords are not saved)
 type NoStorage struct{}
 
-func (n *NoStorage) Save(service api.Service, password string, role string) error {
+func (n *NoStorage) Save(target PasswordTarget, password string, role string) error {
 	return nil // Do nothing
 }
 
-func (n *NoStorage) Get(service api.Service, role string) (string, error) {
+func (n *NoStorage) Get(target PasswordTarget, role string) (string, error) {
 	return "", fmt.Errorf("password storage disabled")
 }
 
-func (n *NoStorage) Remove(service api.Service, role string) error {
+func (n *NoStorage) Remove(target PasswordTarget, role string) error {
 	return nil // Do nothing
 }
 
@@ -330,7 +359,7 @@ func GetPasswordStorage(cfg *config.Config) PasswordStorage {
 }
 
 // SavePasswordWithResult handles saving a password and returns both error and result info
-func SavePasswordWithResult(cfg *config.Config, service api.Service, password string, role string) (PasswordStorageResult, error) {
+func SavePasswordWithResult(cfg *config.Config, target PasswordTarget, password string, role string) (PasswordStorageResult, error) {
 	if password == "" {
 		return PasswordStorageResult{
 			Success: false,
@@ -347,7 +376,7 @@ func SavePasswordWithResult(cfg *config.Config, service api.Service, password st
 	}
 
 	storage := GetPasswordStorage(cfg)
-	err := storage.Save(service, password, role)
+	err := storage.Save(target, password, role)
 	result := storage.GetStorageResult(err, password)
 
 	return result, err

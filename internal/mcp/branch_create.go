@@ -134,7 +134,7 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 	// fails or is interrupted.
 	var passwordStorage *common.PasswordStorageResult
 	if branch.InitialPassword != nil {
-		result, err := common.SavePasswordWithResult(cfg, common.BranchAsService(branch), *branch.InitialPassword, "tsdbadmin")
+		result, err := common.SavePasswordWithResult(cfg, common.BranchPasswordTarget(branch), *branch.InitialPassword, "tsdbadmin")
 		passwordStorage = &result
 		if err != nil {
 			s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))

@@ -633,7 +633,7 @@ func expectGetBranch(m *mocks.MockClientWithResponsesInterface, branch api.Branc
 func checkStoredPassword(id, want string) checkFunc {
 	return func(t *testing.T, result toolResult) {
 		t.Helper()
-		got, err := (&common.KeyringStorage{}).Get(api.Service{ServiceID: id, ProjectID: testProjectID}, "tsdbadmin")
+		got, err := (&common.KeyringStorage{}).Get(common.PasswordTarget{ID: id, ProjectID: testProjectID}, "tsdbadmin")
 		if err != nil {
 			t.Fatalf("failed to read stored password: %v", err)
 		}

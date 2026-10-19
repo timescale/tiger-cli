@@ -20,20 +20,6 @@ func BranchCPUMemoryConfigs() CPUMemoryConfigs {
 	return FluidCPUMemoryConfigs()
 }
 
-// BranchAsService adapts a branch to the api.Service shape that password
-// storage and connection details work with. Both key off the ID, project, and
-// endpoint, which a branch has just like a service.
-func BranchAsService(branch api.Branch) api.Service {
-	return api.Service{
-		ServiceID: branch.ID,
-		ProjectID: branch.ProjectID,
-		Name:      branch.Name,
-		Status:    branch.Status,
-		Created:   branch.Created,
-		Endpoint:  branch.Endpoint,
-	}
-}
-
 // ResolveBranch resolves ref, a branch ID or name, to the branch it names.
 // The branch carries its parent's ID, which every other branch endpoint needs.
 func ResolveBranch(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string) (*api.Branch, error) {

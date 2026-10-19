@@ -109,16 +109,15 @@ PostgreSQL Configuration Parameters That May Be Set:
 			if err != nil {
 				return err
 			}
-			if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)); err != nil {
+			if err := common.CheckReadOnly(cfg, target.Environment); err != nil {
 				return err
 			}
 
 			// A read replica is read-only, so a role can't be created there.
-			if target.IsReplica {
+			if target.Kind == common.TargetReadReplica {
 				return fmt.Errorf("'%s' is a read replica; create the role on its primary service '%s' instead",
-					target.ConnectionService.ServiceID, target.CredentialService.ServiceID)
+					target.ID, target.Credentials.ID)
 			}
-			service := target.ConnectionService
 
 			// Get password
 			rolePassword, err := getPasswordForRole(password)
@@ -127,7 +126,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Build connection string
-			details, err := common.GetConnectionDetails(cfg, service, common.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(cfg, target, common.ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin", // Use admin role to create new roles
 				WithPassword: true,
@@ -152,7 +151,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Save password to storage with the new role name
-			result, err := common.SavePasswordWithResult(cfg, service, rolePassword, name)
+			result, err := common.SavePasswordWithResult(cfg, target.Credentials.PasswordTarget, rolePassword, name)
 			if err != nil {
 				cmd.PrintErrf("Warning: %s\n", result.Message)
 			} else if !result.Success {

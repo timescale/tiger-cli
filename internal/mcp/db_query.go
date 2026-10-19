@@ -170,7 +170,7 @@ func (s *Server) handleDBQuery(ctx context.Context, req *mcp.CallToolRequest, in
 	}
 
 	// Under prod mode the resolved target's tag decides.
-	readOnlySession := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)) != nil
+	readOnlySession := common.CheckReadOnly(cfg, target.Environment) != nil
 
 	// A replica without a pooler connects directly; surface that as a warning.
 	poolerWarning := common.ReplicaPoolerWarning(target, input.Pooled)

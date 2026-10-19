@@ -527,11 +527,11 @@ func checkDefaultService(want string) checkFunc {
 	}
 }
 
-// withStoredPassword seeds a password for svc in the mock keyring before the
-// command runs.
-func withStoredPassword(svc api.Service, password string) runOption {
+// withStoredPassword seeds a password for target in the mock keyring before
+// the command runs.
+func withStoredPassword(target common.PasswordTarget, password string) runOption {
 	return withSetup(func(t *testing.T) {
-		if err := (&common.KeyringStorage{}).Save(svc, password, "tsdbadmin"); err != nil {
+		if err := (&common.KeyringStorage{}).Save(target, password, "tsdbadmin"); err != nil {
 			t.Fatalf("failed to seed password: %v", err)
 		}
 	})
@@ -542,8 +542,8 @@ func withStoredPassword(svc api.Service, password string) runOption {
 func checkStoredPassword(serviceID, want string) checkFunc {
 	return func(t *testing.T, result cmdResult) {
 		t.Helper()
-		svc := api.Service{ServiceID: serviceID, ProjectID: testProjectID}
-		got, err := (&common.KeyringStorage{}).Get(svc, "tsdbadmin")
+		target := common.PasswordTarget{ID: serviceID, ProjectID: testProjectID}
+		got, err := (&common.KeyringStorage{}).Get(target, "tsdbadmin")
 		if err != nil {
 			t.Fatalf("failed to read stored password: %v", err)
 		}

@@ -30,7 +30,7 @@ func TestNoStorage_Save(t *testing.T) {
 	storage := &NoStorage{}
 	service := createTestService("test-service-123")
 
-	err := storage.Save(service, "test-password", "tsdbadmin")
+	err := storage.Save(ServicePasswordTarget(service), "test-password", "tsdbadmin")
 	if err != nil {
 		t.Errorf("NoStorage.Save() should never return an error, got: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestNoStorage_Get(t *testing.T) {
 	storage := &NoStorage{}
 	service := createTestService("test-service-123")
 
-	password, err := storage.Get(service, "tsdbadmin")
+	password, err := storage.Get(ServicePasswordTarget(service), "tsdbadmin")
 	if err == nil {
 		t.Error("NoStorage.Get() should return an error")
 	}
@@ -56,7 +56,7 @@ func TestNoStorage_Remove(t *testing.T) {
 	storage := &NoStorage{}
 	service := createTestService("test-service-123")
 
-	err := storage.Remove(service, "tsdbadmin")
+	err := storage.Remove(ServicePasswordTarget(service), "tsdbadmin")
 	if err != nil {
 		t.Errorf("NoStorage.Remove() should never return an error, got: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestKeyringStorage_Save_NoServiceId(t *testing.T) {
 	storage := &KeyringStorage{}
 	service := api.Service{} // No ServiceID
 
-	err := storage.Save(service, "test-password", "tsdbadmin")
+	err := storage.Save(ServicePasswordTarget(service), "test-password", "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Save() should return error when ServiceID is nil")
 	}
@@ -83,7 +83,7 @@ func TestKeyringStorage_Save_NoProjectId(t *testing.T) {
 		// No ProjectID
 	}
 
-	err := storage.Save(service, "test-password", "tsdbadmin")
+	err := storage.Save(ServicePasswordTarget(service), "test-password", "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Save() should return error when ProjectID is nil")
 	}
@@ -96,7 +96,7 @@ func TestKeyringStorage_Save_NoRole(t *testing.T) {
 	storage := &KeyringStorage{}
 	service := createTestService("test-service-123")
 
-	err := storage.Save(service, "test-password", "")
+	err := storage.Save(ServicePasswordTarget(service), "test-password", "")
 	if err == nil {
 		t.Error("KeyringStorage.Save() should return error when role is empty")
 	}
@@ -109,7 +109,7 @@ func TestKeyringStorage_Get_NoServiceId(t *testing.T) {
 	storage := &KeyringStorage{}
 	service := api.Service{} // No ServiceID
 
-	password, err := storage.Get(service, "tsdbadmin")
+	password, err := storage.Get(ServicePasswordTarget(service), "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Get() should return error when ServiceID is nil")
 	}
@@ -129,7 +129,7 @@ func TestKeyringStorage_Get_NoProjectId(t *testing.T) {
 		// No ProjectID
 	}
 
-	password, err := storage.Get(service, "tsdbadmin")
+	password, err := storage.Get(ServicePasswordTarget(service), "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Get() should return error when ProjectID is nil")
 	}
@@ -145,7 +145,7 @@ func TestKeyringStorage_Get_NoRole(t *testing.T) {
 	storage := &KeyringStorage{}
 	service := createTestService("test-service-123")
 
-	password, err := storage.Get(service, "")
+	password, err := storage.Get(ServicePasswordTarget(service), "")
 	if err == nil {
 		t.Error("KeyringStorage.Get() should return error when role is empty")
 	}
@@ -161,7 +161,7 @@ func TestKeyringStorage_Remove_NoServiceId(t *testing.T) {
 	storage := &KeyringStorage{}
 	service := api.Service{} // No ServiceID
 
-	err := storage.Remove(service, "tsdbadmin")
+	err := storage.Remove(ServicePasswordTarget(service), "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Remove() should return error when ServiceID is nil")
 	}
@@ -178,7 +178,7 @@ func TestKeyringStorage_Remove_NoProjectId(t *testing.T) {
 		// No ProjectID
 	}
 
-	err := storage.Remove(service, "tsdbadmin")
+	err := storage.Remove(ServicePasswordTarget(service), "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Remove() should return error when ProjectID is nil")
 	}
@@ -191,7 +191,7 @@ func TestKeyringStorage_Remove_NoRole(t *testing.T) {
 	storage := &KeyringStorage{}
 	service := createTestService("test-service-123")
 
-	err := storage.Remove(service, "")
+	err := storage.Remove(ServicePasswordTarget(service), "")
 	if err == nil {
 		t.Error("KeyringStorage.Remove() should return error when role is empty")
 	}
@@ -207,7 +207,7 @@ func TestPgpassStorage_Remove_NoEndpoint(t *testing.T) {
 		// No Endpoint
 	}
 
-	err := storage.Remove(service, "tsdbadmin")
+	err := storage.Remove(ServicePasswordTarget(service), "tsdbadmin")
 	if err == nil {
 		t.Error("PgpassStorage.Remove() should return error when endpoint is nil")
 	}
@@ -223,13 +223,13 @@ func TestPgpassStorage_NoPort(t *testing.T) {
 	service := createTestService("test-service-123")
 	service.Endpoint.Port = nil
 
-	if err := storage.Save(service, "secret", "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
+	if err := storage.Save(ServicePasswordTarget(service), "secret", "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
 		t.Errorf("PgpassStorage.Save() error = %v, want service endpoint not available", err)
 	}
-	if _, err := storage.Get(service, "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
+	if _, err := storage.Get(ServicePasswordTarget(service), "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
 		t.Errorf("PgpassStorage.Get() error = %v, want service endpoint not available", err)
 	}
-	if err := storage.Remove(service, "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
+	if err := storage.Remove(ServicePasswordTarget(service), "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
 		t.Errorf("PgpassStorage.Remove() error = %v, want service endpoint not available", err)
 	}
 }
@@ -238,7 +238,7 @@ func TestPgpassStorage_Remove_NoRole(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := createTestService("test-service-123")
 
-	err := storage.Remove(service, "")
+	err := storage.Remove(ServicePasswordTarget(service), "")
 	if err == nil {
 		t.Error("PgpassStorage.Remove() should return error when role is empty")
 	}
@@ -254,7 +254,7 @@ func TestPgpassStorage_Get_NoEndpoint(t *testing.T) {
 		// No Endpoint
 	}
 
-	password, err := storage.Get(service, "tsdbadmin")
+	password, err := storage.Get(ServicePasswordTarget(service), "tsdbadmin")
 	if err == nil {
 		t.Error("PgpassStorage.Get() should return error when endpoint is nil")
 	}
@@ -270,7 +270,7 @@ func TestPgpassStorage_Get_NoRole(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := createTestService("test-service-123")
 
-	password, err := storage.Get(service, "")
+	password, err := storage.Get(ServicePasswordTarget(service), "")
 	if err == nil {
 		t.Error("PgpassStorage.Get() should return error when role is empty")
 	}
@@ -292,7 +292,7 @@ func TestPgpassStorage_Get_NoFile(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := createTestService("test-service-123")
 
-	password, err := storage.Get(service, "tsdbadmin")
+	password, err := storage.Get(ServicePasswordTarget(service), "tsdbadmin")
 	if err == nil {
 		t.Error("PgpassStorage.Get() should return error when .pgpass file doesn't exist")
 	}
@@ -352,7 +352,7 @@ func TestPasswordStorage_DifferentRoles(t *testing.T) {
 			cleanup: func(t *testing.T, service api.Service, roles []string) {
 				storage := &KeyringStorage{}
 				for _, role := range roles {
-					storage.Remove(service, role)
+					storage.Remove(ServicePasswordTarget(service), role)
 				}
 			},
 		},
@@ -398,7 +398,7 @@ func TestPasswordStorage_DifferentRoles(t *testing.T) {
 
 			// Save passwords for all roles
 			for _, r := range roles {
-				err := tt.storage.Save(service, r.password, r.role)
+				err := tt.storage.Save(ServicePasswordTarget(service), r.password, r.role)
 				if _, ok := tt.storage.(*NoStorage); ok {
 					continue
 				}
@@ -409,7 +409,7 @@ func TestPasswordStorage_DifferentRoles(t *testing.T) {
 
 			// Verify each role has its own password stored separately
 			for _, r := range roles {
-				retrieved, err := tt.storage.Get(service, r.role)
+				retrieved, err := tt.storage.Get(ServicePasswordTarget(service), r.role)
 				if _, ok := tt.storage.(*NoStorage); ok {
 					if err == nil {
 						t.Error("NoStorage.Get() should always return error")
@@ -426,20 +426,20 @@ func TestPasswordStorage_DifferentRoles(t *testing.T) {
 
 			// Verify removing one role doesn't affect others
 			if _, ok := tt.storage.(*NoStorage); !ok {
-				err := tt.storage.Remove(service, roles[0].role)
+				err := tt.storage.Remove(ServicePasswordTarget(service), roles[0].role)
 				if err != nil {
 					t.Fatalf("Remove(%s) failed: %v", roles[0].role, err)
 				}
 
 				// First role should be gone
-				_, err = tt.storage.Get(service, roles[0].role)
+				_, err = tt.storage.Get(ServicePasswordTarget(service), roles[0].role)
 				if err == nil {
 					t.Errorf("Get(%s) should fail after removal", roles[0].role)
 				}
 
 				// Other roles should still exist
 				for _, r := range roles[1:] {
-					retrieved, err := tt.storage.Get(service, r.role)
+					retrieved, err := tt.storage.Get(ServicePasswordTarget(service), r.role)
 					if err != nil {
 						t.Errorf("Get(%s) should still work after removing %s: %v", r.role, roles[0].role, err)
 					}
@@ -468,7 +468,7 @@ func TestPgpassStorage_Integration(t *testing.T) {
 	role := "tsdbadmin"
 
 	// Test Save
-	err := storage.Save(service, password, role)
+	err := storage.Save(ServicePasswordTarget(service), password, role)
 	if err != nil {
 		t.Fatalf("PgpassStorage.Save() failed: %v", err)
 	}
@@ -491,7 +491,7 @@ func TestPgpassStorage_Integration(t *testing.T) {
 	}
 
 	// Test Get
-	retrievedPassword, err := storage.Get(service, role)
+	retrievedPassword, err := storage.Get(ServicePasswordTarget(service), role)
 	if err != nil {
 		t.Fatalf("PgpassStorage.Get() failed: %v", err)
 	}
@@ -500,7 +500,7 @@ func TestPgpassStorage_Integration(t *testing.T) {
 	}
 
 	// Test Remove
-	err = storage.Remove(service, role)
+	err = storage.Remove(ServicePasswordTarget(service), role)
 	if err != nil {
 		t.Fatalf("PgpassStorage.Remove() failed: %v", err)
 	}
@@ -638,7 +638,7 @@ func TestPgpassStorage_GetStorageResult_Error(t *testing.T) {
 func TestSavePasswordWithResult_EmptyPassword(t *testing.T) {
 	service := createTestService("test-service-123")
 
-	result, err := SavePasswordWithResult(testConfig(""), service, "", "tsdbadmin")
+	result, err := SavePasswordWithResult(testConfig(""), ServicePasswordTarget(service), "", "tsdbadmin")
 	if err != nil {
 		t.Errorf("SavePasswordWithResult() with empty password should not return error, got: %v", err)
 	}
@@ -657,7 +657,7 @@ func TestSavePasswordWithResult_WithPassword(t *testing.T) {
 	service := createTestService("test-service-123")
 
 	// Use NoStorage for predictable behavior
-	result, err := SavePasswordWithResult(testConfig("none"), service, "test-password", "tsdbadmin")
+	result, err := SavePasswordWithResult(testConfig("none"), ServicePasswordTarget(service), "test-password", "tsdbadmin")
 	if err != nil {
 		t.Errorf("SavePasswordWithResult() should not return error with NoStorage, got: %v", err)
 	}
@@ -787,7 +787,7 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := buildPasswordKeyringUsername(tt.service, tt.role)
+			result, err := buildPasswordKeyringUsername(ServicePasswordTarget(tt.service), tt.role)
 
 			if tt.expectError && err == nil {
 				t.Errorf("buildPasswordKeyringUsername() expected error but got none")
@@ -819,7 +819,7 @@ func TestPasswordStorage_OverwritePreviousValue(t *testing.T) {
 			},
 			cleanup: func(t *testing.T, service api.Service) {
 				storage := &KeyringStorage{}
-				storage.Remove(service, "tsdbadmin") // Ignore errors in cleanup
+				storage.Remove(ServicePasswordTarget(service), "tsdbadmin") // Ignore errors in cleanup
 			},
 		},
 		{
@@ -857,10 +857,10 @@ func TestPasswordStorage_OverwritePreviousValue(t *testing.T) {
 			role := "tsdbadmin"
 
 			// Save original password
-			err1 := tt.storage.Save(service, originalPassword, role)
+			err1 := tt.storage.Save(ServicePasswordTarget(service), originalPassword, role)
 
 			// Save new password (should overwrite)
-			err2 := tt.storage.Save(service, newPassword, role)
+			err2 := tt.storage.Save(ServicePasswordTarget(service), newPassword, role)
 
 			// Handle NoStorage specially (always succeeds but doesn't store)
 			if _, ok := tt.storage.(*NoStorage); ok {
@@ -868,7 +868,7 @@ func TestPasswordStorage_OverwritePreviousValue(t *testing.T) {
 					t.Errorf("NoStorage.Save() should not return error, got first: %v, second: %v", err1, err2)
 				}
 				// NoStorage.Get() always returns error, so we can't test retrieval
-				_, err := tt.storage.Get(service, role)
+				_, err := tt.storage.Get(ServicePasswordTarget(service), role)
 				if err == nil {
 					t.Error("NoStorage.Get() should always return error")
 				}
@@ -888,7 +888,7 @@ func TestPasswordStorage_OverwritePreviousValue(t *testing.T) {
 			}
 
 			// Get the stored password - should be the new one
-			retrieved, err := tt.storage.Get(service, role)
+			retrieved, err := tt.storage.Get(ServicePasswordTarget(service), role)
 			if err != nil {
 				t.Fatalf("Get() failed: %v", err)
 			}
