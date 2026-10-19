@@ -54,7 +54,7 @@ func newBranchUpdatePasswordTool() *mcp.Tool {
 		Title: "Update Branch Password",
 		Description: `Update the master password for the 'tsdbadmin' user of a branch.
 
-A branch starts with its parent service's password. Changing it here affects only the branch. The tool generates a secure random password itself; it does not accept one. The change takes effect immediately and may terminate existing connections to the branch. The new password is saved to the configured password storage and is included in the result only if with_password is true.
+Changing it affects only the branch, not its parent service. The tool generates a secure random password itself; it does not accept one. The change takes effect immediately and may terminate existing connections to the branch. The new password is saved to the configured password storage and is included in the result only if with_password is true.
 
 If the user wants to set a specific password, tell them to run 'tiger branch update-password' from the CLI instead, which keeps the password out of this conversation.`,
 		InputSchema:  BranchUpdatePasswordInput{}.Schema(),

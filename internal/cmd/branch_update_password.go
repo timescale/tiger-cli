@@ -23,8 +23,7 @@ func buildBranchUpdatePasswordCmd(app *common.App) *cobra.Command {
 		Short: "Update the master password for a branch",
 		Long: `Update the master password for the 'tsdbadmin' user of a branch.
 
-A branch gets its own password when it is created, independent of its parent
-service's, so changing one doesn't change the other.
+Changing a branch's password doesn't change its parent service's.
 
 The branch can be given by ID or name.`,
 		Example: `  # Update a branch's password, interactively prompts

@@ -31,8 +31,7 @@ func buildBranchCmd(app *common.App) *cobra.Command {
 
 A branch is a lightweight, ephemeral copy of a Fluid Service, for development,
 testing, CI/CD, and agent workflows. It shares its parent's storage as of the
-moment it was created, gets its own compute, and starts with the same users
-and passwords as its parent.`,
+moment it was created and gets its own compute.`,
 	}
 
 	cmd.AddCommand(buildBranchCreateCmd(app))
