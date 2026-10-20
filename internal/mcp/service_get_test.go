@@ -16,7 +16,7 @@ func TestServiceGetTool(t *testing.T) {
 
 	created := time.Date(2025, 1, 15, 9, 30, 0, 0, time.UTC)
 	endpoint := &api.Endpoint{
-		Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
+		Host: new("e6ue9697jf.project.tsdb.cloud.tigerdata.com"),
 		Port: new(5432),
 	}
 
@@ -30,7 +30,7 @@ func TestServiceGetTool(t *testing.T) {
 		s.Endpoint = endpoint
 		s.ConnectionPooler = &api.ConnectionPooler{
 			Endpoint: &api.Endpoint{
-				Host: new("e6ue9697jf.project.pooler.tsdb.cloud.timescale.com"),
+				Host: new("e6ue9697jf.project.pooler.tsdb.cloud.tigerdata.com"),
 				Port: new(6432),
 			},
 		}
@@ -64,9 +64,9 @@ func TestServiceGetTool(t *testing.T) {
 			"environment":       "PROD",
 			"resources":         map[string]any{"cpu": "2 cores", "memory": "8 GB"},
 			"replicas":          float64(2),
-			"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
-			"pooler_endpoint":   "e6ue9697jf.project.pooler.tsdb.cloud.timescale.com:6432",
-			"connection_string": "postgresql://tsdbadmin@e6ue9697jf.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+			"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.tigerdata.com:5432",
+			"pooler_endpoint":   "e6ue9697jf.project.pooler.tsdb.cloud.tigerdata.com:6432",
+			"connection_string": "postgresql://tsdbadmin@e6ue9697jf.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
 		},
 	}
 	withPassword := map[string]any{
@@ -79,9 +79,9 @@ func TestServiceGetTool(t *testing.T) {
 			"created":           "2025-01-15T09:30:00Z",
 			"environment":       "DEV",
 			"replicas":          float64(0),
-			"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
+			"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.tigerdata.com:5432",
 			"password":          "super-secret-pw",
-			"connection_string": "postgresql://tsdbadmin:super-secret-pw@e6ue9697jf.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+			"connection_string": "postgresql://tsdbadmin:super-secret-pw@e6ue9697jf.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
 		},
 	}
 
@@ -164,8 +164,8 @@ func TestServiceGetTool(t *testing.T) {
 					"created":           "2025-01-15T09:30:00Z",
 					"environment":       "DEV",
 					"replicas":          float64(0),
-					"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
-					"connection_string": "postgresql://tsdbadmin@e6ue9697jf.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+					"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.tigerdata.com:5432",
+					"connection_string": "postgresql://tsdbadmin@e6ue9697jf.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
 				},
 			},
 		},

@@ -26,7 +26,7 @@ func TestServiceForkCmd(t *testing.T) {
 
 	// Env rendering of the forked service, for cases where the table would be
 	// noise. The endpoint host comes from sampleService.
-	forkedEnv := `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+	forkedEnv := `PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com
 PGPORT=5432
 PGDATABASE=tsdb
 PGUSER=tsdbadmin
@@ -333,9 +333,9 @@ const sampleForkedServiceTable = `┌──────────────�
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 cores (1000m)                                                                             │
 │ Memory            │ 4 GB                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.tigerdata.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
-│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-67890                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `

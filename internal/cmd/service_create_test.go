@@ -369,7 +369,7 @@ Service is being created. Use 'tiger service list' to check status.
 						JSON202:      &svc,
 					}, nil)
 			},
-			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com
 PGPORT=5432
 PGDATABASE=tsdb
 PGUSER=tsdbadmin
@@ -393,7 +393,7 @@ Service is being created. Use 'tiger service list' to check status.
 						JSON202:      &pwSvc,
 					}, nil)
 			},
-			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com
 PGPORT=5432
 PGDATABASE=tsdb
 PGUSER=tsdbadmin
@@ -429,7 +429,7 @@ Service is being created. Use 'tiger service list' to check status.
 					JSON202:      &svc,
 				}, nil)
 			},
-			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com
 PGPORT=5432
 PGDATABASE=tsdb
 PGUSER=tsdbadmin
@@ -452,7 +452,7 @@ Service is being created. Use 'tiger service list' to check status.
 						JSON202:      &svc,
 					}, nil)
 			},
-			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com
 PGPORT=5432
 PGDATABASE=tsdb
 PGUSER=tsdbadmin
@@ -487,9 +487,9 @@ Service is being created. Use 'tiger service list' to check status.
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 cores (1000m)                                                                             │
 │ Memory            │ 4 GB                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.tigerdata.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
-│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
@@ -513,7 +513,7 @@ Service is being created. Use 'tiger service list' to check status.
 						JSON202:      &svc,
 					}, nil)
 			},
-			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com
 PGPORT=5432
 PGDATABASE=tsdb
 PGUSER=tsdbadmin
@@ -537,7 +537,7 @@ Service is being created. Use 'tiger service list' to check status.
 					JSON202:      &svc,
 				}, nil)
 			},
-			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com
 PGPORT=5432
 PGDATABASE=tsdb
 PGUSER=tsdbadmin
@@ -589,7 +589,7 @@ Service is being created. Use 'tiger service list' to check status.
 						JSON202:      &svc,
 					}, nil)
 			},
-			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com
 PGPORT=5432
 PGDATABASE=tsdb
 PGUSER=tsdbadmin
@@ -614,9 +614,9 @@ const sampleServiceCreateTable = `┌──────────────�
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 cores (1000m)                                                                             │
 │ Memory            │ 4 GB                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.tigerdata.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
-│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `
@@ -632,9 +632,9 @@ const sampleServiceCreateQueuedTable = `┌────────────�
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 cores (1000m)                                                                             │
 │ Memory            │ 4 GB                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.tigerdata.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
-│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `
@@ -642,7 +642,7 @@ const sampleServiceCreateQueuedTable = `┌────────────�
 const sampleServiceCreateJSON = `{
   "created": "2025-01-15T10:30:00Z",
   "endpoint": {
-    "host": "svc-12345.project.tsdb.cloud.timescale.com",
+    "host": "svc-12345.project.tsdb.cloud.tigerdata.com",
     "port": 5432
   },
   "name": "test-service",
@@ -661,22 +661,22 @@ const sampleServiceCreateJSON = `{
   "service_type": "TIMESCALEDB",
   "status": "READY",
   "role": "tsdbadmin",
-  "host": "svc-12345.project.tsdb.cloud.timescale.com",
+  "host": "svc-12345.project.tsdb.cloud.tigerdata.com",
   "port": 5432,
   "database": "tsdb",
-  "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+  "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
   "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
 }
 `
 
-const sampleServiceCreateYAML = `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
+const sampleServiceCreateYAML = `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require
 console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
 created: "2025-01-15T10:30:00Z"
 database: tsdb
 endpoint:
-  host: svc-12345.project.tsdb.cloud.timescale.com
+  host: svc-12345.project.tsdb.cloud.tigerdata.com
   port: 5432
-host: svc-12345.project.tsdb.cloud.timescale.com
+host: svc-12345.project.tsdb.cloud.tigerdata.com
 name: test-service
 port: 5432
 project_id: test-project-123

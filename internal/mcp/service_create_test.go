@@ -37,7 +37,7 @@ func TestServiceCreateTool(t *testing.T) {
 	newService := func(overrides ...func(*api.Service)) api.Service {
 		return sampleService(append([]func(*api.Service){func(s *api.Service) {
 			s.Created = time.Date(2025, 1, 15, 9, 30, 0, 0, time.UTC)
-			s.Endpoint = &api.Endpoint{Host: new("e6ue9697jf.abc.tsdb.cloud.timescale.com"), Port: new(5432)}
+			s.Endpoint = &api.Endpoint{Host: new("e6ue9697jf.abc.tsdb.cloud.tigerdata.com"), Port: new(5432)}
 		}}, overrides...)...)
 	}
 	provisioning := func(s *api.Service) { s.Status = api.DeployStatusCONFIGURING }
@@ -62,9 +62,9 @@ func TestServiceCreateTool(t *testing.T) {
 		"region":            "us-east-1",
 		"created":           "2025-01-15T09:30:00Z",
 		"environment":       "DEV",
-		"direct_endpoint":   "e6ue9697jf.abc.tsdb.cloud.timescale.com:5432",
+		"direct_endpoint":   "e6ue9697jf.abc.tsdb.cloud.tigerdata.com:5432",
 		"replicas":          float64(0),
-		"connection_string": "postgresql://tsdbadmin@e6ue9697jf.abc.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+		"connection_string": "postgresql://tsdbadmin@e6ue9697jf.abc.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
 	}
 	detail := func(overrides map[string]any) map[string]any {
 		d := maps.Clone(baseDetail)
@@ -338,7 +338,7 @@ func TestServiceCreateTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"service": detail(map[string]any{
 					"password":          "init-pass-123",
-					"connection_string": "postgresql://tsdbadmin:init-pass-123@e6ue9697jf.abc.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+					"connection_string": "postgresql://tsdbadmin:init-pass-123@e6ue9697jf.abc.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
 				}),
 				"message":          acceptedMsg,
 				"password_storage": storedPassword,

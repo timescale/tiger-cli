@@ -12,9 +12,9 @@ import (
 
 func TestDbURICmd(t *testing.T) {
 	const (
-		directURI   = "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n"
-		readOnlyURI = "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require&options=-c%20tsdb_admin.read_only_connection%3Dtrue\n"
-		replicaURI  = "postgresql://tsdbadmin@rep-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n"
+		directURI   = "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require\n"
+		readOnlyURI = "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require&options=-c%20tsdb_admin.read_only_connection%3Dtrue\n"
+		replicaURI  = "postgresql://tsdbadmin@rep-67890.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require\n"
 	)
 
 	setupGet := func(m *mocks.MockClientWithResponsesInterface) {
@@ -27,7 +27,7 @@ func TestDbURICmd(t *testing.T) {
 	withPooler := func(s *api.Service) {
 		s.ConnectionPooler = &api.ConnectionPooler{
 			Endpoint: &api.Endpoint{
-				Host: new("pooler.svc-12345.project.tsdb.cloud.timescale.com"),
+				Host: new("pooler.svc-12345.project.tsdb.cloud.tigerdata.com"),
 				Port: new(6432),
 			},
 		}
@@ -103,7 +103,7 @@ func TestDbURICmd(t *testing.T) {
 			name:       "custom role",
 			args:       []string{"db", "uri", "svc-12345", "--role", "readonly"},
 			mock:       setupGet,
-			wantStdout: "postgresql://readonly@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
+			wantStdout: "postgresql://readonly@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require\n",
 		},
 		{
 			name: "pooled with pooler available",
@@ -111,7 +111,7 @@ func TestDbURICmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService(withPooler))
 			},
-			wantStdout: "postgresql://tsdbadmin@pooler.svc-12345.project.tsdb.cloud.timescale.com:6432/tsdb?sslmode=require\n",
+			wantStdout: "postgresql://tsdbadmin@pooler.svc-12345.project.tsdb.cloud.tigerdata.com:6432/tsdb?sslmode=require\n",
 		},
 		{
 			name:    "pooled without pooler",
@@ -186,14 +186,14 @@ func TestDbURICmd(t *testing.T) {
 				expectResolveRef(m, "rep-67890", sampleReplica(func(s *api.Service) {
 					s.ConnectionPooler = &api.ConnectionPooler{
 						Endpoint: &api.Endpoint{
-							Host: new("pooler.rep-67890.project.tsdb.cloud.timescale.com"),
+							Host: new("pooler.rep-67890.project.tsdb.cloud.tigerdata.com"),
 							Port: new(6432),
 						},
 					}
 				}))
 				expectGetService(m, "svc-12345", sampleService())
 			},
-			wantStdout: "postgresql://tsdbadmin@pooler.rep-67890.project.tsdb.cloud.timescale.com:6432/tsdb?sslmode=require\n",
+			wantStdout: "postgresql://tsdbadmin@pooler.rep-67890.project.tsdb.cloud.tigerdata.com:6432/tsdb?sslmode=require\n",
 		},
 		{
 			name:       "replica pooled without pooler falls back with warning",
@@ -217,14 +217,14 @@ func TestDbURICmd(t *testing.T) {
 			args:       []string{"db", "uri", "svc-12345", "--with-password"},
 			mock:       setupGet,
 			opts:       []runOption{withStoredPassword(sampleService(), "secret-pw")},
-			wantStdout: "postgresql://tsdbadmin:secret-pw@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
+			wantStdout: "postgresql://tsdbadmin:secret-pw@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require\n",
 		},
 		{
 			name:       "replica uses primary credentials",
 			args:       []string{"db", "uri", "rep-67890", "--with-password"},
 			mock:       setupGetReplica,
 			opts:       []runOption{withStoredPassword(sampleService(), "primary-pw")},
-			wantStdout: "postgresql://tsdbadmin:primary-pw@rep-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
+			wantStdout: "postgresql://tsdbadmin:primary-pw@rep-67890.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require\n",
 		},
 	})
 }

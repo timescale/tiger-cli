@@ -228,7 +228,7 @@ func TestDBQueryTool(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{
-						Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
+						Host: new("e6ue9697jf.project.tsdb.cloud.tigerdata.com"),
 						Port: new(5432),
 					}
 				}))
@@ -275,7 +275,7 @@ func TestDBQueryTool(t *testing.T) {
 				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
 					s.ConnectionPooler = &api.ConnectionPooler{
 						Endpoint: &api.Endpoint{
-							Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
+							Host: new("e6ue9697jf.project.tsdb.cloud.tigerdata.com"),
 							Port: new(6432),
 						},
 					}

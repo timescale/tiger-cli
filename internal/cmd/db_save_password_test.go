@@ -32,7 +32,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 	}
 
 	// pgpass entry prefix for sampleService's endpoint and the default role.
-	const pgpassPrefix = "svc-12345.project.tsdb.cloud.timescale.com:5432:tsdb:tsdbadmin:"
+	const pgpassPrefix = "svc-12345.project.tsdb.cloud.tigerdata.com:5432:tsdb:tsdbadmin:"
 	pgpassHome := t.TempDir()
 	overwriteHome := t.TempDir()
 

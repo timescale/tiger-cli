@@ -20,7 +20,7 @@ func TestServiceGetCmd(t *testing.T) {
 		s.HaReplicas = &api.HAReplica{ReplicaCount: new(2)}
 		s.ConnectionPooler = &api.ConnectionPooler{
 			Endpoint: &api.Endpoint{
-				Host: new("svc-12345.project.pooler.tsdb.cloud.timescale.com"),
+				Host: new("svc-12345.project.pooler.tsdb.cloud.tigerdata.com"),
 				Port: new(6432),
 			},
 		}
@@ -160,10 +160,10 @@ func TestServiceGetCmd(t *testing.T) {
 │ CPU               │ 2 cores (2000m)                                                                             │
 │ Memory            │ 8 GB                                                                                        │
 │ Replicas          │ 2                                                                                           │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
-│ Pooler Endpoint   │ svc-12345.project.pooler.tsdb.cloud.timescale.com:6432                                      │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.tigerdata.com:5432                                             │
+│ Pooler Endpoint   │ svc-12345.project.pooler.tsdb.cloud.tigerdata.com:6432                                      │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
-│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
@@ -182,9 +182,9 @@ func TestServiceGetCmd(t *testing.T) {
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ shared                                                                                      │
 │ Memory            │ shared                                                                                      │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.tigerdata.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
-│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
@@ -207,9 +207,9 @@ func TestServiceGetCmd(t *testing.T) {
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 0.25 cores (250m)                                                                           │
 │ Memory            │ 2 GB                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.tigerdata.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
-│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
@@ -229,9 +229,9 @@ func TestServiceGetCmd(t *testing.T) {
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ shared                                                                                      │
 │ Memory            │ shared                                                                                      │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.tigerdata.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
-│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
@@ -245,7 +245,7 @@ func TestServiceGetCmd(t *testing.T) {
 			wantStdout: `{
   "created": "2025-01-15T10:30:00Z",
   "endpoint": {
-    "host": "svc-12345.project.tsdb.cloud.timescale.com",
+    "host": "svc-12345.project.tsdb.cloud.tigerdata.com",
     "port": 5432
   },
   "name": "test-service",
@@ -264,10 +264,10 @@ func TestServiceGetCmd(t *testing.T) {
   "service_type": "TIMESCALEDB",
   "status": "READY",
   "role": "tsdbadmin",
-  "host": "svc-12345.project.tsdb.cloud.timescale.com",
+  "host": "svc-12345.project.tsdb.cloud.tigerdata.com",
   "port": 5432,
   "database": "tsdb",
-  "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+  "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
   "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
 }
 `,
@@ -276,14 +276,14 @@ func TestServiceGetCmd(t *testing.T) {
 			name: "yaml output",
 			args: []string{"service", "get", "svc-12345", "-o", "yaml"},
 			mock: setupGet(sampleService()),
-			wantStdout: `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
+			wantStdout: `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require
 console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
 created: "2025-01-15T10:30:00Z"
 database: tsdb
 endpoint:
-  host: svc-12345.project.tsdb.cloud.timescale.com
+  host: svc-12345.project.tsdb.cloud.tigerdata.com
   port: 5432
-host: svc-12345.project.tsdb.cloud.timescale.com
+host: svc-12345.project.tsdb.cloud.tigerdata.com
 name: test-service
 port: 5432
 project_id: test-project-123
@@ -317,9 +317,9 @@ status: READY
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 cores (1000m)                                                                             │
 │ Memory            │ 4 GB                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.tigerdata.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
-│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
@@ -332,7 +332,7 @@ status: READY
 			wantStdout: `{
   "created": "2025-01-15T10:30:00Z",
   "endpoint": {
-    "host": "svc-12345.project.tsdb.cloud.timescale.com",
+    "host": "svc-12345.project.tsdb.cloud.tigerdata.com",
     "port": 5432
   },
   "name": "test-service",
@@ -352,10 +352,10 @@ status: READY
   "service_type": "TIMESCALEDB",
   "status": "READY",
   "role": "tsdbadmin",
-  "host": "svc-12345.project.tsdb.cloud.timescale.com",
+  "host": "svc-12345.project.tsdb.cloud.tigerdata.com",
   "port": 5432,
   "database": "tsdb",
-  "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+  "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
   "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
 }
 `,
@@ -365,14 +365,14 @@ status: READY
 			args: []string{"service", "get", "svc-12345", "-o", "yaml"},
 			mock: setupGet(fluidService),
 			opts: []runOption{experimental},
-			wantStdout: `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
+			wantStdout: `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require
 console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
 created: "2025-01-15T10:30:00Z"
 database: tsdb
 endpoint:
-  host: svc-12345.project.tsdb.cloud.timescale.com
+  host: svc-12345.project.tsdb.cloud.tigerdata.com
   port: 5432
-host: svc-12345.project.tsdb.cloud.timescale.com
+host: svc-12345.project.tsdb.cloud.tigerdata.com
 name: test-service
 platform: FLUID
 port: 5432
@@ -393,13 +393,13 @@ status: READY
 			name:       "env output",
 			args:       []string{"service", "get", "svc-12345", "-o", "env"},
 			mock:       setupGet(sampleService()),
-			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 		{
 			name:       "env output with password",
 			args:       []string{"service", "get", "svc-12345", "-o", "env", "--with-password"},
 			mock:       setupGet(withInitialPassword),
-			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\nPGPASSWORD=super-secret-pw\n",
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\nPGPASSWORD=super-secret-pw\n",
 		},
 		{
 			name: "table output with password",
@@ -415,10 +415,10 @@ status: READY
 │ Region            │ us-east-1                                                                                                   │
 │ CPU               │ 1 cores (1000m)                                                                                             │
 │ Memory            │ 4 GB                                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                                             │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.tigerdata.com:5432                                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                                     │
 │ Password          │ super-secret-pw                                                                                             │
-│ Connection String │ postgresql://tsdbadmin:super-secret-pw@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Connection String │ postgresql://tsdbadmin:super-secret-pw@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
@@ -459,19 +459,19 @@ status: READY
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "test-service", sampleService())
 			},
-			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 		{
 			name:       "describe alias",
 			args:       []string{"service", "describe", "svc-12345", "-o", "env"},
 			mock:       setupGet(sampleService()),
-			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 		{
 			name:       "show alias",
 			args:       []string{"service", "show", "svc-12345", "-o", "env"},
 			mock:       setupGet(sampleService()),
-			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.tigerdata.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 	})
 }

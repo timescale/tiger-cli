@@ -643,7 +643,7 @@ func sampleService(overrides ...func(*api.Service)) api.Service {
 		Platform:    new(api.ServicePlatformSTANDARD),
 		Created:     time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC),
 		Endpoint: &api.Endpoint{
-			Host: new("svc-12345.project.tsdb.cloud.timescale.com"),
+			Host: new("svc-12345.project.tsdb.cloud.tigerdata.com"),
 			Port: new(5432),
 		},
 		Resources: []api.Resource{{

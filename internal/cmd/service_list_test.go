@@ -29,7 +29,7 @@ func TestServiceListCmd(t *testing.T) {
 			s.Status = api.DeployStatusPAUSED
 			s.Created = time.Date(2025, 2, 1, 8, 0, 0, 0, time.UTC)
 			s.Endpoint = &api.Endpoint{
-				Host: new("svc-67890.project.tsdb.cloud.timescale.com"),
+				Host: new("svc-67890.project.tsdb.cloud.tigerdata.com"),
 				Port: new(5432),
 			}
 		}),
@@ -122,14 +122,14 @@ func TestServiceListCmd(t *testing.T) {
 			name: "yaml output",
 			args: []string{"service", "list", "-o", "yaml"},
 			mock: setupList(services),
-			wantStdout: `- connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
+			wantStdout: `- connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require
   console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
   created: "2025-01-15T10:30:00Z"
   database: tsdb
   endpoint:
-    host: svc-12345.project.tsdb.cloud.timescale.com
+    host: svc-12345.project.tsdb.cloud.tigerdata.com
     port: 5432
-  host: svc-12345.project.tsdb.cloud.timescale.com
+  host: svc-12345.project.tsdb.cloud.tigerdata.com
   name: test-service
   port: 5432
   project_id: test-project-123
@@ -143,14 +143,14 @@ func TestServiceListCmd(t *testing.T) {
   service_id: svc-12345
   service_type: TIMESCALEDB
   status: READY
-- connection_string: postgresql://tsdbadmin@svc-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
+- connection_string: postgresql://tsdbadmin@svc-67890.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require
   console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-67890
   created: "2025-02-01T08:00:00Z"
   database: tsdb
   endpoint:
-    host: svc-67890.project.tsdb.cloud.timescale.com
+    host: svc-67890.project.tsdb.cloud.tigerdata.com
     port: 5432
-  host: svc-67890.project.tsdb.cloud.timescale.com
+  host: svc-67890.project.tsdb.cloud.tigerdata.com
   name: analytics-db
   port: 5432
   project_id: test-project-123
@@ -202,7 +202,7 @@ const serviceListJSON = `[
   {
     "created": "2025-01-15T10:30:00Z",
     "endpoint": {
-      "host": "svc-12345.project.tsdb.cloud.timescale.com",
+      "host": "svc-12345.project.tsdb.cloud.tigerdata.com",
       "port": 5432
     },
     "name": "test-service",
@@ -221,16 +221,16 @@ const serviceListJSON = `[
     "service_type": "TIMESCALEDB",
     "status": "READY",
     "role": "tsdbadmin",
-    "host": "svc-12345.project.tsdb.cloud.timescale.com",
+    "host": "svc-12345.project.tsdb.cloud.tigerdata.com",
     "port": 5432,
     "database": "tsdb",
-    "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+    "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
     "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
   },
   {
     "created": "2025-02-01T08:00:00Z",
     "endpoint": {
-      "host": "svc-67890.project.tsdb.cloud.timescale.com",
+      "host": "svc-67890.project.tsdb.cloud.tigerdata.com",
       "port": 5432
     },
     "name": "analytics-db",
@@ -249,10 +249,10 @@ const serviceListJSON = `[
     "service_type": "POSTGRES",
     "status": "PAUSED",
     "role": "tsdbadmin",
-    "host": "svc-67890.project.tsdb.cloud.timescale.com",
+    "host": "svc-67890.project.tsdb.cloud.tigerdata.com",
     "port": 5432,
     "database": "tsdb",
-    "connection_string": "postgresql://tsdbadmin@svc-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+    "connection_string": "postgresql://tsdbadmin@svc-67890.project.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
     "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-67890"
   }
 ]

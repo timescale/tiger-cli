@@ -28,7 +28,7 @@ func TestServiceForkTool(t *testing.T) {
 			s.Name = "test-service-fork"
 			s.Created = time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)
 			s.Endpoint = &api.Endpoint{
-				Host: new("u8me885b93.test-project-id.tsdb.cloud.timescale.com"),
+				Host: new("u8me885b93.test-project-id.tsdb.cloud.tigerdata.com"),
 				Port: new(5432),
 			}
 		}}, overrides...)...)
@@ -56,8 +56,8 @@ func TestServiceForkTool(t *testing.T) {
 		"created":           "2025-01-15T10:30:00Z",
 		"environment":       "DEV",
 		"replicas":          float64(0),
-		"direct_endpoint":   "u8me885b93.test-project-id.tsdb.cloud.timescale.com:5432",
-		"connection_string": "postgresql://tsdbadmin@u8me885b93.test-project-id.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+		"direct_endpoint":   "u8me885b93.test-project-id.tsdb.cloud.tigerdata.com:5432",
+		"connection_string": "postgresql://tsdbadmin@u8me885b93.test-project-id.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
 	}
 	detail := func(overrides map[string]any) map[string]any {
 		d := maps.Clone(baseDetail)
@@ -334,7 +334,7 @@ func TestServiceForkTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"service": detail(map[string]any{
 					"password":          "fork-pass-123",
-					"connection_string": "postgresql://tsdbadmin:fork-pass-123@u8me885b93.test-project-id.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+					"connection_string": "postgresql://tsdbadmin:fork-pass-123@u8me885b93.test-project-id.tsdb.cloud.tigerdata.com:5432/tsdb?sslmode=require",
 				}),
 				"message":          acceptedMsg,
 				"password_storage": storedPassword,

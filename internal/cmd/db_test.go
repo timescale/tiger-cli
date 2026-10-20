@@ -18,7 +18,7 @@ func sampleReplica(overrides ...func(*api.Service)) api.Service {
 		s.ServiceID = "rep-67890"
 		s.Name = "replica-service"
 		s.Endpoint = &api.Endpoint{
-			Host: new("rep-67890.project.tsdb.cloud.timescale.com"),
+			Host: new("rep-67890.project.tsdb.cloud.tigerdata.com"),
 			Port: new(5432),
 		}
 		s.ForkedFrom = &api.ForkSpec{
