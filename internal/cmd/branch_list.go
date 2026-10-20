@@ -66,7 +66,7 @@ service from your configuration.`,
 				return nil
 			}
 
-			return outputBranches(cmd, cfg, branches, cfg.Output)
+			return outputBranches(cmd, cfg, branches, branchOutputOptions{ServiceName: service.Name})
 		},
 	}
 
@@ -76,15 +76,15 @@ service from your configuration.`,
 	return cmd
 }
 
-// outputBranches formats and outputs a list of branches in the given format.
-func outputBranches(cmd *cobra.Command, cfg *config.Config, branches []api.Branch, format string) error {
+// outputBranches outputs a list of branches in the configured output format.
+func outputBranches(cmd *cobra.Command, cfg *config.Config, branches []api.Branch, opts branchOutputOptions) error {
 	prepared := make([]OutputBranch, len(branches))
 	for i, branch := range branches {
-		prepared[i] = prepareBranchForOutput(cmd, cfg, branch)
+		prepared[i] = prepareBranchForOutput(cmd, cfg, branch, opts)
 	}
 
 	outputWriter := cmd.OutOrStdout()
-	switch strings.ToLower(format) {
+	switch strings.ToLower(cfg.Output) {
 	case "json":
 		return util.SerializeToJSON(outputWriter, prepared)
 	case "yaml":

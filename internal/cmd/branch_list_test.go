@@ -127,6 +127,7 @@ func TestBranchListCmd(t *testing.T) {
     "project_id": "test-project-123",
     "service_id": "svc-12345",
     "status": "READY",
+    "service_name": "test-service",
     "role": "tsdbadmin",
     "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
     "port": 36956,

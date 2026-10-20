@@ -79,21 +79,36 @@ func cpuMemoryHelp(shared, experimental bool) string {
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service
+	// BranchCount is set only by service get, behind the experimental gate,
+	// for a service that can have branches.
+	BranchCount *int `json:"branch_count,omitempty"`
 	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty"`
 	ConsoleURL       string `json:"console_url,omitempty"`
 }
 
-// outputService formats and outputs a single service based on the specified format
-func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, experimental bool, format string, withPassword bool, strict bool) error {
-	// Prepare the output service with computed fields
-	outputSvc := prepareServiceForOutput(cmd, cfg, service, experimental, withPassword)
-	if strict && withPassword && outputSvc.Password == "" {
+// serviceOutputOptions controls what the service output functions include.
+// The zero value leaves out every optional field.
+type serviceOutputOptions struct {
+	// Experimental includes preview fields (the platform).
+	Experimental bool
+	// WithPassword includes the tsdbadmin password, if one is available.
+	WithPassword bool
+	// RequirePassword fails the output when WithPassword finds no password.
+	RequirePassword bool
+	// BranchCount is the service's branch count, if it was counted.
+	BranchCount *int
+}
+
+// outputService outputs a single service in the configured output format.
+func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, opts serviceOutputOptions) error {
+	outputSvc := prepareServiceForOutput(cmd, cfg, service, opts)
+	if opts.RequirePassword && opts.WithPassword && outputSvc.Password == "" {
 		return fmt.Errorf("password requested but not available for service %s", outputSvc.ServiceID)
 	}
 	outputWriter := cmd.OutOrStdout()
 
-	switch strings.ToLower(format) {
+	switch strings.ToLower(cfg.Output) {
 	case "json":
 		return util.SerializeToJSON(outputWriter, outputSvc)
 	case "yaml":
@@ -164,6 +179,10 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 		}
 	}
 
+	if service.BranchCount != nil {
+		table.Append("Branches", fmt.Sprintf("%d", *service.BranchCount))
+	}
+
 	// Endpoint information
 	if service.Endpoint != nil && service.Endpoint.Host != nil && service.Endpoint.Port != nil {
 		table.Append("Direct Endpoint", fmt.Sprintf("%s:%d", *service.Endpoint.Host, *service.Endpoint.Port))
@@ -197,25 +216,24 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 
 // prepareServiceForOutput builds the output view of a service. cmd may be nil,
 // in which case the connection-details warning is dropped rather than printed.
-// The platform field is a preview field, so it is dropped unless experimental
-// is set.
-func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, experimental bool, withPassword bool) OutputService {
+func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, opts serviceOutputOptions) OutputService {
 	outputSvc := OutputService{
-		Service: service,
+		Service:     service,
+		BranchCount: opts.BranchCount,
 	}
 	outputSvc.Service.InitialPassword = nil
-	if !experimental {
+	if !opts.Experimental {
 		outputSvc.Service.Platform = nil
 	}
 
-	opts := common.ConnectionDetailsOptions{
+	detailsOpts := common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
-		WithPassword:    withPassword,
+		WithPassword:    opts.WithPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
 		ReadOnly:        common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)) != nil,
 	}
 
-	if connectionDetails, err := common.GetConnectionDetails(cfg, common.NewServiceConnectionTarget(service), opts); err != nil {
+	if connectionDetails, err := common.GetConnectionDetails(cfg, common.NewServiceConnectionTarget(service), detailsOpts); err != nil {
 		if cmd != nil {
 			cmd.PrintErrf("Warning: Failed to get connection details: %v\n", err)
 		}

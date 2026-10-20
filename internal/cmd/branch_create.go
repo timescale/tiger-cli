@@ -157,7 +157,7 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 				}
 			}
 
-			if err := outputBranch(cmd, cfg, branch, cfg.Output); err != nil {
+			if err := outputBranch(cmd, cfg, branch, branchOutputOptions{ServiceName: parent.Name}); err != nil {
 				cmd.PrintErrf("Warning: failed to output branch details: %v\n", err)
 			}
 

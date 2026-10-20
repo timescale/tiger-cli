@@ -217,7 +217,10 @@ default service from your configuration.`,
 				}
 			}
 
-			if err := outputService(cmd, cfg, forkedService, app.Experimental, cfg.Output, withPassword, false); err != nil {
+			if err := outputService(cmd, cfg, forkedService, serviceOutputOptions{
+				Experimental: app.Experimental,
+				WithPassword: withPassword,
+			}); err != nil {
 				cmd.PrintErrf("Warning: Failed to output service details: %v\n", err)
 			}
 

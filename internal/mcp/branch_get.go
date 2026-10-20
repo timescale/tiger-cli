@@ -7,6 +7,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -64,5 +65,15 @@ func (s *Server) handleBranchGet(ctx context.Context, req *mcp.CallToolRequest, 
 		return nil, BranchGetOutput{}, err
 	}
 
-	return nil, BranchGetOutput{Branch: s.convertToBranchDetail(cfg, *branch)}, nil
+	detail := s.convertToBranchDetail(cfg, *branch)
+
+	// The branch carries only its parent's ID, so the name takes a second
+	// fetch. The rest of the output doesn't depend on it.
+	if parent, err := common.GetService(ctx, client, projectID, branch.ServiceID); err != nil {
+		s.logger.Error("MCP: Failed to get parent service", slog.Any("error", err))
+	} else {
+		detail.ServiceName = parent.Name
+	}
+
+	return nil, BranchGetOutput{Branch: detail}, nil
 }

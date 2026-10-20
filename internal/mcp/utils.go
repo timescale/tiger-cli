@@ -94,6 +94,16 @@ func setPlatformSchemaProperties(schema *jsonschema.Schema, experimental bool) {
 	schema.Properties["platform"].Enum = []any{api.ServicePlatformSTANDARD, api.ServicePlatformFLUID}
 }
 
+// setBranchCountSchemaProperties describes a service's branch count, or
+// removes it outside the experimental gate, since branches are a preview.
+func setBranchCountSchemaProperties(schema *jsonschema.Schema, experimental bool) {
+	if !experimental {
+		delete(schema.Properties, "branch_count")
+		return
+	}
+	schema.Properties["branch_count"].Description = "Number of branches of the service (only returned by service_get, for fluid services)"
+}
+
 // ResourceInfo represents resource allocation information
 type ResourceInfo struct {
 	CPU    string `json:"cpu,omitempty"`
@@ -122,6 +132,7 @@ type ServiceDetail struct {
 	Environment      string        `json:"environment"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
 	Replicas         int           `json:"replicas"`
+	BranchCount      *int          `json:"branch_count,omitempty"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
 	PoolerEndpoint   string        `json:"pooler_endpoint,omitempty"`
 	Password         string        `json:"password,omitempty"`
@@ -145,6 +156,7 @@ func (ServiceDetail) Schema(experimental bool) *jsonschema.Schema {
 	setResourceInfoSchemaProperties(schema.Properties["resources"])
 
 	schema.Properties["replicas"].Description = "Number of HA replicas (0=single node/no HA, 1+=HA enabled)"
+	setBranchCountSchemaProperties(schema, experimental)
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint"
 	schema.Properties["pooler_endpoint"].Description = "Connection pooler endpoint"
 	schema.Properties["password"].Description = "Password for tsdbadmin user (only included if with_password=true)"
@@ -299,6 +311,7 @@ type BranchDetail struct {
 	BranchID         string        `json:"id"`
 	Name             string        `json:"name"`
 	ServiceID        string        `json:"service_id"`
+	ServiceName      string        `json:"service_name,omitempty"`
 	Status           string        `json:"status"`
 	Created          string        `json:"created,omitempty"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
@@ -313,6 +326,7 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 	schema.Properties["id"].Description = "Branch identifier (10-character alphanumeric string)"
 	schema.Properties["name"].Description = "Branch name, unique within its parent service"
 	schema.Properties["service_id"].Description = "ID of the parent service the branch was created from"
+	schema.Properties["service_name"].Description = "Name of the parent service (only returned by branch_get)"
 
 	schema.Properties["status"].Description = "Branch status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "QUEUED", "CONFIGURING"}

@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -13,6 +14,7 @@ import (
 func TestBranchGetCmd(t *testing.T) {
 	getSample := func(m *mocks.MockClientWithResponsesInterface) {
 		expectResolveBranch(m, "br-12345", sampleBranch())
+		expectGetService(m, "svc-12345", sampleService(fluidPlatform))
 	}
 
 	runCmdTests(t, []cmdTest{
@@ -113,8 +115,25 @@ port: 36956
 project_id: test-project-123
 role: tsdbadmin
 service_id: svc-12345
+service_name: test-service
 status: READY
 `,
+		},
+		{
+			// The parent's name is the only thing the second fetch adds, so
+			// without it the branch is still shown, by parent ID.
+			name: "parent fetch fails",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantStdout: strings.Replace(sampleBranchTable,
+				"│ Parent Service    │ test-service (svc-12345)  ",
+				"│ Parent Service    │ svc-12345                 ", 1),
+			wantStderr: "Warning: failed to get parent service: failed to fetch service details: connection refused\n",
 		},
 		{
 			name:       "env",
@@ -143,6 +162,7 @@ status: READY
   "project_id": "test-project-123",
   "service_id": "svc-12345",
   "status": "READY",
+  "service_name": "test-service",
   "role": "tsdbadmin",
   "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
   "port": 36956,
@@ -160,13 +180,14 @@ status: READY
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) { b.Endpoint.Port = nil }))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
 			},
 			wantStdout: `┌────────────────┬────────────────────────────────────────────────────────────────────────────────────┐
 │    PROPERTY    │                                       VALUE                                        │
 ├────────────────┼────────────────────────────────────────────────────────────────────────────────────┤
 │ Branch ID      │ br-12345                                                                           │
 │ Name           │ test-branch                                                                        │
-│ Parent Service │ svc-12345                                                                          │
+│ Parent Service │ test-service (svc-12345)                                                           │
 │ Status         │ READY                                                                              │
 │ CPU            │ 0.25 cores (250m)                                                                  │
 │ Memory         │ 2 GB                                                                               │
@@ -177,10 +198,13 @@ status: READY
 			wantStderr: "Warning: failed to get connection details: endpoint port not available\n",
 		},
 		{
-			name:       "by name",
-			args:       []string{"branch", "get", "test-branch", "-o", "env"},
-			opts:       []runOption{withExperimental()},
-			mock:       func(m *mocks.MockClientWithResponsesInterface) { expectResolveBranch(m, "test-branch", sampleBranch()) },
+			name: "by name",
+			args: []string{"branch", "get", "test-branch", "-o", "env"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "test-branch", sampleBranch())
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
 			wantStdout: sampleBranchEnv,
 		},
 		{

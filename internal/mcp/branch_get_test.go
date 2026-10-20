@@ -13,6 +13,19 @@ func TestBranchGetTool(t *testing.T) {
 	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x"}
 
+	// getBranch registers resolving branch and then fetching its parent, for
+	// the parent's name.
+	getBranch := func(branch api.Branch) func(m *mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveBranch(m, branch)
+			expectGetService(m, "e6ue9697jf", sampleService())
+		}
+	}
+	withServiceName := func(detail map[string]any) map[string]any {
+		detail["service_name"] = "test-service"
+		return detail
+	}
+
 	runToolTests(t, []toolTest{
 		{
 			name:        "not registered without the experimental gate",
@@ -86,7 +99,21 @@ func TestBranchGetTool(t *testing.T) {
 			tool:       toolBranchGet,
 			args:       args,
 			opts:       []runOption{experimental},
-			mock:       func(m *mocks.MockClientWithResponsesInterface) { expectResolveBranch(m, sampleBranch()) },
+			mock:       getBranch(sampleBranch()),
+			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetail(api.DeployStatusREADY))},
+		},
+		{
+			// The parent's name is the only thing the second fetch adds, so
+			// without it the branch is still returned.
+			name: "parent fetch fails",
+			tool: toolBranchGet,
+			args: args,
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, sampleBranch())
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
+					Return(nil, errors.New("connection refused"))
+			},
 			wantOutput: map[string]any{"branch": sampleBranchDetail(api.DeployStatusREADY)},
 		},
 		{
@@ -96,9 +123,9 @@ func TestBranchGetTool(t *testing.T) {
 			tool: toolBranchGet,
 			args: args,
 			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "all"})},
-			mock: func(m *mocks.MockClientWithResponsesInterface) { expectResolveBranch(m, sampleBranch()) },
+			mock: getBranch(sampleBranch()),
 			wantOutput: map[string]any{"branch": func() map[string]any {
-				detail := sampleBranchDetail(api.DeployStatusREADY)
+				detail := withServiceName(sampleBranchDetail(api.DeployStatusREADY))
 				detail["connection_string"] = "postgresql://tsdbadmin@br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require&options=-c%20tsdb_admin.read_only_connection%3Dtrue"
 				return detail
 			}()},
@@ -110,16 +137,15 @@ func TestBranchGetTool(t *testing.T) {
 			tool: toolBranchGet,
 			args: args,
 			opts: []runOption{experimental},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, sampleBranch(func(b *api.Branch) { b.Endpoint.Port = nil }))
-			},
+			mock: getBranch(sampleBranch(func(b *api.Branch) { b.Endpoint.Port = nil })),
 			wantOutput: map[string]any{"branch": map[string]any{
-				"id":         "br4nch1d9x",
-				"name":       "test-branch",
-				"service_id": "e6ue9697jf",
-				"status":     "READY",
-				"created":    "2025-01-16T09:00:00Z",
-				"resources":  map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
+				"id":           "br4nch1d9x",
+				"name":         "test-branch",
+				"service_id":   "e6ue9697jf",
+				"service_name": "test-service",
+				"status":       "READY",
+				"created":      "2025-01-16T09:00:00Z",
+				"resources":    map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
 			}},
 		},
 		{
@@ -127,16 +153,15 @@ func TestBranchGetTool(t *testing.T) {
 			tool: toolBranchGet,
 			args: args,
 			opts: []runOption{experimental},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, sampleBranch(branchStatus(api.DeployStatusQUEUED), func(b *api.Branch) { b.Endpoint = nil }))
-			},
+			mock: getBranch(sampleBranch(branchStatus(api.DeployStatusQUEUED), func(b *api.Branch) { b.Endpoint = nil })),
 			wantOutput: map[string]any{"branch": map[string]any{
-				"id":         "br4nch1d9x",
-				"name":       "test-branch",
-				"service_id": "e6ue9697jf",
-				"status":     "QUEUED",
-				"created":    "2025-01-16T09:00:00Z",
-				"resources":  map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
+				"id":           "br4nch1d9x",
+				"name":         "test-branch",
+				"service_id":   "e6ue9697jf",
+				"service_name": "test-service",
+				"status":       "QUEUED",
+				"created":      "2025-01-16T09:00:00Z",
+				"resources":    map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
 			}},
 		},
 	})

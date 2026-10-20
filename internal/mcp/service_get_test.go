@@ -46,6 +46,11 @@ func TestServiceGetTool(t *testing.T) {
 		s.Created = created
 		s.Endpoint = endpoint
 	})
+	fluidService := sampleService(func(s *api.Service) {
+		s.Created = created
+		s.Endpoint = endpoint
+		s.Platform = new(api.ServicePlatformFLUID)
+	})
 
 	setupGet := func(svc api.Service) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
@@ -169,17 +174,75 @@ func TestServiceGetTool(t *testing.T) {
 			},
 		},
 		{
-			// The platform is a preview field: the case above carries one from
-			// sampleService and drops it, while this one returns it.
-			name: "experimental returns the platform",
+			// The platform and branch count are preview fields: the case above
+			// carries a platform from sampleService and drops it, while this
+			// one returns both.
+			name: "experimental returns the platform and branch count",
 			tool: toolServiceGet,
 			args: args,
 			opts: []runOption{withExperimental()},
-			mock: setupGet(sampleService(func(s *api.Service) {
-				s.Created = created
-				s.Endpoint = endpoint
-				s.Platform = new(api.ServicePlatformFLUID)
-			})),
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				setupGet(fluidService)(m)
+				branches := []api.Branch{sampleBranch(), sampleBranch()}
+				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
+					Return(&api.GetBranchesResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &branches,
+					}, nil)
+			},
+			wantOutput: map[string]any{
+				"service": map[string]any{
+					"id":                "e6ue9697jf",
+					"name":              "test-service",
+					"status":            "READY",
+					"platform":          "FLUID",
+					"type":              "TIMESCALEDB",
+					"region":            "us-east-1",
+					"created":           "2025-01-15T09:30:00Z",
+					"environment":       "DEV",
+					"replicas":          float64(0),
+					"branch_count":      float64(2),
+					"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
+					"connection_string": "postgresql://tsdbadmin@e6ue9697jf.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+				},
+			},
+		},
+		{
+			// Only fluid services can be branched, so a standard one isn't
+			// counted. The mock fails the test on any branch listing.
+			name: "experimental standard service lists no branches",
+			tool: toolServiceGet,
+			args: args,
+			opts: []runOption{withExperimental()},
+			mock: setupGet(noPasswordService),
+			wantOutput: map[string]any{
+				"service": map[string]any{
+					"id":                "e6ue9697jf",
+					"name":              "test-service",
+					"status":            "READY",
+					"platform":          "STANDARD",
+					"type":              "TIMESCALEDB",
+					"region":            "us-east-1",
+					"created":           "2025-01-15T09:30:00Z",
+					"environment":       "DEV",
+					"replicas":          float64(0),
+					"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
+					"connection_string": "postgresql://tsdbadmin@e6ue9697jf.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+				},
+			},
+		},
+		{
+			// The count is the only thing the branch listing adds, so the
+			// service is still returned without it.
+			name: "branch count fails",
+			tool: toolServiceGet,
+			args: args,
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				setupGet(fluidService)(m)
+				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
+					Return(nil, errors.New("connection refused"))
+			},
 			wantOutput: map[string]any{
 				"service": map[string]any{
 					"id":                "e6ue9697jf",

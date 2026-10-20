@@ -214,7 +214,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 			}
 
-			if err := outputService(cmd, cfg, service, app.Experimental, cfg.Output, withPassword, false); err != nil {
+			if err := outputService(cmd, cfg, service, serviceOutputOptions{
+				Experimental: app.Experimental,
+				WithPassword: withPassword,
+			}); err != nil {
 				cmd.PrintErrf("Warning: Failed to output service details: %v\n", err)
 			}
 

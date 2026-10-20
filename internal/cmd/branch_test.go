@@ -124,7 +124,7 @@ const (
 ├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ Branch ID         │ br-12345                                                                                                    │
 │ Name              │ test-branch                                                                                                 │
-│ Parent Service    │ svc-12345                                                                                                   │
+│ Parent Service    │ test-service (svc-12345)                                                                                    │
 │ Status            │ READY                                                                                                       │
 │ CPU               │ 0.25 cores (250m)                                                                                           │
 │ Memory            │ 2 GB                                                                                                        │
@@ -147,6 +147,7 @@ const (
   "project_id": "test-project-123",
   "service_id": "svc-12345",
   "status": "READY",
+  "service_name": "test-service",
   "role": "tsdbadmin",
   "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
   "port": 36956,

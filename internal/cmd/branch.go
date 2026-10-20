@@ -49,17 +49,27 @@ moment it was created and gets its own compute.`,
 // OutputBranch represents a branch with computed fields for output.
 type OutputBranch struct {
 	api.Branch
+	// ServiceName is the parent service's name, when it's known.
+	ServiceName string `json:"service_name,omitempty"`
 	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty"`
 	ConsoleURL       string `json:"console_url,omitempty"`
 }
 
-// outputBranch formats and outputs a single branch in the given format.
-func outputBranch(cmd *cobra.Command, cfg *config.Config, branch api.Branch, format string) error {
-	outputBr := prepareBranchForOutput(cmd, cfg, branch)
+// branchOutputOptions controls what the branch output functions include.
+// The zero value leaves out every optional field.
+type branchOutputOptions struct {
+	// ServiceName is the parent service's name, if it's known. A branch
+	// carries only its parent's ID.
+	ServiceName string
+}
+
+// outputBranch outputs a single branch in the configured output format.
+func outputBranch(cmd *cobra.Command, cfg *config.Config, branch api.Branch, opts branchOutputOptions) error {
+	outputBr := prepareBranchForOutput(cmd, cfg, branch, opts)
 	outputWriter := cmd.OutOrStdout()
 
-	switch strings.ToLower(format) {
+	switch strings.ToLower(cfg.Output) {
 	case "json":
 		return util.SerializeToJSON(outputWriter, outputBr)
 	case "yaml":
@@ -88,7 +98,11 @@ func outputBranchTable(branch OutputBranch, output io.Writer) error {
 
 	table.Append("Branch ID", branch.ID)
 	table.Append("Name", branch.Name)
-	table.Append("Parent Service", branch.ServiceID)
+	if branch.ServiceName != "" {
+		table.Append("Parent Service", fmt.Sprintf("%s (%s)", branch.ServiceName, branch.ServiceID))
+	} else {
+		table.Append("Parent Service", branch.ServiceID)
+	}
 	table.Append("Status", string(branch.Status))
 	table.Append("CPU", fmt.Sprintf("%s cores (%dm)", common.FormatCPUCores(branch.CPUMillis), branch.CPUMillis))
 	table.Append("Memory", fmt.Sprintf("%d GB", branch.MemoryGbs))
@@ -111,8 +125,11 @@ func outputBranchTable(branch OutputBranch, output io.Writer) error {
 
 // prepareBranchForOutput builds the output view of a branch. cmd may be nil,
 // in which case the connection-details warning is dropped rather than printed.
-func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.Branch) OutputBranch {
-	outputBr := OutputBranch{Branch: branch}
+func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.Branch, opts branchOutputOptions) OutputBranch {
+	outputBr := OutputBranch{
+		Branch:      branch,
+		ServiceName: opts.ServiceName,
+	}
 	outputBr.Branch.InitialPassword = nil
 
 	// A branch that's still provisioning may have no endpoint yet, which
