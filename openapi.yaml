@@ -1469,6 +1469,34 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/branches:
+    get:
+      operationId: getProjectBranches
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      x-tigerdata-internal: true
+      tags:
+        - Branches
+      summary: List All Branches in a Project
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves a list of all branches within a specific project, regardless
+        of parent service.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: A list of branches.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/services/{service_id}/branches:
     get:
       operationId: getBranches
@@ -2906,13 +2934,13 @@ components:
         cpu_millis:
           type: integer
           minimum: 1
-          description: The initial CPU allocation in milli-cores. Defaults to 500 if not provided.
-          example: 500
+          description: The initial CPU allocation in milli-cores. Defaults to 250 if not provided.
+          example: 250
         memory_gbs:
           type: integer
           minimum: 1
-          description: The initial memory allocation in gigabytes. Defaults to 4 if not provided.
-          example: 4
+          description: The initial memory allocation in gigabytes. Defaults to 2 if not provided.
+          example: 2
         iops:
           x-tigerdata-preview: true
           type: integer
@@ -2931,10 +2959,7 @@ components:
           example: "my-production-db-pr-412"
     BranchResizeInput:
       type: object
-      description: Parameters for resizing a branch.
-      required:
-        - cpu_millis
-        - memory_gbs
+      minProperties: 1
       properties:
         cpu_millis:
           type: string
@@ -2952,6 +2977,9 @@ components:
           minimum: 0
           description: The new provisioned IOPS for the branch's storage.
           example: 4000
+      description: >-
+        At least one of cpu_millis, memory_gbs, or iops must be provided.
+        cpu_millis and memory_gbs must be provided together.
     ServiceCreate:
       type: object
       description: Parameters for creating a service.

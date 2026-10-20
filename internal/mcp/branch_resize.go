@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -97,22 +96,16 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchResizeOutput{}, err
 	}
 
-	// The branch resize endpoint requires CPU and memory, so an IOPS-only
-	// resize sends the branch's current ones.
-	// TODO: omit them once the endpoint makes them optional, as the service
-	// resize endpoint does.
-	resizeReq := api.BranchResizeInput{
-		CPUMillis: strconv.Itoa(resolved.CPUMillis),
-		MemoryGbs: strconv.Itoa(resolved.MemoryGbs),
-		Iops:      input.IOPS,
-	}
+	// An IOPS-only resize omits CPU and memory, which the API leaves
+	// unchanged.
+	resizeReq := api.BranchResizeInput{Iops: input.IOPS}
 	if input.CPUMemory != "" {
 		cpuMemoryCfg, err := parseBranchCPUMemory(input.CPUMemory)
 		if err != nil {
 			return nil, BranchResizeOutput{}, err
 		}
-		resizeReq.CPUMillis = strconv.Itoa(cpuMemoryCfg.CPUMillis)
-		resizeReq.MemoryGbs = strconv.Itoa(cpuMemoryCfg.MemoryGBs)
+		resizeReq.CPUMillis = cpuMemoryCfg.CPUMillisString()
+		resizeReq.MemoryGbs = cpuMemoryCfg.MemoryGBsString()
 	}
 
 	s.logger.Info("MCP: Resizing branch",

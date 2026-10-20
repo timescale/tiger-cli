@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -50,8 +49,9 @@ given, the branch keeps its current CPU and memory.`,
 
   # Resize without waiting for completion
   tiger branch resize br-12345 --cpu 2000 --no-wait`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: branchRefCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
@@ -77,18 +77,14 @@ given, the branch keeps its current CPU and memory.`,
 				return err
 			}
 
-			// The branch resize endpoint requires CPU and memory, so an
-			// IOPS-only resize sends the branch's current ones.
-			// TODO: omit them once the endpoint makes them optional, as the
-			// service resize endpoint does.
+			// An IOPS-only resize omits CPU and memory, which the API leaves
+			// unchanged.
 			resizeReq := api.BranchResizeInput{
-				CPUMillis: strconv.Itoa(resolved.CPUMillis),
-				MemoryGbs: strconv.Itoa(resolved.MemoryGbs),
+				CPUMillis: cpuMemoryCfg.CPUMillisString(),
+				MemoryGbs: cpuMemoryCfg.MemoryGBsString(),
 			}
 			var targets []string
 			if cpuMemoryCfg != nil {
-				resizeReq.CPUMillis = *cpuMemoryCfg.CPUMillisString()
-				resizeReq.MemoryGbs = *cpuMemoryCfg.MemoryGBsString()
 				targets = append(targets, cpuMemoryCfg.String())
 			}
 			if iopsSet {

@@ -12,7 +12,7 @@ import (
 func TestBranchResizeTool(t *testing.T) {
 	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x", "cpu_memory": "2 CPU/16 GB"}
-	req := api.BranchResizeInput{CPUMillis: "2000", MemoryGbs: "16"}
+	req := api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}
 	expectResizeWith := func(req api.BranchResizeInput, status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			branch := sampleBranch(branchStatus(status))
@@ -90,13 +90,12 @@ func TestBranchResizeTool(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
-			// The endpoint requires CPU and memory, so an IOPS-only resize
-			// sends the branch's current ones.
-			name:       "iops only keeps the current cpu and memory",
+			// CPU and memory are left out, so the API keeps the current ones.
+			name:       "iops only omits cpu and memory",
 			tool:       toolBranchResize,
 			args:       map[string]any{"branch_id": "br4nch1d9x", "iops": 16000},
 			opts:       []runOption{experimental},
-			mock:       expectResizeWith(api.BranchResizeInput{CPUMillis: "250", MemoryGbs: "2", Iops: new(16000)}, api.DeployStatusCONFIGURING),
+			mock:       expectResizeWith(api.BranchResizeInput{Iops: new(16000)}, api.DeployStatusCONFIGURING),
 			wantOutput: accepted,
 		},
 		{

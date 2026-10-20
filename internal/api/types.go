@@ -1352,9 +1352,9 @@ type Branch struct {
 
 // BranchCreate Parameters for creating a branch of the service identified by `service_id` in the path.
 type BranchCreate struct {
-	// CPUMillis The initial CPU allocation in milli-cores. Defaults to 500 if not provided.
+	// CPUMillis The initial CPU allocation in milli-cores. Defaults to 250 if not provided.
 	//
-	// Example: 500
+	// Example: 250
 	CPUMillis *int `json:"cpu_millis,omitempty"`
 
 	// Iops Requested provisioned IOPS for the branch's storage.
@@ -1362,9 +1362,9 @@ type BranchCreate struct {
 	// Example: 4000
 	Iops *int `json:"iops,omitempty"`
 
-	// MemoryGbs The initial memory allocation in gigabytes. Defaults to 4 if not provided.
+	// MemoryGbs The initial memory allocation in gigabytes. Defaults to 2 if not provided.
 	//
-	// Example: 4
+	// Example: 2
 	MemoryGbs *int `json:"memory_gbs,omitempty"`
 
 	// Name A human-readable name for the branch. If not provided, defaults to "branch-<parent name>", with "-1", "-2", ... appended if that name is already in use in the project.
@@ -1381,12 +1381,12 @@ type BranchRename struct {
 	Name string `json:"name"`
 }
 
-// BranchResizeInput Parameters for resizing a branch.
+// BranchResizeInput At least one of cpu_millis, memory_gbs, or iops must be provided. cpu_millis and memory_gbs must be provided together.
 type BranchResizeInput struct {
 	// CPUMillis The new CPU allocation in milli-cores.
 	//
 	// Example: 1000
-	CPUMillis string `json:"cpu_millis"`
+	CPUMillis *string `json:"cpu_millis,omitempty"`
 
 	// Iops The new provisioned IOPS for the branch's storage.
 	//
@@ -1396,7 +1396,7 @@ type BranchResizeInput struct {
 	// MemoryGbs The new memory allocation in gigabytes.
 	//
 	// Example: 4
-	MemoryGbs string `json:"memory_gbs"`
+	MemoryGbs *string `json:"memory_gbs,omitempty"`
 }
 
 // CloudWatchLogsConfig Where a CloudWatch logs exporter writes, and how it authenticates.

@@ -22,7 +22,7 @@ func TestBranchResizeCmd(t *testing.T) {
 				}, nil)
 		}
 	}
-	req2000 := api.BranchResizeInput{CPUMillis: "2000", MemoryGbs: "16"}
+	req2000 := api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}
 	noWaitStderr := "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
 		"Resize request accepted for branch 'test-branch' (br-12345).\n" +
 		"Use 'tiger branch get' to check branch status.\n"
@@ -94,12 +94,11 @@ func TestBranchResizeCmd(t *testing.T) {
 				"Error: empty response from API\n",
 		},
 		{
-			// The endpoint requires CPU and memory, so an IOPS-only resize
-			// sends the branch's current ones.
-			name: "iops only keeps the current cpu and memory",
+			// CPU and memory are left out, so the API keeps the current ones.
+			name: "iops only omits cpu and memory",
 			args: []string{"branch", "resize", "br-12345", "--iops", "16000", "--no-wait"},
 			opts: []runOption{withExperimental()},
-			mock: setupResize(api.BranchResizeInput{CPUMillis: "250", MemoryGbs: "2", Iops: new(16000)}, api.DeployStatusCONFIGURING),
+			mock: setupResize(api.BranchResizeInput{Iops: new(16000)}, api.DeployStatusCONFIGURING),
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 16000 IOPS...\n" +
 				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
 				"Use 'tiger branch get' to check branch status.\n",
@@ -108,7 +107,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			name: "cpu and iops",
 			args: []string{"branch", "resize", "br-12345", "--cpu", "2000", "--iops", "16000", "--no-wait"},
 			opts: []runOption{withExperimental()},
-			mock: setupResize(api.BranchResizeInput{CPUMillis: "2000", MemoryGbs: "16", Iops: new(16000)}, api.DeployStatusCONFIGURING),
+			mock: setupResize(api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16"), Iops: new(16000)}, api.DeployStatusCONFIGURING),
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB, 16000 IOPS...\n" +
 				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
 				"Use 'tiger branch get' to check branch status.\n",

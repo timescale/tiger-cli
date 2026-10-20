@@ -302,6 +302,16 @@ type ClientInterface interface {
 	// Corresponds with PATCH /projects/{project_id}/allow-lists/{allow_list_id} (the `UpdateAllowList` operationId).
 	UpdateAllowList(ctx context.Context, projectID ProjectID, allowListID AllowListID, body UpdateAllowListJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetProjectBranches List All Branches in a Project
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves a list of all branches within a specific project, regardless
+	// of parent service.
+	//
+	// Corresponds with GET /projects/{project_id}/branches (the `GetProjectBranches` operationId).
+	GetProjectBranches(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetExporters List All Exporters
 	//
 	// **Preview - this endpoint is experimental and may change without notice.**
@@ -1596,6 +1606,26 @@ func (c *Client) UpdateAllowListWithBody(ctx context.Context, projectID ProjectI
 // Corresponds with PATCH /projects/{project_id}/allow-lists/{allow_list_id} (the `UpdateAllowList` operationId).
 func (c *Client) UpdateAllowList(ctx context.Context, projectID ProjectID, allowListID AllowListID, body UpdateAllowListJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateAllowListRequest(c.Server, projectID, allowListID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetProjectBranches List All Branches in a Project
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves a list of all branches within a specific project, regardless
+// of parent service.
+//
+// Corresponds with GET /projects/{project_id}/branches (the `GetProjectBranches` operationId).
+func (c *Client) GetProjectBranches(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetProjectBranchesRequest(c.Server, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -3854,6 +3884,40 @@ func NewUpdateAllowListRequestWithBody(server string, projectID ProjectID, allow
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetProjectBranchesRequest constructs an http.Request for the GetProjectBranches method
+func NewGetProjectBranchesRequest(server string, projectID ProjectID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/branches", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -7269,6 +7333,18 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /projects/{project_id}/allow-lists/{allow_list_id} (the `UpdateAllowList` operationId).
 	UpdateAllowListWithResponse(ctx context.Context, projectID ProjectID, allowListID AllowListID, body UpdateAllowListJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAllowListResponse, error)
 
+	// GetProjectBranchesWithResponse List All Branches in a Project
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves a list of all branches within a specific project, regardless
+	// of parent service.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project_id}/branches (the `GetProjectBranches` operationId).
+	GetProjectBranchesWithResponse(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*GetProjectBranchesResponse, error)
+
 	// GetExportersWithResponse List All Exporters
 	//
 	// **Preview - this endpoint is experimental and may change without notice.**
@@ -8760,6 +8836,54 @@ func (r UpdateAllowListResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateAllowListResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetProjectBranchesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]Branch
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetProjectBranchesResponse) GetJSON200() *[]Branch {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetProjectBranchesResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetProjectBranchesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetProjectBranchesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetProjectBranchesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetProjectBranchesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -12003,6 +12127,24 @@ func (c *ClientWithResponses) UpdateAllowListWithResponse(ctx context.Context, p
 	return ParseUpdateAllowListResponse(rsp)
 }
 
+// GetProjectBranchesWithResponse List All Branches in a Project
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves a list of all branches within a specific project, regardless
+// of parent service.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project_id}/branches (the `GetProjectBranches` operationId).
+func (c *ClientWithResponses) GetProjectBranchesWithResponse(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*GetProjectBranchesResponse, error) {
+	rsp, err := c.GetProjectBranches(ctx, projectID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetProjectBranchesResponse(rsp)
+}
+
 // GetExportersWithResponse List All Exporters
 //
 // **Preview - this endpoint is experimental and may change without notice.**
@@ -13866,6 +14008,39 @@ func ParseUpdateAllowListResponse(rsp *http.Response) (*UpdateAllowListResponse,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest AllowList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetProjectBranchesResponse parses an HTTP response from a GetProjectBranchesWithResponse call
+func ParseGetProjectBranchesResponse(rsp *http.Response) (*GetProjectBranchesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetProjectBranchesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Branch
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

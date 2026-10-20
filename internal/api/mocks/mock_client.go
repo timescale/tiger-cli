@@ -1142,6 +1142,26 @@ func (mr *MockClientInterfaceMockRecorder) GetExporters(ctx, projectID any, reqE
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExporters", reflect.TypeOf((*MockClientInterface)(nil).GetExporters), varargs...)
 }
 
+// GetProjectBranches mocks base method.
+func (m *MockClientInterface) GetProjectBranches(ctx context.Context, projectID api.ProjectID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetProjectBranches", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectBranches indicates an expected call of GetProjectBranches.
+func (mr *MockClientInterfaceMockRecorder) GetProjectBranches(ctx, projectID any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectBranches", reflect.TypeOf((*MockClientInterface)(nil).GetProjectBranches), varargs...)
+}
+
 // GetProjects mocks base method.
 func (m *MockClientInterface) GetProjects(ctx context.Context, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -3304,6 +3324,26 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetExportersWithResponse
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectID}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExportersWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetExportersWithResponse), varargs...)
+}
+
+// GetProjectBranchesWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetProjectBranchesWithResponse(ctx context.Context, projectID api.ProjectID, reqEditors ...api.RequestEditorFn) (*api.GetProjectBranchesResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetProjectBranchesWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetProjectBranchesResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectBranchesWithResponse indicates an expected call of GetProjectBranchesWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetProjectBranchesWithResponse(ctx, projectID any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectBranchesWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetProjectBranchesWithResponse), varargs...)
 }
 
 // GetProjectsWithResponse mocks base method.
