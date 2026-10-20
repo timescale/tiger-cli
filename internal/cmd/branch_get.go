@@ -21,8 +21,9 @@ The branch can be given by ID or name.`,
 
   # Get branch details in JSON format
   tiger branch get br-12345 --output json`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: branchRefCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {

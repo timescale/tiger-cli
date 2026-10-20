@@ -31,8 +31,9 @@ The branch can be given by ID or name.`,
 
   # Stop a branch without waiting for completion
   tiger branch stop br-12345 --no-wait`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: branchRefCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {

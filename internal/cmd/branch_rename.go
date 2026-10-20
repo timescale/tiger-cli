@@ -26,8 +26,9 @@ Both the branch and the new name are required. The branch can be given by ID
 or by its current name.`,
 		Example: `  # Rename a branch
   tiger branch rename br-12345 feature/rbac`,
-		Args:         cobra.ExactArgs(2),
-		SilenceUsage: true,
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: branchRefCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			branchRef, newName := args[0], strings.TrimSpace(args[1])
 

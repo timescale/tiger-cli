@@ -33,8 +33,9 @@ Note for AI agents: Always confirm with the user before performing this destruct
 
   # Delete a branch without confirmation prompt
   tiger branch delete br-12345 --confirm`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: branchRefCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			branchRef, err := getBranchRef(args)
 			if err != nil {

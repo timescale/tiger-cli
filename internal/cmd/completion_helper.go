@@ -115,6 +115,38 @@ func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {
 	return *resp.JSON200, nil
 }
 
+// branchRefCompletion completes the branch argument of the branch commands.
+// Like serviceRefCompletion, it offers each branch at most once, by name,
+// falling back to its ID when what is typed matches the ID instead.
+func branchRefCompletion(app *common.App) cobra.CompletionFunc {
+	return withAppLoad(app, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// The branch ref is always the first positional argument
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		client, projectID, err := app.GetClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		resp, err := client.GetProjectBranchesWithResponse(cmd.Context(), projectID)
+		if err != nil || resp.StatusCode() != http.StatusOK || resp.JSON200 == nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		branches := *resp.JSON200
+		results := make([]string, 0, len(branches))
+		for _, branch := range branches {
+			if strings.HasPrefix(branch.Name, toComplete) {
+				results = append(results, cobra.CompletionWithDesc(branch.Name, branch.ID))
+			} else if strings.HasPrefix(branch.ID, toComplete) {
+				results = append(results, cobra.CompletionWithDesc(branch.ID, branch.Name))
+			}
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
+}
+
 func projectIDCompletion(app *common.App) cobra.CompletionFunc {
 	return withAppLoad(app, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		// Project ID is always first positional argument

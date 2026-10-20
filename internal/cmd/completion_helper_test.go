@@ -53,6 +53,21 @@ func TestCompletion(t *testing.T) {
 			}, nil)
 	}
 
+	listBranches := func(m *mocks.MockClientWithResponsesInterface) {
+		branches := []api.Branch{
+			sampleBranch(),
+			sampleBranch(func(b *api.Branch) {
+				b.ID = "br-67890"
+				b.Name = "other-branch"
+			}),
+		}
+		m.EXPECT().GetProjectBranchesWithResponse(validCtx, testProjectID).
+			Return(&api.GetProjectBranchesResponse{
+				HTTPResponse: httpResponse(http.StatusOK),
+				JSON200:      &branches,
+			}, nil)
+	}
+
 	runCmdTests(t, []cmdTest{
 		{
 			name:       "service argument lists services by name with their IDs",
@@ -118,6 +133,42 @@ func TestCompletion(t *testing.T) {
 			args: []string{"__complete", "service", "get", ""},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
+					Return(nil, errors.New("connection refused"))
+			},
+			wantStdout: noFileComp,
+			wantStderr: directive,
+		},
+		{
+			name:       "branch argument lists branches by name with their IDs",
+			args:       []string{"__complete", "branch", "get", ""},
+			opts:       []runOption{withExperimental()},
+			mock:       listBranches,
+			wantStdout: "test-branch\tbr-12345\nother-branch\tbr-67890\n" + noFileComp,
+			wantStderr: directive,
+		},
+		{
+			// A prefix that matches no name falls back to IDs, with the name
+			// as the description.
+			name:       "branch argument offers IDs matching what is typed",
+			args:       []string{"__complete", "branch", "stop", "br-6"},
+			opts:       []runOption{withExperimental()},
+			mock:       listBranches,
+			wantStdout: "br-67890\tother-branch\n" + noFileComp,
+			wantStderr: directive,
+		},
+		{
+			name:       "branch argument completes only the first argument",
+			args:       []string{"__complete", "branch", "rename", "br-12345", ""},
+			opts:       []runOption{withExperimental()},
+			wantStdout: noFileComp,
+			wantStderr: directive,
+		},
+		{
+			name: "branch argument offers nothing when the API fails",
+			args: []string{"__complete", "branch", "delete", ""},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetProjectBranchesWithResponse(validCtx, testProjectID).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantStdout: noFileComp,

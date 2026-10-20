@@ -38,8 +38,9 @@ The branch can be given by ID or name.`,
 
   # Auto-generate a secure password
   tiger branch update-password br-12345 --auto-generate`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: branchRefCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
