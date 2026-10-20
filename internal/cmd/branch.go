@@ -53,7 +53,6 @@ type OutputBranch struct {
 	ServiceName string `json:"service_name,omitempty"`
 	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty"`
-	ConsoleURL       string `json:"console_url,omitempty"`
 }
 
 // branchOutputOptions controls what the branch output functions include.
@@ -116,9 +115,6 @@ func outputBranchTable(branch OutputBranch, output io.Writer) error {
 	if branch.ConnectionString != "" {
 		table.Append("Connection String", branch.ConnectionString)
 	}
-	if branch.ConsoleURL != "" {
-		table.Append("Console URL", branch.ConsoleURL)
-	}
 
 	return table.Render()
 }
@@ -149,9 +145,7 @@ func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.B
 		}
 	}
 
-	// TODO: confirm the Console URL for branches once the Console supports
-	// them. This is the one proposed in the PRD.
-	outputBr.ConsoleURL = fmt.Sprintf("%s/dashboard/services/%s/branches/%s", cfg.ConsoleURL, branch.ServiceID, branch.ID)
+	// TODO: add a Console URL once the Console supports branches.
 
 	return outputBr
 }

@@ -132,8 +132,7 @@ func TestBranchListCmd(t *testing.T) {
     "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
     "port": 36956,
     "database": "tsdb",
-    "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
-    "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345/branches/br-12345"
+    "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require"
   }
 ]
 `,

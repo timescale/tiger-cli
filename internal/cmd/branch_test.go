@@ -131,7 +131,6 @@ const (
 │ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
 │ Created           │ 2025-01-16 09:00:00 UTC                                                                                     │
 │ Connection String │ postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345/branches/br-12345                          │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 `
 	sampleBranchJSON = `{
@@ -152,8 +151,7 @@ const (
   "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
   "port": 36956,
   "database": "tsdb",
-  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
-  "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345/branches/br-12345"
+  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require"
 }
 `
 )

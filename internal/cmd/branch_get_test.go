@@ -100,7 +100,6 @@ func TestBranchGetCmd(t *testing.T) {
 			opts: []runOption{withExperimental()},
 			mock: getSample,
 			wantStdout: `connection_string: postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require
-console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345/branches/br-12345
 cpu_millis: 250
 created: "2025-01-16T09:00:00Z"
 database: tsdb
@@ -167,8 +166,7 @@ status: READY
   "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
   "port": 36956,
   "database": "tsdb",
-  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require\u0026options=-c%20tsdb_admin.read_only_connection%3Dtrue",
-  "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345/branches/br-12345"
+  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require\u0026options=-c%20tsdb_admin.read_only_connection%3Dtrue"
 }
 `,
 		},
@@ -182,18 +180,17 @@ status: READY
 				expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) { b.Endpoint.Port = nil }))
 				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
 			},
-			wantStdout: `┌────────────────┬────────────────────────────────────────────────────────────────────────────────────┐
-│    PROPERTY    │                                       VALUE                                        │
-├────────────────┼────────────────────────────────────────────────────────────────────────────────────┤
-│ Branch ID      │ br-12345                                                                           │
-│ Name           │ test-branch                                                                        │
-│ Parent Service │ test-service (svc-12345)                                                           │
-│ Status         │ READY                                                                              │
-│ CPU            │ 0.25 cores (250m)                                                                  │
-│ Memory         │ 2 GB                                                                               │
-│ Created        │ 2025-01-16 09:00:00 UTC                                                            │
-│ Console URL    │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345/branches/br-12345 │
-└────────────────┴────────────────────────────────────────────────────────────────────────────────────┘
+			wantStdout: `┌────────────────┬──────────────────────────┐
+│    PROPERTY    │          VALUE           │
+├────────────────┼──────────────────────────┤
+│ Branch ID      │ br-12345                 │
+│ Name           │ test-branch              │
+│ Parent Service │ test-service (svc-12345) │
+│ Status         │ READY                    │
+│ CPU            │ 0.25 cores (250m)        │
+│ Memory         │ 2 GB                     │
+│ Created        │ 2025-01-16 09:00:00 UTC  │
+└────────────────┴──────────────────────────┘
 `,
 			wantStderr: "Warning: failed to get connection details: endpoint port not available\n",
 		},
