@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -15,9 +13,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
-
-// errBranchRequired is returned when no argument identifies a branch.
-var errBranchRequired = errors.New("branch name or ID is required")
 
 // branchCPUMemoryHelp is the table of CPU/Memory configurations a branch can
 // be created or resized onto.
@@ -57,42 +52,6 @@ type OutputBranch struct {
 	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty"`
 	ConsoleURL       string `json:"console_url,omitempty"`
-}
-
-// getBranchRef returns the branch ref, an ID or a name, given as an argument.
-// There is no default branch: the service_id default only ever holds a
-// service ID.
-func getBranchRef(args []string) (string, error) {
-	if len(args) == 0 || args[0] == "" {
-		return "", errBranchRequired
-	}
-	return args[0], nil
-}
-
-// resolveBranch resolves a branch ref to the branch it names, through the
-// API's resolve endpoint restricted to branches. The branch carries its
-// parent's ID, which every other branch endpoint needs.
-func resolveBranch(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string) (*api.Branch, error) {
-	branch, err := common.ResolveBranch(ctx, client, projectID, ref)
-	if err != nil {
-		return nil, withAmbiguousRefHint(err, "Run 'tiger branch list' on the branch's service to find the ID you want")
-	}
-	return branch, nil
-}
-
-// resolveBranchForWrite is resolveBranch for a command that changes the branch
-// it resolves. A branch always counts as DEV (see common.BranchEnvironmentTag),
-// so the gate needs nothing off the branch and runs before the lookup.
-func resolveBranchForWrite(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface, projectID, ref string) (*api.Branch, error) {
-	if err := common.CheckReadOnly(cfg, common.BranchEnvironmentTag); err != nil {
-		return nil, err
-	}
-	return resolveBranch(ctx, client, projectID, ref)
-}
-
-// branchLabel identifies a branch in status output by name and ID together.
-func branchLabel(branch api.Branch) string {
-	return fmt.Sprintf("'%s' (%s)", branch.Name, branch.ID)
 }
 
 // outputBranch formats and outputs a single branch in the given format.
