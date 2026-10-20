@@ -59,14 +59,7 @@ service from your configuration.`,
 				return fmt.Errorf("empty response from API")
 			}
 
-			branches := *resp.JSON200
-
-			if len(branches) == 0 {
-				cmd.PrintErrf("No branches found for service %s.\n", serviceLabel(*service))
-				return nil
-			}
-
-			return outputBranches(cmd, cfg, branches, branchOutputOptions{ServiceName: service.Name})
+			return outputBranches(cmd, cfg, *service, *resp.JSON200)
 		},
 	}
 
@@ -76,8 +69,10 @@ service from your configuration.`,
 	return cmd
 }
 
-// outputBranches outputs a list of branches in the configured output format.
-func outputBranches(cmd *cobra.Command, cfg *config.Config, branches []api.Branch, opts branchOutputOptions) error {
+// outputBranches outputs the branches of service in the configured output
+// format.
+func outputBranches(cmd *cobra.Command, cfg *config.Config, service api.Service, branches []api.Branch) error {
+	opts := branchOutputOptions{ServiceName: service.Name}
 	prepared := make([]OutputBranch, len(branches))
 	for i, branch := range branches {
 		prepared[i] = prepareBranchForOutput(cmd, cfg, branch, opts)
@@ -90,12 +85,16 @@ func outputBranches(cmd *cobra.Command, cfg *config.Config, branches []api.Branc
 	case "yaml":
 		return util.SerializeToYAML(outputWriter, prepared)
 	default: // table format (default)
-		return outputBranchesTable(prepared, outputWriter)
+		if len(prepared) == 0 {
+			cmd.PrintErrf("No branches found for service %s.\n", serviceLabel(service))
+			return nil
+		}
+		return outputBranchesTable(outputWriter, prepared)
 	}
 }
 
 // outputBranchesTable outputs branches in a formatted table.
-func outputBranchesTable(branches []OutputBranch, output io.Writer) error {
+func outputBranchesTable(output io.Writer, branches []OutputBranch) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("BRANCH ID", "NAME", "STATUS", "CREATED")
 

@@ -76,7 +76,7 @@ func outputBranch(cmd *cobra.Command, cfg *config.Config, branch api.Branch, opt
 	case "env":
 		return outputBranchEnv(cmd, outputBr)
 	default: // table format (default)
-		return outputBranchTable(outputBr, outputWriter)
+		return outputBranchTable(outputWriter, outputBr)
 	}
 }
 
@@ -91,7 +91,7 @@ func outputBranchEnv(cmd *cobra.Command, branch OutputBranch) error {
 }
 
 // outputBranchTable outputs detailed branch information in a formatted table.
-func outputBranchTable(branch OutputBranch, output io.Writer) error {
+func outputBranchTable(output io.Writer, branch OutputBranch) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 

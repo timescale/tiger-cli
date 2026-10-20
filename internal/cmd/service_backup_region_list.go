@@ -94,16 +94,15 @@ func outputBackupRegions(cmd *cobra.Command, regions []api.BackupRegion, format 
 	case "env":
 		return fmt.Errorf("environment variable output is not supported for backup regions")
 	default:
-		return outputBackupRegionsTable(regions, out)
+		if len(regions) == 0 {
+			cmd.PrintErrln("No backup regions configured for this service.")
+			return nil
+		}
+		return outputBackupRegionsTable(out, regions)
 	}
 }
 
-func outputBackupRegionsTable(regions []api.BackupRegion, output io.Writer) error {
-	if len(regions) == 0 {
-		_, err := fmt.Fprintln(output, "No backup regions configured for this service.")
-		return err
-	}
-
+func outputBackupRegionsTable(output io.Writer, regions []api.BackupRegion) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("REGION", "ADDED")
 

@@ -44,16 +44,7 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 			if resp.JSON200 == nil {
 				return fmt.Errorf("empty response from API")
 			}
-			services := *resp.JSON200
-
-			if len(services) == 0 {
-				cmd.PrintErrln("No services found.")
-				cmd.PrintErrln("Create your first service with: tiger service create")
-				return nil
-			}
-
-			// Output services in requested format
-			return outputServices(cmd, cfg, services, serviceOutputOptions{Experimental: app.Experimental})
+			return outputServices(cmd, cfg, *resp.JSON200, serviceOutputOptions{Experimental: app.Experimental})
 		},
 	}
 
@@ -77,7 +68,12 @@ func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Servi
 	case "env":
 		return fmt.Errorf("environment variable output is not supported for multiple services")
 	default: // table format (default)
-		return outputServicesTable(outputServices, outputWriter)
+		if len(outputServices) == 0 {
+			cmd.PrintErrln("No services found.")
+			cmd.PrintErrln("Create your first service with: tiger service create")
+			return nil
+		}
+		return outputServicesTable(outputWriter, outputServices)
 	}
 }
 
@@ -91,7 +87,7 @@ func prepareServicesForOutput(cmd *cobra.Command, cfg *config.Config, services [
 }
 
 // outputServicesTable outputs services in a formatted table using tablewriter
-func outputServicesTable(services []OutputService, output io.Writer) error {
+func outputServicesTable(output io.Writer, services []OutputService) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED")
 

@@ -116,7 +116,7 @@ func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, 
 	case "env":
 		return outputServiceEnv(cmd, outputSvc)
 	default: // table format (default)
-		return outputServiceTable(outputSvc, outputWriter)
+		return outputServiceTable(outputWriter, outputSvc)
 	}
 }
 
@@ -133,7 +133,7 @@ func outputServiceEnv(cmd *cobra.Command, service OutputService) error {
 }
 
 // outputServiceTable outputs detailed service information in a formatted table
-func outputServiceTable(service OutputService, output io.Writer) error {
+func outputServiceTable(output io.Writer, service OutputService) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 

@@ -96,6 +96,22 @@ func TestBranchListCmd(t *testing.T) {
 			wantStderr: "No branches found for service 'test-service' (svc-12345).\n",
 		},
 		{
+			// Structured output is always structured, so an empty list is
+			// still a list rather than a message.
+			name:       "no branches json",
+			args:       []string{"branch", "list", "svc-12345", "-o", "json"},
+			opts:       []runOption{withExperimental()},
+			mock:       expectList(),
+			wantStdout: "[]\n",
+		},
+		{
+			name:       "no branches yaml",
+			args:       []string{"branch", "list", "svc-12345", "-o", "yaml"},
+			opts:       []runOption{withExperimental()},
+			mock:       expectList(),
+			wantStdout: "[]\n",
+		},
+		{
 			name: "table",
 			args: []string{"branch", "list", "svc-12345"},
 			opts: []runOption{withExperimental()},
