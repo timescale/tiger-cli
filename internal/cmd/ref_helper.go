@@ -74,10 +74,10 @@ func defaultServiceSource(cmd *cobra.Command) string {
 // empty one rather than a 404. A read replica set ID matches too, and comes
 // back as a service whose ForkedFrom links to its parent.
 //
-// TODO: move to the resolve endpoint (common.Resolve) like the branch and db
-// commands. Its SERVICE type doesn't match read replica sets, which commands
-// here accept today, so that needs the CLI's handling of replica sets fixed
-// first.
+// TODO: move to the resolve endpoint (common.Resolve), like the branch and db
+// commands, once read replica sets have their own commands. Its SERVICE type
+// doesn't match replica sets, and until those commands exist this lookup is
+// the only way to reach one.
 func resolveService(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, ref serviceRef) (*api.Service, error) {
 	resp, err := client.GetServicesWithResponse(ctx, projectID, &api.GetServicesParams{Ref: &ref.ref})
 	if err != nil {
