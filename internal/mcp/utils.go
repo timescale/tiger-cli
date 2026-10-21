@@ -354,7 +354,6 @@ type BranchDetail struct {
 	Status           string        `json:"status"`
 	Created          string        `json:"created,omitempty"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
-	IOPS             *int          `json:"iops,omitempty"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
 	ConnectionString string        `json:"connection_string,omitempty"`
 }
@@ -370,11 +369,9 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 	schema.Properties["status"].Description = "Branch status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "QUEUED", "CONFIGURING"}
 
-	// The branch tools only exist behind the experimental gate. The IOPS are
-	// still returned at the top level, and left out of resources.
+	// The branch tools only exist behind the experimental gate, so the IOPS
+	// are always included.
 	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
-
-	schema.Properties["iops"].Description = "Provisioned IOPS for the branch's storage"
 
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint (absent while the branch is still provisioning)"
 	schema.Properties["connection_string"].Description = "PostgreSQL connection string, without a password"
@@ -393,8 +390,8 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch) Br
 		Resources: &ResourceInfo{
 			CPU:    common.FormatCPUCores(branch.CPUMillis) + " cores",
 			Memory: fmt.Sprintf("%d GB", branch.MemoryGbs),
+			IOPS:   util.Deref(branch.Iops),
 		},
-		IOPS: branch.Iops,
 	}
 
 	// A branch that's still provisioning may have no endpoint yet.

@@ -103,6 +103,19 @@ func TestBranchGetTool(t *testing.T) {
 			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetail(api.DeployStatusREADY))},
 		},
 		{
+			// The IOPS go in resources, as they do for services.
+			name: "returns the IOPS in resources",
+			tool: toolBranchGet,
+			args: args,
+			opts: []runOption{experimental},
+			mock: getBranch(sampleBranch(func(b *api.Branch) { b.Iops = new(16000) })),
+			wantOutput: map[string]any{"branch": func() map[string]any {
+				detail := withServiceName(sampleBranchDetail(api.DeployStatusREADY))
+				detail["resources"] = map[string]any{"cpu": "0.25 cores", "memory": "2 GB", "iops": float64(16000)}
+				return detail
+			}()},
+		},
+		{
 			// The parent's name is the only thing the second fetch adds, so
 			// without it the branch is still returned.
 			name: "parent fetch fails",
