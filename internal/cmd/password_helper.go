@@ -13,8 +13,8 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// updateAndSavePassword sets the password of credentials' owner through the
-// API, and saves it locally.
+// updateAndSavePassword sets the password of credentials' owner, a service or
+// a branch, through the matching API endpoint, and saves it locally.
 func updateAndSavePassword(
 	ctx context.Context,
 	cmd *cobra.Command,
@@ -33,15 +33,30 @@ func updateAndSavePassword(
 		cmd.PrintErrf("Warning: could not save password: %v\n", err)
 	} else if result.Success {
 		cmd.PrintErrf("%s\n", result.Message)
-		cmd.PrintErrf("View it with: tiger service get %s --with-password\n", credentials.ID)
+		// Only service get can show a stored password.
+		if credentials.BranchServiceID == "" {
+			cmd.PrintErrf("View it with: tiger service get %s --with-password\n", credentials.ID)
+		}
 	}
 
 	return nil
 }
 
-// updatePassword sets the password of credentials' owner through the API.
+// updatePassword sets the password of credentials' owner through the service
+// or branch password endpoint.
 func updatePassword(ctx context.Context, client api.ClientWithResponsesInterface, credentials common.CredentialOwner, newPassword string) error {
 	input := api.UpdatePasswordInput{Password: newPassword}
+	if credentials.BranchServiceID != "" {
+		resp, err := client.UpdateBranchPasswordWithResponse(ctx, credentials.ProjectID, credentials.BranchServiceID, credentials.ID, input)
+		if err != nil {
+			return fmt.Errorf("failed to update password: %w", err)
+		}
+		if resp.StatusCode() != http.StatusNoContent {
+			return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+		}
+		return nil
+	}
+
 	resp, err := client.UpdatePasswordWithResponse(ctx, credentials.ProjectID, credentials.ID, input)
 	if err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
@@ -120,7 +135,7 @@ func handlePasswordSaving(cmd *cobra.Command, cfg *config.Config, target common.
 	return printPasswordStorageResult(cmd, result)
 }
 
-// printConnectMessage tells the user how to connect to a new service.
+// printConnectMessage tells the user how to connect to a new service or branch.
 func printConnectMessage(cmd *cobra.Command, passwordSaved, noSetDefault bool, serviceID string) {
 	if !passwordSaved {
 		// We can't connect if no password was saved, so don't show message

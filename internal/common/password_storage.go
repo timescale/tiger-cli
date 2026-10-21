@@ -13,8 +13,9 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// PasswordTarget is what a stored password belongs to. The keyring keys a
-// password by project and ID, and ~/.pgpass by the endpoint's host and port.
+// PasswordTarget is what a stored password belongs to: a service or a branch.
+// The keyring keys a password by project and ID, and ~/.pgpass by the
+// endpoint's host and port.
 type PasswordTarget struct {
 	ProjectID string
 	ID        string
@@ -28,6 +29,16 @@ func ServicePasswordTarget(service api.Service) PasswordTarget {
 		ProjectID: service.ProjectID,
 		ID:        service.ServiceID,
 		Endpoint:  service.Endpoint,
+	}
+}
+
+// BranchPasswordTarget returns the PasswordTarget of a branch's own
+// passwords.
+func BranchPasswordTarget(branch api.Branch) PasswordTarget {
+	return PasswordTarget{
+		ProjectID: branch.ProjectID,
+		ID:        branch.ID,
+		Endpoint:  branch.Endpoint,
 	}
 }
 

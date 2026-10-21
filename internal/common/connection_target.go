@@ -10,9 +10,9 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// ConnectionTarget is what a database connection goes to: a service or one of
-// its read replica sets, reduced to what connecting to it and reporting on it
-// need.
+// ConnectionTarget is what a database connection goes to: a service, one of
+// its read replica sets, or a branch, reduced to what connecting to it and
+// reporting on it need.
 type ConnectionTarget struct {
 	Kind TargetKind
 	ID   string
@@ -22,23 +22,29 @@ type ConnectionTarget struct {
 	Status api.DeployStatus
 
 	// Environment alone decides a session's read-only verdict, so a replica is
-	// judged on its own tag rather than its primary's.
+	// judged on its own tag rather than its primary's, and a branch, which has
+	// none, counts as DEV.
 	Environment api.EnvironmentTag
 
 	Endpoint *api.Endpoint
 	Pooler   *api.ConnectionPooler
 
 	// Credentials is whose passwords the connection uses: the target itself
-	// for a service, the primary for a read replica, which shares them.
+	// for a service or a branch, the primary for a read replica, which shares
+	// them.
 	Credentials CredentialOwner
 }
 
-// CredentialOwner is the service whose passwords a connection uses.
+// CredentialOwner is the service or branch whose passwords a connection uses.
 type CredentialOwner struct {
 	PasswordTarget
 
 	// Name names the owner in messages.
 	Name string
+
+	// BranchServiceID is the parent service of an owner that is a branch,
+	// whose password endpoint is nested under it. It is empty for a service.
+	BranchServiceID string
 
 	// Environment is the owner's own tag, which decides whether read-only mode
 	// lets its passwords be changed.
@@ -51,6 +57,7 @@ type TargetKind int
 const (
 	TargetService TargetKind = iota
 	TargetReadReplica
+	TargetBranch
 )
 
 // NewServiceConnectionTarget returns the ConnectionTarget of a service,
@@ -75,6 +82,31 @@ func ServiceCredentials(service api.Service) CredentialOwner {
 		PasswordTarget: ServicePasswordTarget(service),
 		Name:           service.Name,
 		Environment:    ServiceEnvironmentTag(service),
+	}
+}
+
+// NewBranchConnectionTarget returns the ConnectionTarget of a branch, which
+// has its own credentials and no pooler.
+func NewBranchConnectionTarget(branch api.Branch) *ConnectionTarget {
+	return &ConnectionTarget{
+		Kind:        TargetBranch,
+		ID:          branch.ID,
+		Name:        branch.Name,
+		Status:      branch.Status,
+		Environment: BranchEnvironmentTag,
+		Endpoint:    branch.Endpoint,
+		Credentials: BranchCredentials(branch),
+	}
+}
+
+// BranchCredentials returns a branch as the owner of the credentials its
+// connections use. A branch has its own, separate from its parent's.
+func BranchCredentials(branch api.Branch) CredentialOwner {
+	return CredentialOwner{
+		PasswordTarget:  BranchPasswordTarget(branch),
+		Name:            branch.Name,
+		BranchServiceID: branch.ServiceID,
+		Environment:     BranchEnvironmentTag,
 	}
 }
 
