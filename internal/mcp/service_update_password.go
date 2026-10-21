@@ -147,7 +147,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
 	}
-	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusNoContent {
+	if resp.StatusCode() != http.StatusNoContent {
 		return nil, ServiceUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 

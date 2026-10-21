@@ -104,6 +104,18 @@ func TestBranchUpdatePasswordCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
+			// The endpoint answers success with a 204 and nothing else.
+			name: "unexpected 200 is an error",
+			args: []string{"branch", "update-password", "br-12345", "--new-password", "secret"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", api.UpdatePasswordInput{Password: "secret"}).
+					Return(&api.UpdateBranchPasswordResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
+			},
+			wantErr: "unknown error",
+		},
+		{
 			name:       "new password flag",
 			args:       []string{"branch", "update-password", "br-12345", "--new-password", "secret"},
 			opts:       []runOption{withExperimental()},

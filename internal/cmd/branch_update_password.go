@@ -91,7 +91,7 @@ The branch can be given by ID or name.`,
 			if err != nil {
 				return fmt.Errorf("failed to update password: %w", err)
 			}
-			if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusNoContent {
+			if resp.StatusCode() != http.StatusNoContent {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/spf13/cobra"
 
@@ -31,7 +32,7 @@ func updateAndSaveServicePassword(
 		return fmt.Errorf("failed to update password: %w", err)
 	}
 
-	if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
+	if resp.StatusCode() != http.StatusNoContent {
 		return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 

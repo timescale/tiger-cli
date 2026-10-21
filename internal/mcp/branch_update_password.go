@@ -100,7 +100,7 @@ func (s *Server) handleBranchUpdatePassword(ctx context.Context, req *mcp.CallTo
 	if err != nil {
 		return nil, BranchUpdatePasswordOutput{}, fmt.Errorf("failed to update branch password: %w", err)
 	}
-	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusNoContent {
+	if resp.StatusCode() != http.StatusNoContent {
 		return nil, BranchUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 

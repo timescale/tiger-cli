@@ -50,7 +50,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 	expectTaggedServiceAndUpdate := func(tag string, calls int) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			expectTaggedService(tag, calls)(m)
-			expectUpdate(http.StatusOK)(m)
+			expectUpdate(http.StatusNoContent)(m)
 		}
 	}
 
@@ -201,7 +201,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 			opts: []runOption{generated},
 			mock: expectGetServiceAndUpdate(sampleService(func(s *api.Service) {
 				s.ForkedFrom = &api.ForkSpec{ServiceID: new("u8me885b93")}
-			}), http.StatusOK),
+			}), http.StatusNoContent),
 			wantOutput: updated,
 		},
 		{
@@ -303,19 +303,20 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 			wantErr: "unknown error",
 		},
 		{
-			name:       "updates password on a 204",
-			tool:       toolServiceUpdatePassword,
-			args:       args,
-			opts:       []runOption{generated},
-			mock:       expectGetServiceAndUpdate(sampleService(), http.StatusNoContent),
-			wantOutput: updated,
+			// The endpoint answers success with a 204 and nothing else.
+			name:    "unexpected 200 is an error",
+			tool:    toolServiceUpdatePassword,
+			args:    args,
+			opts:    []runOption{generated},
+			mock:    expectGetServiceAndUpdate(sampleService(), http.StatusOK),
+			wantErr: "unknown error",
 		},
 		{
 			name: "with_password includes the generated password",
 			tool: toolServiceUpdatePassword,
 			args: withPasswordArgs,
 			opts: []runOption{generated},
-			mock: expectGetServiceAndUpdate(sampleService(), http.StatusOK),
+			mock: expectGetServiceAndUpdate(sampleService(), http.StatusNoContent),
 			wantOutput: map[string]any{
 				"updated":          true,
 				"message":          "Password updated for tsdbadmin.",
@@ -328,7 +329,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 			tool: toolServiceUpdatePassword,
 			args: withPasswordArgs,
 			opts: []runOption{withConfig(map[string]any{"password_storage": "none"}), generated},
-			mock: expectGetServiceAndUpdate(sampleService(), http.StatusOK),
+			mock: expectGetServiceAndUpdate(sampleService(), http.StatusNoContent),
 			wantOutput: map[string]any{
 				"updated":  true,
 				"message":  "Password updated for tsdbadmin.",
@@ -347,7 +348,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 			tool: toolServiceUpdatePassword,
 			args: args,
 			opts: []runOption{withConfig(map[string]any{"password_storage": "none"}), generated},
-			mock: expectGetServiceAndUpdate(sampleService(), http.StatusOK),
+			mock: expectGetServiceAndUpdate(sampleService(), http.StatusNoContent),
 			wantOutput: map[string]any{
 				"updated": true,
 				"message": "Password updated for tsdbadmin. Warning: the new password was not saved, and was not returned because with_password was false.",
@@ -366,7 +367,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 			tool: toolServiceUpdatePassword,
 			args: args,
 			opts: []runOption{withConfig(map[string]any{"password_storage": "pgpass"}), generated},
-			mock: expectGetServiceAndUpdate(sampleService(), http.StatusOK),
+			mock: expectGetServiceAndUpdate(sampleService(), http.StatusNoContent),
 			wantOutput: map[string]any{
 				"updated": true,
 				"message": "Password updated for tsdbadmin. Warning: the new password was not saved, and was not returned because with_password was false.",

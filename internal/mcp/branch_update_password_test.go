@@ -74,6 +74,19 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			wantErr: "failed to update branch password: connection refused",
 		},
 		{
+			// The endpoint answers success with a 204 and nothing else.
+			name: "unexpected 200 is an error",
+			tool: toolBranchUpdatePassword,
+			args: args,
+			opts: []runOption{experimental, generated},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, sampleBranch())
+				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.UpdatePasswordInput{Password: "generated-pw"}).
+					Return(&api.UpdateBranchPasswordResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
+			},
+			wantErr: "unknown error",
+		},
+		{
 			name: "saves the generated password",
 			tool: toolBranchUpdatePassword,
 			args: args,

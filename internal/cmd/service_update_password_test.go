@@ -22,7 +22,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "svc-12345", api.UpdatePasswordInput{Password: password}).
 				Return(&api.UpdatePasswordResponse{
-					HTTPResponse: httpResponse(http.StatusOK),
+					HTTPResponse: httpResponse(http.StatusNoContent),
 				}, nil)
 		}
 	}
@@ -31,7 +31,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 	setupUpdateAny := func(m *mocks.MockClientWithResponsesInterface) {
 		m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "svc-12345", gomock.Any()).
 			Return(&api.UpdatePasswordResponse{
-				HTTPResponse: httpResponse(http.StatusOK),
+				HTTPResponse: httpResponse(http.StatusNoContent),
 			}, nil)
 	}
 
@@ -178,6 +178,17 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			},
 			wantErr: "permission denied",
 			checks:  []checkFunc{checkExitCode(common.ExitPermissionDenied)},
+		},
+		{
+			// The endpoint answers success with a 204 and nothing else.
+			name: "unexpected 200 is an error",
+			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				setupGet(m)
+				m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "svc-12345", api.UpdatePasswordInput{Password: "newpass123"}).
+					Return(&api.UpdatePasswordResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
+			},
+			wantErr: "unknown error",
 		},
 		{
 			name: "new-password flag",
