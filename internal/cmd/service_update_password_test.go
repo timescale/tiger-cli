@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	"go.uber.org/mock/gomock"
-
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -27,18 +25,10 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		}
 	}
 
-	// setupUpdateAny is for the paths that generate a random password.
-	setupUpdateAny := func(m *mocks.MockClientWithResponsesInterface) {
-		m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "svc-12345", gomock.Any()).
-			Return(&api.UpdatePasswordResponse{
-				HTTPResponse: httpResponse(http.StatusNoContent),
-			}, nil)
-	}
-
 	// storedPassword reads the password the command saved for the sample
 	// service in the per-test mock keyring ("" if none is stored). The shared
-	// checkStoredPassword helper can't express "nothing stored" or "random,
-	// but 32 characters", so those cases read the keyring through this.
+	// checkStoredPassword helper can't express "nothing stored", so that case
+	// reads the keyring through this.
 	storedPassword := func(t *testing.T) string {
 		t.Helper()
 		storage := &common.KeyringStorage{}
@@ -214,16 +204,20 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name: "auto-generate",
 			args: []string{"service", "update-password", "svc-12345", "--auto-generate"},
+			opts: []runOption{withGenerateSecurePassword(32, "generated-pw", nil)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
-				setupUpdateAny(m)
+				setupUpdate("generated-pw")(m)
 			},
 			wantStderr: savedStderr,
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				if got := storedPassword(t); len(got) != 32 {
-					t.Errorf("stored password length = %d, want 32", len(got))
-				}
-			}},
+			checks:     []checkFunc{checkStoredPassword("svc-12345", "generated-pw")},
+		},
+		{
+			name:    "password generation fails",
+			args:    []string{"service", "update-password", "svc-12345", "--auto-generate"},
+			opts:    []runOption{withGenerateSecurePassword(32, "", errors.New("entropy unavailable"))},
+			mock:    setupGet,
+			wantErr: "failed to generate new password: entropy unavailable",
 		},
 		{
 			name: "interactive prompt",
@@ -239,18 +233,14 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name: "interactive prompt empty generates",
 			args: []string{"service", "update-password", "svc-12345"},
-			opts: []runOption{withIsTerminal(true), withReadPassword("")},
+			opts: []runOption{withIsTerminal(true), withReadPassword(""), withGenerateSecurePassword(32, "generated-pw", nil)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
-				setupUpdateAny(m)
+				setupUpdate("generated-pw")(m)
 			},
 			wantStderr: "Enter new password (leave empty to generate): \n" +
 				savedStderr,
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				if got := storedPassword(t); len(got) != 32 {
-					t.Errorf("stored password length = %d, want 32", len(got))
-				}
-			}},
+			checks: []checkFunc{checkStoredPassword("svc-12345", "generated-pw")},
 		},
 		{
 			name: "password storage none",

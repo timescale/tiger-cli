@@ -10,22 +10,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-// withGenerateSecurePassword pins the otherwise random generated password,
-// asserting the length it is asked for, so the request that carries it can
-// be asserted exactly.
-func withGenerateSecurePassword(password string) runOption {
-	return withSetup(func(t *testing.T) {
-		original := common.GenerateSecurePassword
-		common.GenerateSecurePassword = func(length int) (string, error) {
-			if length != 32 {
-				t.Errorf("GenerateSecurePassword length = %d, want 32", length)
-			}
-			return password, nil
-		}
-		t.Cleanup(func() { common.GenerateSecurePassword = original })
-	})
-}
-
 func TestBranchUpdatePasswordCmd(t *testing.T) {
 	setupUpdate := func(password string) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
@@ -142,10 +126,19 @@ func TestBranchUpdatePasswordCmd(t *testing.T) {
 		{
 			name:       "auto-generate",
 			args:       []string{"branch", "update-password", "br-12345", "--auto-generate"},
-			opts:       []runOption{withExperimental(), withGenerateSecurePassword("generated")},
+			opts:       []runOption{withExperimental(), withGenerateSecurePassword(32, "generated", nil)},
 			mock:       setupUpdate("generated"),
 			wantStderr: successStderr,
 			checks:     []checkFunc{checkStoredPassword("br-12345", "generated")},
+		},
+		{
+			name: "password generation fails",
+			args: []string{"branch", "update-password", "br-12345", "--auto-generate"},
+			opts: []runOption{withExperimental(), withGenerateSecurePassword(32, "", errors.New("entropy unavailable"))},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch())
+			},
+			wantErr: "failed to generate new password: entropy unavailable",
 		},
 	})
 }

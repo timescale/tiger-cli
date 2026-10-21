@@ -74,6 +74,16 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			wantErr: "failed to update branch password: connection refused",
 		},
 		{
+			name: "password generation fails",
+			tool: toolBranchUpdatePassword,
+			args: args,
+			opts: []runOption{experimental, withGenerateSecurePassword(32, "", errors.New("failed to generate random password: entropy unavailable"))},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, sampleBranch())
+			},
+			wantErr: "failed to generate random password: entropy unavailable",
+		},
+		{
 			// The endpoint answers success with a 204 and nothing else.
 			name: "unexpected 200 is an error",
 			tool: toolBranchUpdatePassword,

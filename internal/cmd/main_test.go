@@ -425,6 +425,23 @@ func withIsTerminal(isTerminal bool) runOption {
 	})
 }
 
+// withGenerateSecurePassword stubs common.GenerateSecurePassword, asserting the
+// requested length and returning password and err in place of a random
+// password, so a case can expect the exact update request and stored password.
+func withGenerateSecurePassword(wantLength int, password string, err error) runOption {
+	return withSetup(func(t *testing.T) {
+		original := common.GenerateSecurePassword
+		common.GenerateSecurePassword = func(length int) (string, error) {
+			t.Helper()
+			if length != wantLength {
+				t.Errorf("GenerateSecurePassword length = %d, want %d", length, wantLength)
+			}
+			return password, err
+		}
+		t.Cleanup(func() { common.GenerateSecurePassword = original })
+	})
+}
+
 // withReadPassword makes util.ReadPassword return the given password. The real
 // implementation needs stdin to be an *os.File, so password prompts can't be
 // driven with withStdin.
