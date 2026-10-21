@@ -41,17 +41,35 @@ func CanHaveBranches(service api.Service) bool {
 	return util.Deref(service.Platform) == api.ServicePlatformFLUID
 }
 
-// CountBranches returns how many branches serviceID has.
-func CountBranches(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) (int, error) {
+// ListBranches returns serviceID's branches.
+func ListBranches(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) ([]api.Branch, error) {
 	resp, err := client.GetBranchesWithResponse(ctx, projectID, serviceID, nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to list branches: %w", err)
+		return nil, fmt.Errorf("failed to list branches: %w", err)
 	}
 	if resp.StatusCode() != http.StatusOK {
-		return 0, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+		return nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 	if resp.JSON200 == nil {
-		return 0, errors.New("empty response from API")
+		return nil, errors.New("empty response from API")
 	}
-	return len(*resp.JSON200), nil
+	return *resp.JSON200, nil
+}
+
+// CountBranches returns how many branches serviceID has.
+func CountBranches(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) (int, error) {
+	branches, err := ListBranches(ctx, client, projectID, serviceID)
+	if err != nil {
+		return 0, err
+	}
+	return len(branches), nil
+}
+
+// FormatBranchCount phrases a number of branches, as "1 branch" or
+// "2 branches".
+func FormatBranchCount(n int) string {
+	if n == 1 {
+		return "1 branch"
+	}
+	return fmt.Sprintf("%d branches", n)
 }

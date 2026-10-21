@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
@@ -48,18 +46,12 @@ service from your configuration.`,
 				return err
 			}
 
-			resp, err := client.GetBranchesWithResponse(cmd.Context(), projectID, service.ServiceID, nil)
+			branches, err := common.ListBranches(cmd.Context(), client, projectID, service.ServiceID)
 			if err != nil {
-				return fmt.Errorf("failed to list branches: %w", err)
-			}
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
+				return err
 			}
 
-			return outputBranches(cmd, cfg, *service, *resp.JSON200)
+			return outputBranches(cmd, cfg, *service, branches)
 		},
 	}
 

@@ -232,7 +232,7 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	addTool(s, mode, newServiceStopTool(), s.handleServiceStop)
 	addTool(s, mode, newServiceResizeTool(experimental), s.handleServiceResize)
 	addTool(s, mode, newServiceRenameTool(), s.handleServiceRename)
-	addTool(s, mode, newServiceDeleteTool(), s.handleServiceDelete)
+	addTool(s, mode, newServiceDeleteTool(experimental), s.handleServiceDelete)
 	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)
 	addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
 	addTool(s, mode, newServiceMetricsDetailsTool(), s.handleServiceMetricsDetails)
