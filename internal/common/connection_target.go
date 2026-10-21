@@ -42,6 +42,10 @@ type CredentialOwner struct {
 	// Name names the owner in messages.
 	Name string
 
+	// BranchServiceID is the parent service of an owner that is a branch,
+	// whose password endpoint is nested under it. It is empty for a service.
+	BranchServiceID string
+
 	// Environment is the owner's own tag, which decides whether read-only mode
 	// lets its passwords be changed.
 	Environment api.EnvironmentTag
@@ -91,11 +95,18 @@ func NewBranchConnectionTarget(branch api.Branch) *ConnectionTarget {
 		Status:      branch.Status,
 		Environment: BranchEnvironmentTag,
 		Endpoint:    branch.Endpoint,
-		Credentials: CredentialOwner{
-			PasswordTarget: BranchPasswordTarget(branch),
-			Name:           branch.Name,
-			Environment:    BranchEnvironmentTag,
-		},
+		Credentials: BranchCredentials(branch),
+	}
+}
+
+// BranchCredentials returns a branch as the owner of the credentials its
+// connections use. A branch has its own, separate from its parent's.
+func BranchCredentials(branch api.Branch) CredentialOwner {
+	return CredentialOwner{
+		PasswordTarget:  BranchPasswordTarget(branch),
+		Name:            branch.Name,
+		BranchServiceID: branch.ServiceID,
+		Environment:     BranchEnvironmentTag,
 	}
 }
 

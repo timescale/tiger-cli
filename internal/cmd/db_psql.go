@@ -411,10 +411,7 @@ func connectWithPasswordMenu(
 	// Password reset is admin-only, and rotating the master password is a
 	// control-plane write, so read-only mode hides the option rather than
 	// offering what it would refuse.
-	//
-	// TODO: offer it for branches too, through the branch password endpoint.
-	// The reset below goes through the service one, which refuses a branch.
-	canResetPassword := details.Role == "tsdbadmin" && target.Kind != common.TargetBranch &&
+	canResetPassword := details.Role == "tsdbadmin" &&
 		common.CheckReadOnly(cfg, credentials.Environment) == nil
 
 	// Interactive recovery loop
@@ -451,7 +448,7 @@ func connectWithPasswordMenu(
 
 		case optionResetPassword:
 			// Prompt and reset
-			password, err := promptAndResetPassword(ctx, cmd, cfg, client, credentials.PasswordTarget, details.Role)
+			password, err := promptAndResetPassword(ctx, cmd, cfg, client, credentials, details.Role)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return nil // user cancelled

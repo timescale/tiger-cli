@@ -2,13 +2,10 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/spf13/cobra"
 
-	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/util"
 )
@@ -70,35 +67,19 @@ The branch can be given by ID or name.`,
 				return err
 			}
 
-			if !autoGenerate && password == "" {
+			credentials := common.BranchCredentials(*branch)
+			if autoGenerate || password != "" {
+				// An empty password is generated.
+				if _, err := resetPassword(ctx, cmd, cfg, client, credentials, "tsdbadmin", password); err != nil {
+					return err
+				}
+			} else {
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
 					return errors.New("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
 				}
-				cmd.PrintErr("Enter new password (leave empty to generate): ")
-				password, err = util.ReadPassword(ctx, cmd.InOrStdin())
-				cmd.PrintErrln() // newline after password entry
-				if err != nil {
-					return fmt.Errorf("error reading password: %w", err)
+				if _, err := promptAndResetPassword(ctx, cmd, cfg, client, credentials, "tsdbadmin"); err != nil {
+					return err
 				}
-			}
-			if password == "" {
-				if password, err = common.GenerateSecurePassword(32); err != nil {
-					return fmt.Errorf("failed to generate new password: %w", err)
-				}
-			}
-
-			resp, err := client.UpdateBranchPasswordWithResponse(ctx, projectID, branch.ServiceID, branch.ID, api.UpdatePasswordInput{Password: password})
-			if err != nil {
-				return fmt.Errorf("failed to update password: %w", err)
-			}
-			if resp.StatusCode() != http.StatusNoContent {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if result, err := common.SavePasswordWithResult(cfg, common.BranchPasswordTarget(*branch), password, "tsdbadmin"); err != nil {
-				cmd.PrintErrf("Warning: could not save password: %v\n", err)
-			} else if result.Success {
-				cmd.PrintErrf("%s\n", result.Message)
 			}
 
 			cmd.PrintErrf("Password updated for tsdbadmin\n")
