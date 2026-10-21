@@ -181,7 +181,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := GetConnectionDetails(testConfig(""), tc.service, tc.opts)
+			result, err := GetConnectionDetails(testConfig(""), NewServiceConnectionTarget(tc.service), tc.opts)
 
 			if tc.expectError {
 				if err == nil {
@@ -230,13 +230,13 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 	testPassword := "test-password-keyring-123"
 	role := "tsdbadmin"
 	storage := GetPasswordStorage(cfg)
-	err := storage.Save(service, testPassword, role)
+	err := storage.Save(ServicePasswordTarget(service), testPassword, role)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
-	defer storage.Remove(service, role) // Clean up after test
+	defer storage.Remove(ServicePasswordTarget(service), role) // Clean up after test
 
-	details, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
+	details, err := GetConnectionDetails(cfg, NewServiceConnectionTarget(service), ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -279,13 +279,13 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 	testPassword := "test-password-pgpass-456"
 	role := "tsdbadmin"
 	storage := GetPasswordStorage(cfg)
-	err := storage.Save(service, testPassword, role)
+	err := storage.Save(ServicePasswordTarget(service), testPassword, role)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
-	defer storage.Remove(service, role) // Clean up after test
+	defer storage.Remove(ServicePasswordTarget(service), role) // Clean up after test
 
-	details, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
+	details, err := GetConnectionDetails(cfg, NewServiceConnectionTarget(service), ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -348,7 +348,7 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 		},
 	}
 
-	result, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
+	result, err := GetConnectionDetails(cfg, NewServiceConnectionTarget(service), ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -386,7 +386,7 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 		},
 	}
 
-	result, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
+	result, err := GetConnectionDetails(cfg, NewServiceConnectionTarget(service), ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -425,12 +425,12 @@ func TestBuildConnectionString_ReadOnly_WithPassword(t *testing.T) {
 	testPassword := "test-password-readonly-789"
 	role := "tsdbadmin"
 	storage := GetPasswordStorage(cfg)
-	if err := storage.Save(service, testPassword, role); err != nil {
+	if err := storage.Save(ServicePasswordTarget(service), testPassword, role); err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
-	defer storage.Remove(service, role)
+	defer storage.Remove(ServicePasswordTarget(service), role)
 
-	details, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
+	details, err := GetConnectionDetails(cfg, NewServiceConnectionTarget(service), ConnectionDetailsOptions{
 		Role:         role,
 		WithPassword: true,
 		ReadOnly:     true,
@@ -463,7 +463,7 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 		Endpoint:  nil, // Invalid - no endpoint
 	}
 
-	_, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
+	_, err := GetConnectionDetails(cfg, NewServiceConnectionTarget(service), ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})

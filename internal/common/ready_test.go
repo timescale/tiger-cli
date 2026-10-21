@@ -7,7 +7,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 )
 
-func TestCheckServiceReady(t *testing.T) {
+func TestCheckReady(t *testing.T) {
 	tests := []struct {
 		name    string
 		status  api.DeployStatus
@@ -30,9 +30,9 @@ func TestCheckServiceReady(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := CheckServiceReady(api.Service{Status: tt.status})
+			err := CheckReady(tt.status)
 			if !errors.Is(err, tt.wantErr) {
-				t.Errorf("CheckServiceReady() = %v, want %v", err, tt.wantErr)
+				t.Errorf("CheckReady() = %v, want %v", err, tt.wantErr)
 			}
 		})
 	}

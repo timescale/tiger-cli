@@ -160,6 +160,22 @@ func TestServiceBackupListCmd(t *testing.T) {
 			wantStderr: "No backups found.\n",
 		},
 		{
+			// Structured output is always structured, so an empty list is
+			// still a list rather than a message.
+			name:       "empty list json",
+			args:       []string{"service", "backup", "list", "svc-12345", "-o", "json"},
+			opts:       []runOption{experimental},
+			mock:       setupList([]api.Backup{}),
+			wantStdout: "[]\n",
+		},
+		{
+			name:       "empty list yaml",
+			args:       []string{"service", "backup", "list", "svc-12345", "-o", "yaml"},
+			opts:       []runOption{experimental},
+			mock:       setupList([]api.Backup{}),
+			wantStdout: "[]\n",
+		},
+		{
 			// The label is omitted from the table: it repeats STARTED and TYPE,
 			// and no command takes it as input.
 			name:       "table output",

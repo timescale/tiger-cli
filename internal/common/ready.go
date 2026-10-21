@@ -15,10 +15,10 @@ var (
 	ErrNotReady = errors.New("service is not ready")
 )
 
-// CheckServiceReady returns nil only when the service is READY, ErrPaused for
+// CheckReady returns nil only for a READY status, ErrPaused for
 // PAUSED/PAUSING, and ErrNotReady for every other (or unknown) status.
-func CheckServiceReady(service api.Service) error {
-	switch service.Status {
+func CheckReady(status api.DeployStatus) error {
+	switch status {
 	case api.DeployStatusREADY:
 		return nil
 	case api.DeployStatusPAUSED, api.DeployStatusPAUSING:

@@ -36,13 +36,13 @@ func buildDbCmd(app *common.App) *cobra.Command {
 func handleDatabaseError(err error, target *common.ConnectionTarget) error {
 	switch {
 	case errors.Is(err, common.ErrPaused):
-		return fmt.Errorf("%w — start it with 'tiger service start %s'", common.ErrPaused, target.ConnectionService.ServiceID)
+		return fmt.Errorf("%w — start it with 'tiger service start %s'", common.ErrPaused, target.ID)
 	case errors.Is(err, common.ErrNotReady):
-		return fmt.Errorf("%w — check its status with 'tiger service get %s' and try again", common.ErrNotReady, target.ConnectionService.ServiceID)
+		return fmt.Errorf("%w — check its status with 'tiger service get %s' and try again", common.ErrNotReady, target.ID)
 	case isPostgresAuthenticationError(err):
 		// A read replica shares its primary's credentials, so the password
-		// belongs to the credential service rather than the one connected to.
-		serviceID := target.CredentialService.ServiceID
+		// belongs to the primary rather than the replica connected to.
+		serviceID := target.Credentials.ID
 		return fmt.Errorf("%w\n\nThe stored password is missing or invalid. Save the current one with 'tiger db save-password %s', or reset it with 'tiger service update-password %s'",
 			err, serviceID, serviceID)
 	}

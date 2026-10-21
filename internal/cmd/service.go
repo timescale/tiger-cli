@@ -83,16 +83,26 @@ type OutputService struct {
 	ConsoleURL       string `json:"console_url,omitempty"`
 }
 
-// outputService formats and outputs a single service based on the specified format
-func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, experimental bool, format string, withPassword bool, strict bool) error {
-	// Prepare the output service with computed fields
-	outputSvc := prepareServiceForOutput(cmd, cfg, service, experimental, withPassword)
-	if strict && withPassword && outputSvc.Password == "" {
+// serviceOutputOptions controls what the service output functions include.
+// The zero value leaves out every optional field.
+type serviceOutputOptions struct {
+	// Experimental includes preview fields (the platform).
+	Experimental bool
+	// WithPassword includes the tsdbadmin password, if one is available.
+	WithPassword bool
+	// RequirePassword fails the output when WithPassword finds no password.
+	RequirePassword bool
+}
+
+// outputService outputs a single service in the configured output format.
+func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, opts serviceOutputOptions) error {
+	outputSvc := prepareServiceForOutput(cmd, cfg, service, opts)
+	if opts.RequirePassword && opts.WithPassword && outputSvc.Password == "" {
 		return fmt.Errorf("password requested but not available for service %s", outputSvc.ServiceID)
 	}
 	outputWriter := cmd.OutOrStdout()
 
-	switch strings.ToLower(format) {
+	switch strings.ToLower(cfg.Output) {
 	case "json":
 		return util.SerializeToJSON(outputWriter, outputSvc)
 	case "yaml":
@@ -100,7 +110,7 @@ func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, 
 	case "env":
 		return outputServiceEnv(cmd, outputSvc)
 	default: // table format (default)
-		return outputServiceTable(outputSvc, outputWriter)
+		return outputServiceTable(outputWriter, outputSvc)
 	}
 }
 
@@ -117,7 +127,7 @@ func outputServiceEnv(cmd *cobra.Command, service OutputService) error {
 }
 
 // outputServiceTable outputs detailed service information in a formatted table
-func outputServiceTable(service OutputService, output io.Writer) error {
+func outputServiceTable(output io.Writer, service OutputService) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 
@@ -168,24 +178,14 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	}
 
 	// Endpoint information
-	if service.Endpoint != nil {
-		if service.Endpoint.Host != nil {
-			port := "5432"
-			if service.Endpoint.Port != nil {
-				port = fmt.Sprintf("%d", *service.Endpoint.Port)
-			}
-			table.Append("Direct Endpoint", fmt.Sprintf("%s:%s", *service.Endpoint.Host, port))
-		}
+	if service.Endpoint != nil && service.Endpoint.Host != nil && service.Endpoint.Port != nil {
+		table.Append("Direct Endpoint", fmt.Sprintf("%s:%d", *service.Endpoint.Host, *service.Endpoint.Port))
 	}
 
 	// Connection pooler information
 	if service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
-		if service.ConnectionPooler.Endpoint.Host != nil {
-			port := "6432"
-			if service.ConnectionPooler.Endpoint.Port != nil {
-				port = fmt.Sprintf("%d", *service.ConnectionPooler.Endpoint.Port)
-			}
-			table.Append("Pooler Endpoint", fmt.Sprintf("%s:%s", *service.ConnectionPooler.Endpoint.Host, port))
+		if pooler := service.ConnectionPooler.Endpoint; pooler.Host != nil && pooler.Port != nil {
+			table.Append("Pooler Endpoint", fmt.Sprintf("%s:%d", *pooler.Host, *pooler.Port))
 		}
 	}
 
@@ -211,25 +211,25 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 // prepareServiceForOutput builds the output view of a service. cmd may be nil,
 // in which case the connection-details warning is dropped rather than printed.
 // The platform and IOPS fields are preview fields, so they are dropped unless
-// experimental is set.
-func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, experimental bool, withPassword bool) OutputService {
+// opts.Experimental is set.
+func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, opts serviceOutputOptions) OutputService {
 	outputSvc := OutputService{
 		Service: service,
 	}
 	outputSvc.Service.InitialPassword = nil
-	if !experimental {
+	if !opts.Experimental {
 		outputSvc.Service.Platform = nil
 		outputSvc.Service.Resources = resourcesWithoutIOPS(service.Resources)
 	}
 
-	opts := common.ConnectionDetailsOptions{
+	detailsOpts := common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
-		WithPassword:    withPassword,
+		WithPassword:    opts.WithPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
 		ReadOnly:        common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)) != nil,
 	}
 
-	if connectionDetails, err := common.GetConnectionDetails(cfg, service, opts); err != nil {
+	if connectionDetails, err := common.GetConnectionDetails(cfg, common.NewServiceConnectionTarget(service), detailsOpts); err != nil {
 		if cmd != nil {
 			cmd.PrintErrf("Warning: Failed to get connection details: %v\n", err)
 		}
@@ -262,31 +262,6 @@ func resourcesWithoutIOPS(resources []api.Resource) []api.Resource {
 	return stripped
 }
 
-// handlePasswordSaving handles saving password using the configured storage
-// method and displaying appropriate messages. Returns true if the password was
-// successfully saved, or false if not.
-func handlePasswordSaving(cmd *cobra.Command, cfg *config.Config, service api.Service, initialPassword string) bool {
-	// Note: We don't fail the service creation if password saving fails
-	// The error is handled by displaying the appropriate message below
-	result, _ := common.SavePasswordWithResult(cfg, service, initialPassword, "tsdbadmin")
-
-	if result.Method == "none" && result.Message == "No password provided" {
-		// Don't output anything for empty password
-		return false
-	}
-
-	// Only a real storage failure is a warning; the "none" method is informational.
-	if result.Success {
-		cmd.PrintErrf("%s\n", result.Message)
-		return true
-	} else if result.Method == "none" {
-		cmd.PrintErrf("%s\n", result.Message)
-	} else {
-		cmd.PrintErrf("Warning: %s\n", result.Message)
-	}
-	return false
-}
-
 // setDefaultService sets the given service as the default service in the configuration
 func setDefaultService(cmd *cobra.Command, cfg *config.Config, serviceID string) error {
 	if _, err := cfg.Set("service_id", serviceID); err != nil {
@@ -295,17 +270,4 @@ func setDefaultService(cmd *cobra.Command, cfg *config.Config, serviceID string)
 
 	cmd.PrintErrf("Default service set to %s.\n", serviceID)
 	return nil
-}
-
-func printConnectMessage(cmd *cobra.Command, passwordSaved, noSetDefault bool, serviceID string) {
-	if !passwordSaved {
-		// We can't connect if no password was saved, so don't show message
-		return
-	} else if noSetDefault {
-		// If the service wasn't set as the default, include the serviceID in the command
-		cmd.PrintErrf("Connect with: tiger db psql %s\n", serviceID)
-	} else {
-		// If the service was set as the default, no need to include the serviceID in the command
-		cmd.PrintErrf("Connect with: tiger db psql\n")
-	}
 }

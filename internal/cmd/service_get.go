@@ -54,7 +54,11 @@ resource usage.`,
 			service := *resolved
 
 			// Output service in requested format
-			return outputService(cmd, cfg, service, app.Experimental, cfg.Output, withPassword, true)
+			return outputService(cmd, cfg, service, serviceOutputOptions{
+				Experimental:    app.Experimental,
+				WithPassword:    withPassword,
+				RequirePassword: true,
+			})
 		},
 	}
 
