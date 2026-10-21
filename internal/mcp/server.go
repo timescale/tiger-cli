@@ -210,7 +210,7 @@ func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, ex
 	s.registerBranchTools(mode, experimental)
 
 	// Database operation tools
-	s.registerDatabaseTools(mode)
+	s.registerDatabaseTools(mode, experimental)
 
 	// Submitting feedback mutates no service, so the tool is absent from
 	// readOnlyGatedTools and stays registered in every read-only mode.
@@ -233,7 +233,7 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	addTool(s, mode, newServiceStopTool(), s.handleServiceStop)
 	addTool(s, mode, newServiceResizeTool(experimental), s.handleServiceResize)
 	addTool(s, mode, newServiceRenameTool(), s.handleServiceRename)
-	addTool(s, mode, newServiceDeleteTool(), s.handleServiceDelete)
+	addTool(s, mode, newServiceDeleteTool(experimental), s.handleServiceDelete)
 	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)
 	addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
 	addTool(s, mode, newServiceMetricsDetailsTool(), s.handleServiceMetricsDetails)
@@ -268,11 +268,11 @@ func (s *Server) registerBranchTools(mode config.ReadOnlyMode, experimental bool
 }
 
 // registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions
-func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode) {
-	addTool(s, mode, newDBQueryTool(), s.handleDBQuery)
+func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode, experimental bool) {
+	addTool(s, mode, newDBQueryTool(experimental), s.handleDBQuery)
 
-	mcp.AddTool(s.mcpServer, newDBSchemaTool(), s.handleDBSchema)
-	mcp.AddTool(s.mcpServer, newDBExtensionsListTool(), s.handleDBExtensionsList)
+	mcp.AddTool(s.mcpServer, newDBSchemaTool(experimental), s.handleDBSchema)
+	mcp.AddTool(s.mcpServer, newDBExtensionsListTool(experimental), s.handleDBExtensionsList)
 }
 
 // analyticsMiddleware tracks analytics for all MCP requests

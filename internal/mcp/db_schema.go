@@ -23,10 +23,10 @@ type DBSchemaInput struct {
 	Pooled      bool   `json:"pooled,omitempty"`
 }
 
-func (DBSchemaInput) Schema() *jsonschema.Schema {
+func (DBSchemaInput) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBSchemaInput](nil))
 
-	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one introspects that read replica instead of the primary service."
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one introspects that read replica instead of the primary service." + branchIDHelp(experimental, "introspects that branch")
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
@@ -69,7 +69,7 @@ func (DBSchemaOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newDBSchemaTool() *mcp.Tool {
+func newDBSchemaTool(experimental bool) *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolDBSchema,
 		Title: "Show Database Schema",
@@ -78,7 +78,7 @@ func newDBSchemaTool() *mcp.Tool {
 Connects to a PostgreSQL/TimescaleDB service in Tiger Cloud and returns its schema as readable text: tables (regular, partitioned, and foreign), views, materialized views, enum types, functions, procedures, indexes, triggers, and TimescaleDB hypertable and continuous aggregate metadata. Only objects the connecting role can access are returned.
 
 By default only user-facing schemas and objects are shown; view/routine definitions and object comments are omitted unless requested. The connection is opened in immutable read-only mode.`,
-		InputSchema:  DBSchemaInput{}.Schema(),
+		InputSchema:  DBSchemaInput{}.Schema(experimental),
 		OutputSchema: DBSchemaOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
@@ -106,8 +106,9 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 		slog.Bool("pooled", input.Pooled),
 	)
 
-	// service_id may name a service or one of its read replicas.
-	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID)
+	// service_id may name a service, one of its read replicas, or (behind the
+	// experimental gate) a branch.
+	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID, s.app.Experimental)
 	if err != nil {
 		return nil, DBSchemaOutput{}, err
 	}
@@ -124,7 +125,7 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 		IncludeComments:    input.Comments,
 	})
 	if err != nil {
-		return nil, DBSchemaOutput{}, handleDatabaseError(err)
+		return nil, DBSchemaOutput{}, handleDatabaseError(err, target)
 	}
 
 	return nil, DBSchemaOutput{SchemaText: common.FormatSchema(schema), Warning: warning}, nil

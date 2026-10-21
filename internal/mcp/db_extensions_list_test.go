@@ -38,7 +38,7 @@ func TestDBExtensionsListTool(t *testing.T) {
 
 	setupGetWithStatus := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) { s.Status = status }))
+			expectResolve(m, "e6ue9697jf", nil, sampleService(func(s *api.Service) { s.Status = status }))
 		}
 	}
 
@@ -53,11 +53,10 @@ func TestDBExtensionsListTool(t *testing.T) {
 
 	primary := sampleService()
 	primaryTarget := common.NewServiceConnectionTarget(primary)
-	replica := sampleReplica(func(s *api.Service) { s.Status = api.DeployStatusREADY })
+	replica := sampleReplica(func(r *api.ReadReplicaSet) { r.Status = api.ReadReplicaSetStatusActive })
 	// A replica connects to its own endpoint with its primary's credentials.
-	replicaTarget := common.NewServiceConnectionTarget(replica)
-	replicaTarget.Kind = common.TargetReadReplica
-	replicaTarget.Credentials = common.ServiceCredentials(primary)
+	replicaTarget := common.NewReplicaConnectionTarget(replica, common.ServiceCredentials(primary))
+	branch := sampleBranch()
 
 	runToolTests(t, []toolTest{
 		{
@@ -79,31 +78,26 @@ func TestDBExtensionsListTool(t *testing.T) {
 			tool: toolDBExtensionsList,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
+				m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: "e6ue9697jf"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: "failed to resolve service or read replica set 'e6ue9697jf': connection refused",
 		},
 		{
 			name: "service lookup API error",
 			tool: toolDBExtensionsList,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.ClientError{Message: new("service not found")},
-					}, nil)
+				expectResolveStatus(m, "e6ue9697jf", nil, http.StatusNotFound, &api.ClientError{Message: new("resource not found")})
 			},
-			wantErr: "service not found",
+			wantErr: "service or read replica set 'e6ue9697jf' not found",
 		},
 		{
 			name: "nil response body",
 			tool: toolDBExtensionsList,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
+				expectResolveStatus(m, "e6ue9697jf", nil, http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -112,7 +106,7 @@ func TestDBExtensionsListTool(t *testing.T) {
 			tool: toolDBExtensionsList,
 			args: map[string]any{"service_id": "u8me885b93"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "u8me885b93", replica)
+				expectResolve(m, "u8me885b93", nil, replica)
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -134,6 +128,28 @@ func TestDBExtensionsListTool(t *testing.T) {
 			args:    args,
 			mock:    setupGetWithStatus(api.DeployStatusQUEUED),
 			wantErr: notReadyMsg,
+		},
+		{
+			// Branches are a preview, so without the gate a branch ID is
+			// reported as not found, without mentioning branches.
+			name: "branch not found without the experimental gate",
+			tool: toolDBExtensionsList,
+			args: map[string]any{"service_id": "br4nch1d9x"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "br4nch1d9x", nil, branch)
+			},
+			wantErr: "service or read replica set 'br4nch1d9x' not found",
+		},
+		{
+			// A branch is started with branch_start, not service_start.
+			name: "paused branch points at branch_start",
+			tool: toolDBExtensionsList,
+			args: map[string]any{"service_id": "br4nch1d9x"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "br4nch1d9x", nil, sampleBranch(branchStatus(api.DeployStatusPAUSED)))
+			},
+			wantErr: "branch is paused — start it with the branch_start tool",
 		},
 		{
 			name:    "ready service without an endpoint",
@@ -180,8 +196,19 @@ func TestDBExtensionsListTool(t *testing.T) {
 			args: map[string]any{"service_id": "u8me885b93"},
 			opts: []runOption{withFetchExtensions(replicaTarget, "tsdbadmin", extensions, nil)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "u8me885b93", replica)
+				expectResolve(m, "u8me885b93", nil, replica)
 				expectGetService(m, "e6ue9697jf", primary)
+			},
+			wantOutput: map[string]any{"extensions": extensionsOutput},
+		},
+		{
+			// A branch connects with its own credentials, not its parent's.
+			name: "returns the extensions of a branch",
+			tool: toolDBExtensionsList,
+			args: map[string]any{"service_id": "br4nch1d9x"},
+			opts: []runOption{withExperimental(), withFetchExtensions(common.NewBranchConnectionTarget(branch), "tsdbadmin", extensions, nil)},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "br4nch1d9x", nil, branch)
 			},
 			wantOutput: map[string]any{"extensions": extensionsOutput},
 		},
