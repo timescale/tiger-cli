@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // BranchEnvironmentTag is the tag every branch is judged by. Branches have no
@@ -26,6 +27,13 @@ func ResolveBranch(ctx context.Context, client api.ClientWithResponsesInterface,
 	return resolved.Branch, nil
 }
 
+// CanHaveBranches reports whether service can have branches, so callers can
+// skip listing them for services that never do. Only fluid services can be
+// branched.
+func CanHaveBranches(service api.Service) bool {
+	return util.Deref(service.Platform) == api.ServicePlatformFLUID
+}
+
 // ListBranches returns serviceID's branches.
 func ListBranches(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) ([]api.Branch, error) {
 	resp, err := client.GetBranchesWithResponse(ctx, projectID, serviceID, nil)
@@ -39,4 +47,22 @@ func ListBranches(ctx context.Context, client api.ClientWithResponsesInterface, 
 		return nil, errors.New("empty response from API")
 	}
 	return *resp.JSON200, nil
+}
+
+// CountBranches returns how many branches serviceID has.
+func CountBranches(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) (int, error) {
+	branches, err := ListBranches(ctx, client, projectID, serviceID)
+	if err != nil {
+		return 0, err
+	}
+	return len(branches), nil
+}
+
+// FormatBranchCount phrases a number of branches, as "1 branch" or
+// "2 branches".
+func FormatBranchCount(n int) string {
+	if n == 1 {
+		return "1 branch"
+	}
+	return fmt.Sprintf("%d branches", n)
 }

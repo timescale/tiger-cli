@@ -159,6 +159,44 @@ func (t *ConnectionTarget) Details(cfg *config.Config, opts ConnectionDetailsOpt
 	return details, nil
 }
 
+// ResolveConnectionTarget resolves ref, an ID or a name, to the service,
+// branch, or read replica set it names and works out whose credentials it
+// uses. Branches are a preview, so unless allowBranches is set a ref naming
+// one is reported as not found.
+func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string, allowBranches bool) (*ConnectionTarget, error) {
+	kind := connectionTargetKind(allowBranches)
+	resolved, err := resolve(ctx, client, projectID, ref, nil, kind)
+	if err != nil {
+		return nil, err
+	}
+
+	switch {
+	case resolved.Branch != nil:
+		if !allowBranches {
+			return nil, ExitWithCode(ExitServiceNotFound, fmt.Errorf("%s '%s' not found", kind, ref))
+		}
+		return NewBranchConnectionTarget(*resolved.Branch), nil
+	case resolved.ReadReplicaSet != nil:
+		replica := *resolved.ReadReplicaSet
+		parent, err := GetService(ctx, client, projectID, replica.ServiceID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", replica.ServiceID, err)
+		}
+		return NewReplicaConnectionTarget(replica, ServiceCredentials(*parent)), nil
+	default:
+		return NewServiceConnectionTarget(*resolved.Service), nil
+	}
+}
+
+// connectionTargetKind names what ResolveConnectionTarget looks for, in its
+// errors. Branches are left out unless they are allowed.
+func connectionTargetKind(allowBranches bool) string {
+	if allowBranches {
+		return "service, branch, or read replica set"
+	}
+	return "service or read replica set"
+}
+
 // ResolveConnectionTargetByID fetches the service named by id — which may be a
 // primary service ID or a read replica set ID, both of which GetService
 // resolves — and works out whose credentials it uses. Callers that already

@@ -38,7 +38,7 @@ func withFetchExtensions(wantTarget *common.ConnectionTarget, wantRole string, e
 func TestDbExtensionsListCmd(t *testing.T) {
 	setupGetWithStatus := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
+			expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
 				s.Status = status
 			}))
 		}
@@ -53,11 +53,9 @@ func TestDbExtensionsListCmd(t *testing.T) {
 	primaryTarget := common.NewServiceConnectionTarget(primary)
 	replica := sampleReplica()
 	// A replica connects to its own endpoint with its primary's credentials.
-	replicaTarget := common.NewServiceConnectionTarget(replica)
-	replicaTarget.Kind = common.TargetReadReplica
-	replicaTarget.Credentials = common.ServiceCredentials(primary)
+	replicaTarget := common.NewReplicaConnectionTarget(replica, common.ServiceCredentials(primary))
 	setupGetReplica := func(m *mocks.MockClientWithResponsesInterface) {
-		expectResolveRef(m, "rep-67890", replica)
+		expectResolveTarget(m, "rep-67890", replica)
 		expectGetService(m, "svc-12345", primary)
 	}
 
@@ -90,24 +88,24 @@ func TestDbExtensionsListCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"db", "extensions", "list", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
+				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service not found",
 			args: []string{"db", "extensions", "list", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefNotFound(m, "svc-12345")
+				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service 'svc-12345' not found",
+			wantErr: "service or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",
 			args: []string{"db", "extensions", "list", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
+				expectResolveTargetStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -115,7 +113,7 @@ func TestDbExtensionsListCmd(t *testing.T) {
 			name: "read replica parent lookup fails",
 			args: []string{"db", "extensions", "list", "rep-67890"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "rep-67890", replica)
+				expectResolveTarget(m, "rep-67890", replica)
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -132,6 +130,27 @@ func TestDbExtensionsListCmd(t *testing.T) {
 			args:    []string{"db", "extensions", "list", "svc-12345"},
 			mock:    setupGetWithStatus(api.DeployStatusQUEUED),
 			wantErr: notReadyMsg("svc-12345"),
+		},
+		{
+			// Branches are a preview, so without the gate a ref naming one is
+			// reported as not found, without mentioning branches.
+			name: "branch not found without experimental",
+			args: []string{"db", "extensions", "list", "test-branch"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveTarget(m, "test-branch", sampleBranch())
+			},
+			wantErr: "service or read replica set 'test-branch' not found",
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+		},
+		{
+			// A branch is started through `tiger branch`, not `tiger service`.
+			name: "branch paused",
+			args: []string{"db", "extensions", "list", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveTarget(m, "br-12345", sampleBranch(branchStatus(api.DeployStatusPAUSED)))
+			},
+			wantErr: "branch is paused — start it with 'tiger branch start br-12345'",
 		},
 		{
 			name:    "fetch fails",
@@ -229,11 +248,28 @@ func TestDbExtensionsListCmd(t *testing.T) {
 			wantStdout: "[]\n",
 		},
 		{
+			// A branch connects with its own credentials, not its parent's.
+			name:       "lists the extensions of a branch",
+			args:       []string{"db", "extensions", "list", "br-12345", "-o", "json"},
+			mock:       func(m *mocks.MockClientWithResponsesInterface) { expectResolveTarget(m, "br-12345", sampleBranch()) },
+			opts:       []runOption{withExperimental(), withFetchExtensions(common.NewBranchConnectionTarget(sampleBranch()), "tsdbadmin", []common.Extension{}, nil)},
+			wantStdout: "[]\n",
+		},
+		{
 			name:       "passes the role down to the fetch",
 			args:       []string{"db", "extensions", "list", "svc-12345", "--role", "reader", "-o", "json"},
 			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			opts:       []runOption{withFetchExtensions(primaryTarget, "reader", []common.Extension{}, nil)},
 			wantStdout: "[]\n",
+		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "extensions", "list", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to list the extensions on that\nbranch."),
 		},
 	})
 }
