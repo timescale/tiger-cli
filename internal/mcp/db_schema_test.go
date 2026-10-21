@@ -38,7 +38,7 @@ func TestDBSchemaTool(t *testing.T) {
 
 	setupGetWithStatus := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) { s.Status = status }))
+			expectResolve(m, "e6ue9697jf", nil, sampleService(func(s *api.Service) { s.Status = status }))
 		}
 	}
 
@@ -78,31 +78,26 @@ func TestDBSchemaTool(t *testing.T) {
 			tool: toolDBSchema,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
+				m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: "e6ue9697jf"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: "failed to resolve service or read replica set 'e6ue9697jf': connection refused",
 		},
 		{
 			name: "service lookup API error",
 			tool: toolDBSchema,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.ClientError{Message: new("service not found")},
-					}, nil)
+				expectResolveStatus(m, "e6ue9697jf", nil, http.StatusNotFound, &api.ClientError{Message: new("resource not found")})
 			},
-			wantErr: "service not found",
+			wantErr: "service or read replica set 'e6ue9697jf' not found",
 		},
 		{
 			name: "nil response body",
 			tool: toolDBSchema,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
+				expectResolveStatus(m, "e6ue9697jf", nil, http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -128,23 +123,23 @@ func TestDBSchemaTool(t *testing.T) {
 			wantErr: notReadyMsg,
 		},
 		{
-			// Both services are fetched: the replica for its endpoint, the
-			// parent for its credentials. The replica's own status then stops it.
+			// The parent is fetched for its credentials, then the replica's own
+			// status stops it: a replica set that isn't active isn't ready.
 			name: "read replica resolves its parent",
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "u8me885b93"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "u8me885b93", sampleReplica())
+				expectResolve(m, "u8me885b93", nil, sampleReplica())
 				expectGetService(m, "e6ue9697jf", sampleService())
 			},
-			wantErr: pausedMsg,
+			wantErr: notReadyMsg,
 		},
 		{
 			name: "read replica parent lookup fails",
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "u8me885b93"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "u8me885b93", sampleReplica())
+				expectResolve(m, "u8me885b93", nil, sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -165,7 +160,7 @@ func TestDBSchemaTool(t *testing.T) {
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "e6ue9697jf", "pooled": true},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
+				expectResolve(m, "e6ue9697jf", nil, sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{
 						Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
 						Port: new(5432),
@@ -221,7 +216,7 @@ func TestDBSchemaTool(t *testing.T) {
 			args: map[string]any{"service_id": "u8me885b93", "pooled": true},
 			opts: []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin", Pooled: true}, schema, nil)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "u8me885b93", sampleReplica(func(s *api.Service) { s.Status = api.DeployStatusREADY }))
+				expectResolve(m, "u8me885b93", nil, sampleReplica(func(r *api.ReadReplicaSet) { r.Status = api.ReadReplicaSetStatusActive }))
 				expectGetService(m, "e6ue9697jf", sampleService())
 			},
 			wantOutput: map[string]any{
