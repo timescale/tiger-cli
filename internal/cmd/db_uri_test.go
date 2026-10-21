@@ -272,5 +272,14 @@ func TestDbURICmd(t *testing.T) {
 			mock:       func(m *mocks.MockClientWithResponsesInterface) { expectResolveTarget(m, "br-12345", sampleBranch()) },
 			wantStdout: "postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require\n",
 		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "uri", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to get a connection string for that branch."),
+		},
 	})
 }

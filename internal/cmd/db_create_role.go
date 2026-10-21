@@ -29,7 +29,7 @@ func buildDbCreateRoleCmd(app *common.App) *cobra.Command {
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. A read replica ID is rejected, since replicas
-are read-only; create the role on the primary instead.
+are read-only; create the role on the primary instead.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to create the role on that branch.") + `
 
 By default, a secure random password is auto-generated for the new role. You can:
 - Provide an explicit password with --password=<value>

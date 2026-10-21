@@ -194,5 +194,14 @@ func TestDbSchemaCmd(t *testing.T) {
 			opts:    []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, nil, errors.New("failed to connect to database: no route to host"))},
 			wantErr: "failed to connect to database: no route to host",
 		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "schema", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to introspect that branch."),
+		},
 	})
 }

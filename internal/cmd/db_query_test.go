@@ -233,7 +233,17 @@ func TestDbQueryCmd(t *testing.T) {
 				Role:  "tsdbadmin",
 			}, nil, common.ErrPaused)},
 			mock:    func(m *mocks.MockClientWithResponsesInterface) { expectResolveTarget(m, "br-12345", sampleBranch()) },
-			wantErr: "service is paused — start it with 'tiger branch start br-12345'",
+			wantErr: "branch is paused — start it with 'tiger branch start br-12345'",
+		},
+		{
+			name: "branch not ready",
+			args: []string{"db", "query", "br-12345", "-c", "SELECT 1"},
+			opts: []runOption{withExperimental(), withExecuteQuery(common.ExecuteQueryArgs{
+				Query: "SELECT 1",
+				Role:  "tsdbadmin",
+			}, nil, common.ErrNotReady)},
+			mock:    func(m *mocks.MockClientWithResponsesInterface) { expectResolveTarget(m, "br-12345", sampleBranch()) },
+			wantErr: "branch is not ready — check its status with 'tiger branch get br-12345' and try again",
 		},
 		{
 			// A bare pgx auth failure says nothing about which password is
@@ -518,6 +528,15 @@ result_sets:
 					Role:  "tsdbadmin",
 				}, &common.QueryResult{}, nil),
 			},
+		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "query", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to query that branch."),
 		},
 	})
 }

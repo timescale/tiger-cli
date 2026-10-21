@@ -201,7 +201,17 @@ func TestDBQueryTool(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolve(m, "br4nch1d9x", nil, sampleBranch(branchStatus(api.DeployStatusPAUSED)))
 			},
-			wantErr: "service is paused — start it with the branch_start tool",
+			wantErr: "branch is paused — start it with the branch_start tool",
+		},
+		{
+			name: "provisioning branch points at branch_get",
+			tool: toolDBQuery,
+			args: map[string]any{"service_id": "br4nch1d9x", "query": "SELECT 1"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "br4nch1d9x", nil, sampleBranch(branchStatus(api.DeployStatusQUEUED)))
+			},
+			wantErr: "branch is not ready — check its status with branch_get and try again",
 		},
 		{
 			name: "read replica parent lookup fails",

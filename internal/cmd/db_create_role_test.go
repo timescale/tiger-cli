@@ -146,6 +146,15 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			},
 			wantErr: "failed to build connection string: service endpoint not available",
 		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "create", "role", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to create the role on that branch."),
+		},
 	})
 }
 

@@ -148,6 +148,15 @@ func TestDbPingCmd(t *testing.T) {
 			wantStderr: "Connection timeout after 250ms\n",
 			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "ping", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to test connectivity to that branch."),
+		},
 	})
 }
 

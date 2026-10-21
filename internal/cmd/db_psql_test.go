@@ -228,6 +228,15 @@ func TestDbPsqlCmd(t *testing.T) {
 			}),
 			wantStderr: matchPrefix("Warning: could not retrieve stored password: secret not found in keyring\n"),
 		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "psql", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to connect to that branch."),
+		},
 	})
 }
 

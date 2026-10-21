@@ -26,7 +26,7 @@ service from your configuration. The password can be provided via:
 3. Interactive prompt (if neither provided)
 
 The password will be saved according to your --password-storage setting
-(keyring, pgpass, or none).`,
+(keyring, pgpass, or none).` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to save the password for that branch."),
 		Example: `  # Save password with explicit value (highest precedence)
   tiger db save-password svc-12345 --password=your-password
 

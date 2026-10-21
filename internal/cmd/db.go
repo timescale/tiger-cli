@@ -30,13 +30,24 @@ func buildDbCmd(app *common.App) *cobra.Command {
 	return cmd
 }
 
+// branchRefHelp is the paragraph a db command's help gains for branches, saying
+// what passing one does. Branches are a preview, so it is empty without the
+// experimental gate.
+func branchRefHelp(experimental bool, text string) string {
+	if !experimental {
+		return ""
+	}
+	return "\n\n" + text
+}
+
 // handleDatabaseError adds guidance to the failures whose fix isn't evident from
 // the message: the readiness sentinels, and a Postgres authentication failure,
 // which otherwise arrives as a bare pgx error saying nothing about the password
 // it was rejected for. Every other error passes through unchanged.
 func handleDatabaseError(err error, target *common.ConnectionTarget) error {
 	// A branch is managed through `tiger branch`, everything else through
-	// `tiger service`.
+	// `tiger service`. The group also names the target in the readiness
+	// errors, whose sentinels always say "service".
 	group := "service"
 	if target.Kind == common.TargetBranch {
 		group = "branch"
@@ -44,9 +55,9 @@ func handleDatabaseError(err error, target *common.ConnectionTarget) error {
 
 	switch {
 	case errors.Is(err, common.ErrPaused):
-		return fmt.Errorf("%w — start it with 'tiger %s start %s'", common.ErrPaused, group, target.ID)
+		return fmt.Errorf("%s is paused — start it with 'tiger %s start %s'", group, group, target.ID)
 	case errors.Is(err, common.ErrNotReady):
-		return fmt.Errorf("%w — check its status with 'tiger %s get %s' and try again", common.ErrNotReady, group, target.ID)
+		return fmt.Errorf("%s is not ready — check its status with 'tiger %s get %s' and try again", group, group, target.ID)
 	case isPostgresAuthenticationError(err):
 		// A read replica shares its primary's credentials, so the password
 		// belongs to the primary rather than the replica connected to.

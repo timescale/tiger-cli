@@ -226,5 +226,14 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			wantStderr: "Password saved for branch 'test-branch' (br-12345), role tsdbadmin\n",
 			checks:     []checkFunc{checkStoredPassword("br-12345", "branch-pw")},
 		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "save-password", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to save the password for that branch."),
+		},
 	})
 }
