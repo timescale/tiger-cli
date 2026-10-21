@@ -29,16 +29,11 @@ func (r *Resolved) ID() string {
 	return ""
 }
 
-// Resolve resolves ref, an ID or a name, to the service, branch, or read
+// resolve resolves ref, an ID or a name, to the service, branch, or read
 // replica set it names, considering only resources of the given type when it
-// is non-nil. A ref that matches nothing is an ExitServiceNotFound error, and
-// one that matches more than one resource is refused by the API with a 400.
-func Resolve(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string, resolveType *api.ResolveType) (*Resolved, error) {
-	return resolve(ctx, client, projectID, ref, resolveType, resolveKind(resolveType))
-}
-
-// resolve is Resolve with the name of what it looks for, used in its errors,
-// given by the caller.
+// is non-nil. kind names what the caller is looking for, in errors. A ref that
+// matches nothing is an ExitServiceNotFound error, and one that matches more
+// than one resource is refused by the API with a 400.
 func resolve(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string, resolveType *api.ResolveType, kind string) (*Resolved, error) {
 	resp, err := client.ResolveRefWithResponse(ctx, projectID, &api.ResolveRefParams{Ref: ref, Type: resolveType})
 	if err != nil {
@@ -62,17 +57,14 @@ func resolve(ctx context.Context, client api.ClientWithResponsesInterface, proje
 	// The API only returns the requested type, so a mismatch means the filter
 	// was ignored, and acting on the result would act on the wrong thing.
 	if resolveType != nil && resolvedType(resolved) != *resolveType {
-		return nil, fmt.Errorf("expected a %s for '%s', got a %s", kind, ref, resolveKind(new(resolvedType(resolved))))
+		return nil, fmt.Errorf("expected a %s for '%s', got a %s", kind, ref, resolveKind(resolvedType(resolved)))
 	}
 	return resolved, nil
 }
 
-// resolveKind names what a Resolve of resolveType looks for, in messages.
-func resolveKind(resolveType *api.ResolveType) string {
-	if resolveType == nil {
-		return "service, branch, or read replica set"
-	}
-	switch *resolveType {
+// resolveKind names a resolve type, in messages.
+func resolveKind(resolveType api.ResolveType) string {
+	switch resolveType {
 	case api.ResolveTypeBRANCH:
 		return "branch"
 	case api.ResolveTypeREADREPLICASET:

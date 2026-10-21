@@ -205,7 +205,7 @@ func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithRespo
 // errors. Branches are left out unless they are allowed.
 func connectionTargetKind(allowBranches bool) string {
 	if allowBranches {
-		return resolveKind(nil)
+		return "service, branch, or read replica set"
 	}
 	return "service or read replica set"
 }

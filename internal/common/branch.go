@@ -20,7 +20,7 @@ const BranchEnvironmentTag = api.EnvironmentTagDEV
 // ResolveBranch resolves ref, a branch ID or name, to the branch it names.
 // The branch carries its parent's ID, which every other branch endpoint needs.
 func ResolveBranch(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string) (*api.Branch, error) {
-	resolved, err := Resolve(ctx, client, projectID, ref, new(api.ResolveTypeBRANCH))
+	resolved, err := resolve(ctx, client, projectID, ref, new(api.ResolveTypeBRANCH), "branch")
 	if err != nil {
 		return nil, err
 	}
