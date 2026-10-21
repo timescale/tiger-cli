@@ -194,7 +194,7 @@ func selectConnection(
 			case targetCancel:
 				return nil, nil
 			case targetReplica:
-				chosen = common.NewReplicaConnectionTarget(target, *choice.replica)
+				chosen = common.NewReplicaConnectionTarget(*choice.replica, target.Credentials)
 			}
 		}
 	}

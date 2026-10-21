@@ -67,11 +67,17 @@ func NewServiceConnectionTarget(service api.Service) *ConnectionTarget {
 		Environment: ServiceEnvironmentTag(service),
 		Endpoint:    service.Endpoint,
 		Pooler:      service.ConnectionPooler,
-		Credentials: CredentialOwner{
-			PasswordTarget: ServicePasswordTarget(service),
-			Name:           service.Name,
-			Environment:    ServiceEnvironmentTag(service),
-		},
+		Credentials: ServiceCredentials(service),
+	}
+}
+
+// ServiceCredentials returns a service as the owner of the credentials its
+// connections use, which its read replica sets share.
+func ServiceCredentials(service api.Service) CredentialOwner {
+	return CredentialOwner{
+		PasswordTarget: ServicePasswordTarget(service),
+		Name:           service.Name,
+		Environment:    ServiceEnvironmentTag(service),
 	}
 }
 
@@ -93,10 +99,10 @@ func NewBranchConnectionTarget(branch api.Branch) *ConnectionTarget {
 	}
 }
 
-// NewReplicaConnectionTarget returns the ConnectionTarget of one of primary's
-// read replica sets. The replica supplies the endpoint; the primary supplies
-// the credentials.
-func NewReplicaConnectionTarget(primary *ConnectionTarget, replica api.ReadReplicaSet) *ConnectionTarget {
+// NewReplicaConnectionTarget returns the ConnectionTarget of a read replica
+// set. The replica supplies the endpoint, and credentials is its primary's
+// (see ServiceCredentials), since a replica shares its primary's passwords.
+func NewReplicaConnectionTarget(replica api.ReadReplicaSet, credentials CredentialOwner) *ConnectionTarget {
 	// Replica sets carry their own status enum. Map only "active" onto READY so
 	// a readiness check on this target (CheckReady) treats every other state —
 	// creating, resizing, error — as not ready.
@@ -118,7 +124,7 @@ func NewReplicaConnectionTarget(primary *ConnectionTarget, replica api.ReadRepli
 		Environment: environmentTag(environment),
 		Endpoint:    replica.Endpoint,
 		Pooler:      replica.ConnectionPooler,
-		Credentials: primary.Credentials,
+		Credentials: credentials,
 	}
 }
 
@@ -165,7 +171,7 @@ func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponses
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", replica.ServiceID, err)
 		}
-		return NewReplicaConnectionTarget(NewServiceConnectionTarget(*parent), replica), nil
+		return NewReplicaConnectionTarget(replica, ServiceCredentials(*parent)), nil
 	default:
 		return NewServiceConnectionTarget(*resolved.Service), nil
 	}

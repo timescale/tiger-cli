@@ -193,7 +193,7 @@ func TestNewReplicaConnectionTarget(t *testing.T) {
 		Endpoint: &api.Endpoint{Host: &host, Port: &port},
 	}
 
-	target := NewReplicaConnectionTarget(NewServiceConnectionTarget(primary), replica)
+	target := NewReplicaConnectionTarget(replica, ServiceCredentials(primary))
 	if target.Kind != TargetReadReplica {
 		t.Error("expected a replica target")
 	}
@@ -239,7 +239,7 @@ func TestConnectionTargetReadOnlyVerdict(t *testing.T) {
 				replica.Metadata = &api.ReplicaSetMetadata{Environment: new(tt.replicaTag)}
 			}
 
-			target := NewReplicaConnectionTarget(NewServiceConnectionTarget(primary), replica)
+			target := NewReplicaConnectionTarget(replica, ServiceCredentials(primary))
 			cfg := &config.Config{ReadOnly: tt.mode}
 			got := CheckReadOnly(cfg, target.Environment) != nil
 			if got != tt.wantSession {
@@ -268,7 +268,7 @@ func TestConnectionTargetDetails(t *testing.T) {
 		for _, override := range overrides {
 			override(&replica)
 		}
-		return NewReplicaConnectionTarget(NewServiceConnectionTarget(primaryService()), replica)
+		return NewReplicaConnectionTarget(replica, ServiceCredentials(primaryService()))
 	}
 
 	cases := []struct {
@@ -368,7 +368,7 @@ func TestReplicaPoolerWarning(t *testing.T) {
 	noPooler := api.ReadReplicaSet{Name: "rep-b"}
 
 	replica := func(replica api.ReadReplicaSet) *ConnectionTarget {
-		return NewReplicaConnectionTarget(NewServiceConnectionTarget(primaryService()), replica)
+		return NewReplicaConnectionTarget(replica, ServiceCredentials(primaryService()))
 	}
 
 	cases := []struct {
