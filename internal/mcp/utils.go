@@ -279,9 +279,6 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 // setBranchIDSchemaProperties sets common branch_id schema properties. Like
 // service_id, branch_id is IDs-only (see setServiceIDSchemaProperties), which
 // resolveBranchByID enforces.
-//
-// TODO: confirm the branch ID format with the API. The pattern assumes branch
-// IDs look like service IDs, which branches are on the platform side.
 func setBranchIDSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["branch_id"].Description = "Unique identifier of the branch (10-character alphanumeric string). Use branch_list to find branch IDs."
 	schema.Properties["branch_id"].Examples = []any{"br4nch1d9x", "k2m9x2sd3a"}
