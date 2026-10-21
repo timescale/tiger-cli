@@ -18,12 +18,12 @@ func hasPooler(pooler *api.ConnectionPooler) bool {
 
 // ReplicaPoolerWarning returns the warning to show when pooling was requested
 // for a read replica with no pooler (the connection falls back to direct), or ""
-// otherwise — including for a non-replica target, so callers need no IsReplica guard.
+// otherwise — including for a non-replica target, so callers need no kind check.
 func ReplicaPoolerWarning(target *ConnectionTarget, pooled bool) string {
-	if !target.IsReplica || !pooled || hasPooler(target.ConnectionService.ConnectionPooler) {
+	if target.Kind != TargetReadReplica || !pooled || hasPooler(target.Pooler) {
 		return ""
 	}
-	return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", target.ConnectionService.Name)
+	return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", target.Name)
 }
 
 // ConnectionDetailsOptions configures how the connection string is built
@@ -63,27 +63,19 @@ type ConnectionDetails struct {
 // activates Tiger Cloud's immutable read-only connection mode.
 const readOnlyConnectionOption = "options=-c%20tsdb_admin.read_only_connection%3Dtrue"
 
-// GetConnectionDetails builds the connection details for a service: it selects
+// GetConnectionDetails builds the connection details for a target: it selects
 // the endpoint (the pooler when requested and available, otherwise the direct
-// one) and looks up the password when one is wanted.
-func GetConnectionDetails(cfg *config.Config, service api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
-	return getConnectionDetails(cfg, service, service, opts)
-}
-
-// getConnectionDetails is GetConnectionDetails with the endpoint and the
-// credentials taken from different services: connService supplies the endpoint
-// and pooler, credService the password. Only a read replica needs them to
-// differ — it connects to its own endpoint with the parent primary's
-// credentials — so ConnectionTarget.Details is the only caller.
-func getConnectionDetails(cfg *config.Config, connService, credService api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
-	if connService.Endpoint == nil {
+// one) and looks up the password, from the target's credentials, when one is
+// wanted. ConnectionTarget.Details adds the pooler check connecting needs.
+func GetConnectionDetails(cfg *config.Config, target *ConnectionTarget, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
+	if target.Endpoint == nil {
 		return nil, fmt.Errorf("service endpoint not available")
 	}
 
-	endpoint := connService.Endpoint
+	endpoint := target.Endpoint
 	isPooler := false
-	if opts.Pooled && hasPooler(connService.ConnectionPooler) {
-		endpoint = connService.ConnectionPooler.Endpoint
+	if opts.Pooled && hasPooler(target.Pooler) {
+		endpoint = target.Pooler.Endpoint
 		isPooler = true
 	}
 
@@ -108,7 +100,7 @@ func getConnectionDetails(cfg *config.Config, connService, credService api.Servi
 	if opts.WithPassword {
 		if opts.InitialPassword != "" {
 			details.Password = opts.InitialPassword
-		} else if password, err := GetPassword(cfg, credService, opts.Role); err == nil {
+		} else if password, err := GetPassword(cfg, target.Credentials.PasswordTarget, opts.Role); err == nil {
 			details.Password = password
 		}
 	}
@@ -132,12 +124,12 @@ func (d *ConnectionDetails) String() string {
 	return fmt.Sprintf("postgresql://%s@%s:%d/%s?%s", userinfo, d.Host, d.Port, d.Database, query)
 }
 
-// GetPassword fetches the password for the specified service from the
-// configured password storage mechanism. It returns an error if it fails to
-// find the password.
-func GetPassword(cfg *config.Config, service api.Service, role string) (string, error) {
+// GetPassword fetches the password stored for the target from the configured
+// password storage mechanism. It returns an error if it fails to find the
+// password.
+func GetPassword(cfg *config.Config, target PasswordTarget, role string) (string, error) {
 	storage := GetPasswordStorage(cfg)
-	password, err := storage.Get(service, role)
+	password, err := storage.Get(target, role)
 	if err != nil {
 		// Provide specific error messages based on storage type
 		switch storage.(type) {
@@ -161,7 +153,7 @@ func GetPassword(cfg *config.Config, service api.Service, role string) (string, 
 // connectReadOnly opens a read-only connection to the target once it is ready.
 // The caller must close it.
 func connectReadOnly(ctx context.Context, cfg *config.Config, target *ConnectionTarget, role string, pooled bool) (*pgx.Conn, error) {
-	if err := CheckServiceReady(target.ConnectionService); err != nil {
+	if err := target.CheckReady(); err != nil {
 		return nil, err
 	}
 

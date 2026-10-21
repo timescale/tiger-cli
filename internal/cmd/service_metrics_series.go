@@ -238,7 +238,7 @@ func renderMetricSeries(cmd *cobra.Command, output string, series []api.MetricSe
 		return util.SerializeToYAML(out, series)
 	default:
 		if len(series) == 0 {
-			cmd.Println("No metric data returned for the requested window.")
+			cmd.PrintErrln("No metric data returned for the requested window.")
 			return nil
 		}
 		table := tablewriter.NewWriter(out)

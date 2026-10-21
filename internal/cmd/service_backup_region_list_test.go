@@ -109,7 +109,7 @@ func TestServiceBackupRegionListCmd(t *testing.T) {
 			args:       []string{"service", "backup", "region", "list", "svc-12345"},
 			opts:       []runOption{experimental},
 			mock:       setupList([]api.BackupRegion{}),
-			wantStdout: "No backup regions configured for this service.\n",
+			wantStderr: "No backup regions configured for this service.\n",
 		},
 		{
 			// An empty list still serializes as a valid array in structured

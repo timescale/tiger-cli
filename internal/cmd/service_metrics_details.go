@@ -92,13 +92,13 @@ func outputMetricDetails(output io.Writer, format string, details api.MetricDeta
 	case "yaml":
 		return util.SerializeToYAML(output, details)
 	default:
-		return outputMetricDetailsTable(details, output)
+		return outputMetricDetailsTable(output, details)
 	}
 }
 
 // outputMetricDetailsTable renders metric metadata as a PROPERTY/VALUE table,
 // plus a LABEL/DESCRIPTION table when the metric has labels.
-func outputMetricDetailsTable(details api.MetricDetails, output io.Writer) error {
+func outputMetricDetailsTable(output io.Writer, details api.MetricDetails) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 

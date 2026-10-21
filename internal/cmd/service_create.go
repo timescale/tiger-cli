@@ -191,7 +191,7 @@ other will be automatically configured).` + iopsSectionHelp,
 
 			// Save password immediately after service creation, before any waiting
 			// This ensures users have access even if they interrupt the wait or it fails
-			passwordSaved := handlePasswordSaving(cmd, cfg, service, util.Deref(service.InitialPassword))
+			passwordSaved := handlePasswordSaving(cmd, cfg, common.ServicePasswordTarget(service), util.Deref(service.InitialPassword))
 
 			// Set as default service unless --no-set-default is specified
 			if !noSetDefault {
@@ -226,7 +226,10 @@ other will be automatically configured).` + iopsSectionHelp,
 				}
 			}
 
-			if err := outputService(cmd, cfg, service, app.Experimental, cfg.Output, withPassword, false); err != nil {
+			if err := outputService(cmd, cfg, service, serviceOutputOptions{
+				Experimental: app.Experimental,
+				WithPassword: withPassword,
+			}); err != nil {
 				cmd.PrintErrf("Warning: Failed to output service details: %v\n", err)
 			}
 

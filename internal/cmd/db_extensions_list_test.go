@@ -50,9 +50,12 @@ func TestDbExtensionsListCmd(t *testing.T) {
 		{Name: "vector", Version: "0.8.0", Schema: "public"},
 	}
 	primary := sampleService()
-	primaryTarget := &common.ConnectionTarget{ConnectionService: primary, CredentialService: primary}
+	primaryTarget := common.NewServiceConnectionTarget(primary)
 	replica := sampleReplica()
-	replicaTarget := &common.ConnectionTarget{ConnectionService: replica, CredentialService: primary, IsReplica: true}
+	// A replica connects to its own endpoint with its primary's credentials.
+	replicaTarget := common.NewServiceConnectionTarget(replica)
+	replicaTarget.Kind = common.TargetReadReplica
+	replicaTarget.Credentials = common.ServiceCredentials(primary)
 	setupGetReplica := func(m *mocks.MockClientWithResponsesInterface) {
 		expectResolveRef(m, "rep-67890", replica)
 		expectGetService(m, "svc-12345", primary)

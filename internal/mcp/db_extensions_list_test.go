@@ -52,9 +52,12 @@ func TestDBExtensionsListTool(t *testing.T) {
 	}
 
 	primary := sampleService()
-	primaryTarget := &common.ConnectionTarget{ConnectionService: primary, CredentialService: primary}
+	primaryTarget := common.NewServiceConnectionTarget(primary)
 	replica := sampleReplica(func(s *api.Service) { s.Status = api.DeployStatusREADY })
-	replicaTarget := &common.ConnectionTarget{ConnectionService: replica, CredentialService: primary, IsReplica: true}
+	// A replica connects to its own endpoint with its primary's credentials.
+	replicaTarget := common.NewServiceConnectionTarget(replica)
+	replicaTarget.Kind = common.TargetReadReplica
+	replicaTarget.Credentials = common.ServiceCredentials(primary)
 
 	runToolTests(t, []toolTest{
 		{

@@ -118,7 +118,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Build connection string
-			details, err := common.GetConnectionDetails(cfg, *service, common.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(cfg, common.NewServiceConnectionTarget(*service), common.ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin", // Use admin role to create new roles
 				WithPassword: true,
@@ -143,7 +143,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Save password to storage with the new role name
-			result, err := common.SavePasswordWithResult(cfg, *service, rolePassword, name)
+			result, err := common.SavePasswordWithResult(cfg, common.ServicePasswordTarget(*service), rolePassword, name)
 			if err != nil {
 				cmd.PrintErrf("Warning: %s\n", result.Message)
 			} else if !result.Success {
