@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -29,6 +31,16 @@ func TestCompletion(t *testing.T) {
 	// --cpu and --memory values ask the shell to keep their numeric order.
 	const keepOrder = ":36\n"
 	const keepOrderDirective = "Completion ended with directive: ShellCompDirectiveNoFileComp, ShellCompDirectiveKeepOrder\n"
+
+	// iopsSteps renders the --iops candidates from one value to another, one
+	// per line in increments of 1000, as the completion lists them.
+	iopsSteps := func(from, to int) string {
+		var b strings.Builder
+		for v := from; v <= to; v += 1000 {
+			fmt.Fprintf(&b, "%d\n", v)
+		}
+		return b.String()
+	}
 
 	listServices := func(m *mocks.MockClientWithResponsesInterface) {
 		services := []api.Service{
@@ -265,6 +277,16 @@ func TestCompletion(t *testing.T) {
 			name:       "--memory flag values for resize omit shared",
 			args:       []string{"__complete", "service", "resize", "--memory", ""},
 			wantStdout: "2\n4\n8\n16\n32\n64\n128\n" + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// The widest range across every plan, platform, and CPU/memory
+			// allocation: the API validates the value.
+			name:       "--iops flag values",
+			args:       []string{"__complete", "service", "create", "--iops", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: iopsSteps(3000, 256000) + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},

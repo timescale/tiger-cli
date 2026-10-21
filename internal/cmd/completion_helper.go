@@ -324,6 +324,26 @@ func completionCPUMemoryConfigs(cmd *cobra.Command, shared, experimental bool) c
 	return common.AllowedCPUMemoryConfigs(shared, experimental)
 }
 
+// The widest --iops range across every plan, platform, and CPU/memory
+// allocation, in the steps it's configured in.
+const (
+	minCompletionIOPS = 3000
+	maxCompletionIOPS = 256000
+	iopsIncrement     = 1000
+)
+
+// iopsCompletion completes --iops on `service create`, `fork`, and `resize`
+// with every value in the widest range. Which of them a service accepts
+// depends on its plan, platform, and CPU/memory allocation, which is left to
+// the API to validate.
+var iopsCompletion = func() cobra.CompletionFunc {
+	values := make([]string, 0, (maxCompletionIOPS-minCompletionIOPS)/iopsIncrement+1)
+	for v := minCompletionIOPS; v <= maxCompletionIOPS; v += iopsIncrement {
+		values = append(values, strconv.Itoa(v))
+	}
+	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp|cobra.ShellCompDirectiveKeepOrder)
+}()
+
 // mcpGetCompletion provides custom completions for the get command
 func mcpGetCompletion(app *common.App) cobra.CompletionFunc {
 	return withAppLoad(app, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

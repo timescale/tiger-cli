@@ -153,6 +153,10 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 				// Memory is null - this indicates a free tier service
 				table.Append("Memory", "shared")
 			}
+
+			if resource.Spec.Iops != nil {
+				table.Append("IOPS", fmt.Sprintf("%d", *resource.Spec.Iops))
+			}
 		}
 	}
 
@@ -206,8 +210,8 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 
 // prepareServiceForOutput builds the output view of a service. cmd may be nil,
 // in which case the connection-details warning is dropped rather than printed.
-// The platform field is a preview field, so it is dropped unless experimental
-// is set.
+// The platform and IOPS fields are preview fields, so they are dropped unless
+// experimental is set.
 func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, experimental bool, withPassword bool) OutputService {
 	outputSvc := OutputService{
 		Service: service,
@@ -215,6 +219,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 	outputSvc.Service.InitialPassword = nil
 	if !experimental {
 		outputSvc.Service.Platform = nil
+		outputSvc.Service.Resources = resourcesWithoutIOPS(service.Resources)
 	}
 
 	opts := common.ConnectionDetailsOptions{
@@ -237,6 +242,24 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 	outputSvc.ConsoleURL = fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, service.ServiceID)
 
 	return outputSvc
+}
+
+// resourcesWithoutIOPS returns a copy of resources with the IOPS cleared,
+// leaving the caller's service untouched.
+func resourcesWithoutIOPS(resources []api.Resource) []api.Resource {
+	if resources == nil {
+		return nil
+	}
+	stripped := make([]api.Resource, len(resources))
+	for i, resource := range resources {
+		stripped[i] = resource
+		if resource.Spec != nil {
+			spec := *resource.Spec
+			spec.Iops = nil
+			stripped[i].Spec = &spec
+		}
+	}
+	return stripped
 }
 
 // handlePasswordSaving handles saving password using the configured storage
