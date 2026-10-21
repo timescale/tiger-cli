@@ -71,7 +71,13 @@ func defaultServiceSource(cmd *cobra.Command) string {
 
 // resolveService resolves a ref to the service it names, through the ref
 // filter on the service list: a match is a one-item list, and no match is an
-// empty one rather than a 404.
+// empty one rather than a 404. A read replica set ID matches too, and comes
+// back as a service whose ForkedFrom links to its parent.
+//
+// TODO: move to the API's resolve endpoint, like the branch and db
+// commands, once read replica sets have their own commands. Its SERVICE type
+// doesn't match replica sets, and until those commands exist this lookup is
+// the only way to reach one.
 func resolveService(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, ref serviceRef) (*api.Service, error) {
 	resp, err := client.GetServicesWithResponse(ctx, projectID, &api.GetServicesParams{Ref: &ref.ref})
 	if err != nil {
@@ -103,23 +109,23 @@ func resolveService(ctx context.Context, client api.ClientWithResponsesInterface
 	}
 
 	service := services[0]
-	if err := checkDefaultIsID(service, ref); err != nil {
+	if err := checkDefaultIsID(service.ServiceID, ref); err != nil {
 		return nil, err
 	}
 	return &service, nil
 }
 
 // checkDefaultIsID refuses a configured default that turned out to be a name
-// (see serviceRef for why). A ref equal to the service's own ID matched by ID
-// or replica set ID; anything else matched by name. Checking after the lookup
-// rather than before is what lets the error name the ID to store instead.
-func checkDefaultIsID(service api.Service, ref serviceRef) error {
-	if ref.source == "" || service.ServiceID == ref.ref {
+// (see serviceRef for why). A ref equal to the resolved ID matched by ID;
+// anything else matched by name. Checking after the lookup rather than before
+// is what lets the error name the ID to store instead.
+func checkDefaultIsID(id string, ref serviceRef) error {
+	if ref.source == "" || id == ref.ref {
 		return nil
 	}
 	return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf(
 		"the default service must be an ID, but %s is set to the name '%s'. Set it to %s, or pass the name as an argument",
-		ref.source, ref.ref, service.ServiceID))
+		ref.source, ref.ref, id))
 }
 
 // serviceLabel identifies a service in status output by name and ID together.

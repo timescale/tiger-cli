@@ -29,7 +29,7 @@ func buildDbCreateRoleCmd(app *common.App) *cobra.Command {
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. A read replica ID is rejected, since replicas
-are read-only; create the role on the primary instead.
+are read-only; create the role on the primary instead.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to create the role on that branch.") + `
 
 By default, a secure random password is auto-generated for the new role. You can:
 - Provide an explicit password with --password=<value>
@@ -100,15 +100,23 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Gated here rather than letting the server reject the CREATE ROLE.
-			service, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
+			// Refuse the blanket case before resolving, as resolveServiceForWrite
+			// does, then gate on the target's own tag.
+			if cfg.ReadOnly.BlocksAll() {
+				return common.ErrReadOnly
+			}
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
 			if err != nil {
+				return err
+			}
+			if err := common.CheckReadOnly(cfg, target.Environment); err != nil {
 				return err
 			}
 
 			// A read replica is read-only, so a role can't be created there.
-			if common.IsReadReplica(*service) {
+			if target.Kind == common.TargetReadReplica {
 				return fmt.Errorf("'%s' is a read replica; create the role on its primary service '%s' instead",
-					service.ServiceID, util.DerefStr(service.ForkedFrom.ServiceID))
+					target.ID, target.Credentials.ID)
 			}
 
 			// Get password
@@ -118,7 +126,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Build connection string
-			details, err := common.GetConnectionDetails(cfg, common.NewServiceConnectionTarget(*service), common.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(cfg, target, common.ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin", // Use admin role to create new roles
 				WithPassword: true,
@@ -143,7 +151,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Save password to storage with the new role name
-			result, err := common.SavePasswordWithResult(cfg, common.ServicePasswordTarget(*service), rolePassword, name)
+			result, err := common.SavePasswordWithResult(cfg, target.Credentials.PasswordTarget, rolePassword, name)
 			if err != nil {
 				cmd.PrintErrf("Warning: %s\n", result.Message)
 			} else if !result.Success {

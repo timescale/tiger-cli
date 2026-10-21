@@ -59,32 +59,32 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "--", "-c", "SELECT 1;"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
+				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service ID before -- separator",
 			args: []string{"db", "psql", "svc-12345", "--", "-c", "SELECT 1;"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
+				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service not found",
 			args: []string{"db", "psql", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefNotFound(m, "svc-12345")
+				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service 'svc-12345' not found",
+			wantErr: "service or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "ambiguous name refused",
 			args: []string{"db", "psql", "my-api-db"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+				expectResolveTargetStatus(m, "my-api-db", http.StatusBadRequest, &api.ClientError{Message: new("ambiguous service name matches multiple services")})
 			},
 			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
@@ -93,7 +93,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"db", "psql", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
+				expectResolveTargetStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -101,7 +101,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			name: "parent fetch fails for read replica",
 			args: []string{"db", "psql", "rep-67890"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "rep-67890", sampleReplica())
+				expectResolveTarget(m, "rep-67890", sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -112,7 +112,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withEnv("PATH", "/nonexistent")},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService())
+				expectResolveTarget(m, "svc-12345", sampleService())
 			},
 			wantErr: "psql not found. Install the PostgreSQL client tools",
 		},
@@ -123,7 +123,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(noEndpoint))
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 			},
 			wantErr: "failed to build connection string: service endpoint not available",
 		},
@@ -132,7 +132,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "svc-12345", "--no-replica-prompt"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(noEndpoint))
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 			},
 			wantErr: "failed to build connection string: service endpoint not available",
 		},
@@ -141,7 +141,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "rep-67890"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "rep-67890", sampleReplica(noEndpoint))
+				expectResolveTarget(m, "rep-67890", sampleReplica(func(r *api.ReadReplicaSet) { r.Endpoint = nil }))
 				expectGetService(m, "svc-12345", sampleService())
 			},
 			wantErr: "failed to build connection string: service endpoint not available",
@@ -151,7 +151,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(noEndpoint))
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -163,7 +163,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(noEndpoint))
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetReplicaSetsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -177,7 +177,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(noEndpoint))
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 				replicas := []api.ReadReplicaSet{
 					{
 						ID:     "rep-1",
@@ -203,7 +203,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "svc-12345", "--pooled"},
 			opts: []runOption{withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService())
+				expectResolveTarget(m, "svc-12345", sampleService())
 			},
 			wantErr: "connection pooler not available for this service",
 		},
@@ -216,7 +216,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			name: "non-auth connection error surfaces directly",
 			args: []string{"db", "psql", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
+				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
 				}))
 			},
@@ -227,6 +227,15 @@ func TestDbPsqlCmd(t *testing.T) {
 				}
 			}),
 			wantStderr: matchPrefix("Warning: could not retrieve stored password: secret not found in keyring\n"),
+		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "psql", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to connect to that branch."),
 		},
 	})
 }

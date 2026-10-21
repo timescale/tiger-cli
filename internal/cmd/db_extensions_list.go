@@ -23,7 +23,7 @@ extension's version, the schema it lives in, and its description.
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. You can also pass a read replica set ID to
 list the extensions on that replica. The connection is opened in Tiger Cloud's
-immutable read-only mode.`,
+immutable read-only mode.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to list the extensions on that\nbranch."),
 		Example: `  # List the extensions installed in the default service
   tiger db extensions list
 
@@ -46,12 +46,7 @@ immutable read-only mode.`,
 				return err
 			}
 
-			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
-			if err != nil {
-				return err
-			}
-
-			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *service)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
 			if err != nil {
 				return err
 			}

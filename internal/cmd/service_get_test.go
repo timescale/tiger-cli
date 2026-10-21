@@ -45,6 +45,18 @@ func TestServiceGetCmd(t *testing.T) {
 		}
 	}
 
+	// setupGetFluid also lists the fluid service's two branches, which only
+	// service get does, behind the experimental gate.
+	setupGetFluid := func(m *mocks.MockClientWithResponsesInterface) {
+		expectResolveRef(m, "svc-12345", fluidService)
+		branches := []api.Branch{sampleBranch(), sampleBranch()}
+		m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "svc-12345", nil).
+			Return(&api.GetBranchesResponse{
+				HTTPResponse: httpResponse(http.StatusOK),
+				JSON200:      &branches,
+			}, nil)
+	}
+
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
@@ -300,12 +312,12 @@ status: READY
 `,
 		},
 		{
-			// The platform and IOPS are preview fields: the output cases above
-			// carry them from sampleService and drop them, while these show them
-			// with the gate.
-			name: "experimental table output shows platform and IOPS",
+			// The platform, IOPS, and branch count are preview fields: the
+			// output cases above carry a platform and IOPS from sampleService
+			// and drop them, while these show all three with the gate.
+			name: "experimental table output shows platform, IOPS, and branches",
 			args: []string{"service", "get", "svc-12345"},
-			mock: setupGet(fluidService),
+			mock: setupGetFluid,
 			opts: []runOption{experimental},
 			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
 │     PROPERTY      │                                            VALUE                                            │
@@ -319,6 +331,7 @@ status: READY
 │ CPU               │ 1 cores (1000m)                                                                             │
 │ Memory            │ 4 GB                                                                                        │
 │ IOPS              │ 6000                                                                                        │
+│ Branches          │ 2                                                                                           │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
@@ -327,9 +340,9 @@ status: READY
 `,
 		},
 		{
-			name: "experimental json output includes platform and IOPS",
+			name: "experimental json output includes platform, IOPS, and branches",
 			args: []string{"service", "get", "svc-12345", "-o", "json"},
-			mock: setupGet(fluidService),
+			mock: setupGetFluid,
 			opts: []runOption{experimental},
 			wantStdout: `{
   "created": "2025-01-15T10:30:00Z",
@@ -354,6 +367,7 @@ status: READY
   "service_id": "svc-12345",
   "service_type": "TIMESCALEDB",
   "status": "READY",
+  "branch_count": 2,
   "role": "tsdbadmin",
   "host": "svc-12345.project.tsdb.cloud.timescale.com",
   "port": 5432,
@@ -364,11 +378,12 @@ status: READY
 `,
 		},
 		{
-			name: "experimental yaml output includes platform and IOPS",
+			name: "experimental yaml output includes platform, IOPS, and branches",
 			args: []string{"service", "get", "svc-12345", "-o", "yaml"},
-			mock: setupGet(fluidService),
+			mock: setupGetFluid,
 			opts: []runOption{experimental},
-			wantStdout: `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
+			wantStdout: `branch_count: 2
+connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
 console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
 created: "2025-01-15T10:30:00Z"
 database: tsdb
@@ -392,6 +407,35 @@ service_id: svc-12345
 service_type: TIMESCALEDB
 status: READY
 `,
+		},
+		{
+			// Only fluid services can be branched, so a standard one isn't
+			// counted. The mock fails the test on any branch listing.
+			name:       "experimental standard service lists no branches",
+			args:       []string{"service", "get", "svc-12345", "-o", "env"},
+			mock:       setupGet(sampleService()),
+			opts:       []runOption{experimental},
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
+		},
+		{
+			name:       "fluid service lists no branches without the gate",
+			args:       []string{"service", "get", "svc-12345", "-o", "env"},
+			mock:       setupGet(fluidService),
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
+		},
+		{
+			// The count is the only thing the branch listing adds, so the
+			// service is still shown without it.
+			name: "branch count fails",
+			args: []string{"service", "get", "svc-12345", "-o", "env"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", fluidService)
+				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "svc-12345", nil).
+					Return(nil, errors.New("connection refused"))
+			},
+			opts:       []runOption{experimental},
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
+			wantStderr: "Warning: failed to count branches: failed to list branches: connection refused\n",
 		},
 		{
 			name:       "env output",
