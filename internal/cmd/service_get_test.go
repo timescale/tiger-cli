@@ -312,10 +312,10 @@ status: READY
 `,
 		},
 		{
-			// The platform and branch count are preview fields: the output cases
-			// above carry a platform from sampleService and drop it, while
-			// these show both with the gate.
-			name: "experimental table output shows platform and branches",
+			// The platform, IOPS, and branch count are preview fields: the
+			// output cases above carry a platform and IOPS from sampleService
+			// and drop them, while these show all three with the gate.
+			name: "experimental table output shows platform, IOPS, and branches",
 			args: []string{"service", "get", "svc-12345"},
 			mock: setupGetFluid,
 			opts: []runOption{experimental},
@@ -330,6 +330,7 @@ status: READY
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 cores (1000m)                                                                             │
 │ Memory            │ 4 GB                                                                                        │
+│ IOPS              │ 6000                                                                                        │
 │ Branches          │ 2                                                                                           │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
@@ -339,7 +340,7 @@ status: READY
 `,
 		},
 		{
-			name: "experimental json output includes platform and branches",
+			name: "experimental json output includes platform, IOPS, and branches",
 			args: []string{"service", "get", "svc-12345", "-o", "json"},
 			mock: setupGetFluid,
 			opts: []runOption{experimental},
@@ -358,6 +359,7 @@ status: READY
       "id": "resource-1",
       "spec": {
         "cpu_millis": 1000,
+        "iops": 6000,
         "memory_gbs": 4
       }
     }
@@ -376,7 +378,7 @@ status: READY
 `,
 		},
 		{
-			name: "experimental yaml output includes platform and branches",
+			name: "experimental yaml output includes platform, IOPS, and branches",
 			args: []string{"service", "get", "svc-12345", "-o", "yaml"},
 			mock: setupGetFluid,
 			opts: []runOption{experimental},
@@ -398,6 +400,7 @@ resources:
   - id: resource-1
     spec:
       cpu_millis: 1000
+      iops: 6000
       memory_gbs: 4
 role: tsdbadmin
 service_id: svc-12345

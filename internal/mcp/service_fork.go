@@ -24,6 +24,7 @@ type ServiceForkInput struct {
 	TargetTime   *time.Time         `json:"target_time,omitempty"`
 	CPUMemory    string             `json:"cpu_memory,omitempty"`
 	Environment  api.EnvironmentTag `json:"environment,omitempty"`
+	IOPS         *int               `json:"iops,omitempty"`
 	Wait         bool               `json:"wait,omitempty"`
 	SetDefault   bool               `json:"set_default,omitempty"`
 	WithPassword bool               `json:"with_password,omitempty"`
@@ -50,6 +51,8 @@ func (ServiceForkInput) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["environment"].Description = "Environment tag for the fork, which is independent of the source service's tag. Use 'PROD' only for production workloads — under read-only mode for production services, forking a PROD source into a DEV fork is allowed but creating a PROD fork is refused, and deleting a PROD fork always requires the user's confirmation."
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
+
+	setIOPSSchemaProperties(schema, experimental, "If not specified, inherits from the source service.")
 
 	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -78,10 +81,10 @@ func (ServiceForkOutput) Schema(experimental bool) *jsonschema.Schema {
 }
 
 func newServiceForkTool(experimental bool) *mcp.Tool {
-	// The platform is a preview, described only behind the gate.
+	// The platform and IOPS are a preview, described only behind the gate.
 	var platformHelp string
 	if experimental {
-		platformHelp = "\n\nThe fork is always created on the same platform as the source service, which determines the valid cpu_memory combinations."
+		platformHelp = "\n\nThe fork is always created on the same platform as the source service, which determines the valid cpu_memory combinations. Provisioned IOPS (iops) are inherited from the source service unless specified."
 	}
 
 	return &mcp.Tool{
@@ -164,6 +167,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		slog.Any("cpu", cpuMillis),
 		slog.Any("memory", memoryGBs),
 		slog.String("environment", string(input.Environment)),
+		slog.Any("iops", input.IOPS),
 	)
 
 	// Prepare service fork request
@@ -178,6 +182,9 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	// Only set name if provided
 	if input.Name != "" {
 		forkReq.Name = &input.Name
+	}
+	if s.app.Experimental {
+		forkReq.Iops = input.IOPS
 	}
 
 	// Make API call to fork service

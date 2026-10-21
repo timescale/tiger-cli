@@ -50,7 +50,9 @@ type BranchResizeOutput struct {
 func (BranchResizeOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[BranchResizeOutput](nil))
 	schema.Properties["status"].Description = "Current branch status after resize operation"
-	setResourceInfoSchemaProperties(schema.Properties["resources"])
+	// The branch tools only exist behind the experimental gate, so the IOPS
+	// are always included.
+	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
 	schema.Properties["message"].Description = "Human-readable outcome of the operation"
 	return schema
 }

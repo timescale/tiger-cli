@@ -104,20 +104,79 @@ func setBranchCountSchemaProperties(schema *jsonschema.Schema, experimental bool
 	schema.Properties["branch_count"].Description = "Number of branches of the service (only returned by service_get, for fluid services)"
 }
 
+// setIOPSSchemaProperties sets a tool's iops input property. IOPS are a
+// preview parameter, so without the experimental gate the property is removed,
+// and the schema rejects it as an unknown property. defaultDescription, if
+// any, says what happens when iops is omitted. The allowed values aren't
+// listed: they depend on too much to describe, and would go stale. The API
+// validates the value.
+func setIOPSSchemaProperties(schema *jsonschema.Schema, experimental bool, defaultDescription string) {
+	if !experimental {
+		delete(schema.Properties, "iops")
+		return
+	}
+	property := schema.Properties["iops"]
+	property.Description = strings.TrimSpace("Provisioned IOPS for the service's storage. " +
+		"Check the Tiger Data documentation for the allowed values, which depend on the user's plan, the service's platform, and its CPU/memory allocation. " +
+		defaultDescription)
+	property.Minimum = new(0.0)
+	property.Examples = []any{16000, 32000}
+}
+
 // ResourceInfo represents resource allocation information
 type ResourceInfo struct {
 	CPU    string `json:"cpu,omitempty"`
 	Memory string `json:"memory,omitempty"`
+	IOPS   int    `json:"iops,omitempty"`
 }
 
 // setResourceInfoSchemaProperties enhances the schema of a ResourceInfo
-// property nested inside a service output schema.
-func setResourceInfoSchemaProperties(schema *jsonschema.Schema) {
+// property nested inside a service output schema. IOPS are a preview field, so
+// without the experimental gate the property is removed.
+func setResourceInfoSchemaProperties(schema *jsonschema.Schema, experimental bool) {
 	schema.Properties["cpu"].Description = "CPU allocation"
 	schema.Properties["cpu"].Examples = []any{"0.5 cores", "1 core", "4 cores"}
 
 	schema.Properties["memory"].Description = "Memory allocation"
 	schema.Properties["memory"].Examples = []any{"2 GB", "4 GB", "16 GB"}
+
+	if experimental {
+		schema.Properties["iops"].Description = "Provisioned IOPS for the service's storage"
+		schema.Properties["iops"].Examples = []any{3000, 12000}
+	} else {
+		delete(schema.Properties, "iops")
+	}
+}
+
+// convertToResourceInfo converts a service's resource allocation to its MCP
+// output form, or nil if the API didn't return one. The IOPS are a preview
+// field, returned only if experimental is set.
+func convertToResourceInfo(service api.Service, experimental bool) *ResourceInfo {
+	if len(service.Resources) == 0 || service.Resources[0].Spec == nil {
+		return nil
+	}
+	spec := service.Resources[0].Spec
+	info := &ResourceInfo{}
+
+	if spec.CPUMillis != nil {
+		info.CPU = common.FormatCPUCores(*spec.CPUMillis) + " cores"
+	} else {
+		// CPU is null - this indicates a free tier service
+		info.CPU = "shared"
+	}
+
+	if spec.MemoryGbs != nil {
+		info.Memory = fmt.Sprintf("%d GB", *spec.MemoryGbs)
+	} else {
+		// Memory is null - this indicates a free tier service
+		info.Memory = "shared"
+	}
+
+	if experimental {
+		info.IOPS = util.Deref(spec.Iops)
+	}
+
+	return info
 }
 
 // ServiceDetail represents detailed service information
@@ -153,7 +212,7 @@ func (ServiceDetail) Schema(experimental bool) *jsonschema.Schema {
 
 	schema.Properties["environment"].Description = "Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."
 
-	setResourceInfoSchemaProperties(schema.Properties["resources"])
+	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
 
 	schema.Properties["replicas"].Description = "Number of HA replicas (0=single node/no HA, 1+=HA enabled)"
 	setBranchCountSchemaProperties(schema, experimental)
@@ -183,27 +242,7 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 		detail.Platform = string(util.Deref(service.Platform))
 	}
 
-	// Add resource information if available
-	if len(service.Resources) > 0 {
-		resource := service.Resources[0]
-		if resource.Spec != nil {
-			detail.Resources = &ResourceInfo{}
-
-			if resource.Spec.CPUMillis != nil {
-				detail.Resources.CPU = common.FormatCPUCores(*resource.Spec.CPUMillis) + " cores"
-			} else {
-				// CPU is null - this indicates a free tier service
-				detail.Resources.CPU = "shared"
-			}
-
-			if resource.Spec.MemoryGbs != nil {
-				detail.Resources.Memory = fmt.Sprintf("%d GB", *resource.Spec.MemoryGbs)
-			} else {
-				// Memory is null - this indicates a free tier service
-				detail.Resources.Memory = "shared"
-			}
-		}
-	}
+	detail.Resources = convertToResourceInfo(service, s.app.Experimental)
 
 	// Add replica information
 	if service.HaReplicas != nil && service.HaReplicas.ReplicaCount != nil {
@@ -331,7 +370,9 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 	schema.Properties["status"].Description = "Branch status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "QUEUED", "CONFIGURING"}
 
-	setResourceInfoSchemaProperties(schema.Properties["resources"])
+	// The branch tools only exist behind the experimental gate. The IOPS are
+	// still returned at the top level, and left out of resources.
+	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
 
 	schema.Properties["iops"].Description = "Provisioned IOPS for the branch's storage"
 

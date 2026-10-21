@@ -102,6 +102,14 @@ func fluidPlatform(s *api.Service) {
 	s.Platform = new(api.ServicePlatformFLUID)
 }
 
+// withIOPS is a sampleService override setting the provisioned IOPS of the
+// service's resource.
+func withIOPS(iops int) func(*api.Service) {
+	return func(s *api.Service) {
+		s.Resources[0].Spec.Iops = new(iops)
+	}
+}
+
 // expectTaggedService registers the resolution of svc-12345 onto a service
 // carrying the given environment tag — the lookup whose tag the prod gate
 // reads, with nothing registered for the write it then refuses.

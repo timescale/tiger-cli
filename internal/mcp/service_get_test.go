@@ -21,11 +21,12 @@ func TestServiceGetTool(t *testing.T) {
 	}
 
 	// A fully populated service, so one success case covers every optional
-	// field: resources, HA replicas, and both endpoints.
+	// field: resources, HA replicas, and both endpoints. Its IOPS are a
+	// preview field, dropped without the experimental gate.
 	fullService := sampleService(func(s *api.Service) {
 		s.Created = created
 		s.Metadata = &api.ServiceMetadata{Environment: new("PROD")}
-		s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(8)}}}
+		s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(8), Iops: new(6000)}}}
 		s.HaReplicas = &api.HAReplica{ReplicaCount: new(2)}
 		s.Endpoint = endpoint
 		s.ConnectionPooler = &api.ConnectionPooler{
@@ -174,15 +175,20 @@ func TestServiceGetTool(t *testing.T) {
 			},
 		},
 		{
-			// The platform and branch count are preview fields: the case above
-			// carries a platform from sampleService and drops it, while this
-			// one returns both.
-			name: "experimental returns the platform and branch count",
+			// The platform, IOPS, and branch count are preview fields: the case
+			// above carries a platform and IOPS and drops them, while this one
+			// returns all three.
+			name: "experimental returns the platform, IOPS, and branch count",
 			tool: toolServiceGet,
 			args: args,
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				setupGet(fluidService)(m)
+				setupGet(sampleService(func(s *api.Service) {
+					s.Created = created
+					s.Endpoint = endpoint
+					s.Platform = new(api.ServicePlatformFLUID)
+					s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(16), Iops: new(12000)}}}
+				}))(m)
 				branches := []api.Branch{sampleBranch(), sampleBranch()}
 				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
 					Return(&api.GetBranchesResponse{
@@ -200,6 +206,7 @@ func TestServiceGetTool(t *testing.T) {
 					"region":            "us-east-1",
 					"created":           "2025-01-15T09:30:00Z",
 					"environment":       "DEV",
+					"resources":         map[string]any{"cpu": "2 cores", "memory": "16 GB", "iops": float64(12000)},
 					"replicas":          float64(0),
 					"branch_count":      float64(2),
 					"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",

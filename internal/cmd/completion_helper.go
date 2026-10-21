@@ -388,9 +388,9 @@ const (
 )
 
 // iopsCompletion completes --iops on `service create`, `fork`, and `resize`,
-// and on `branch create` and `resize`, with every value in the widest range. Which of them a service accepts
-// depends on its plan, platform, and CPU/memory allocation, which is left to
-// the API to validate.
+// and on `branch create` and `resize`, with every value in the widest range.
+// Which of them a service accepts depends on its plan, platform, and
+// CPU/memory allocation, which is left to the API to validate.
 var iopsCompletion = func() cobra.CompletionFunc {
 	values := make([]string, 0, (maxCompletionIOPS-minCompletionIOPS)/iopsIncrement+1)
 	for v := minCompletionIOPS; v <= maxCompletionIOPS; v += iopsIncrement {

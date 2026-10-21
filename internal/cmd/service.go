@@ -169,6 +169,10 @@ func outputServiceTable(output io.Writer, service OutputService) error {
 				// Memory is null - this indicates a free tier service
 				table.Append("Memory", "shared")
 			}
+
+			if resource.Spec.Iops != nil {
+				table.Append("IOPS", fmt.Sprintf("%d", *resource.Spec.Iops))
+			}
 		}
 	}
 
@@ -216,6 +220,8 @@ func outputServiceTable(output io.Writer, service OutputService) error {
 
 // prepareServiceForOutput builds the output view of a service. cmd may be nil,
 // in which case the connection-details warning is dropped rather than printed.
+// The platform and IOPS fields are preview fields, so they are dropped unless
+// opts.Experimental is set.
 func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, opts serviceOutputOptions) OutputService {
 	outputSvc := OutputService{
 		Service:     service,
@@ -224,6 +230,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 	outputSvc.Service.InitialPassword = nil
 	if !opts.Experimental {
 		outputSvc.Service.Platform = nil
+		outputSvc.Service.Resources = resourcesWithoutIOPS(service.Resources)
 	}
 
 	detailsOpts := common.ConnectionDetailsOptions{
@@ -246,6 +253,24 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 	outputSvc.ConsoleURL = fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, service.ServiceID)
 
 	return outputSvc
+}
+
+// resourcesWithoutIOPS returns a copy of resources with the IOPS cleared,
+// leaving the caller's service untouched.
+func resourcesWithoutIOPS(resources []api.Resource) []api.Resource {
+	if resources == nil {
+		return nil
+	}
+	stripped := make([]api.Resource, len(resources))
+	for i, resource := range resources {
+		stripped[i] = resource
+		if resource.Spec != nil {
+			spec := *resource.Spec
+			spec.Iops = nil
+			stripped[i].Spec = &spec
+		}
+	}
+	return stripped
 }
 
 // setDefaultService sets the given service as the default service in the configuration

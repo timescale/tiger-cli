@@ -32,10 +32,14 @@ func TestCompletion(t *testing.T) {
 	const keepOrder = ":36\n"
 	const keepOrderDirective = "Completion ended with directive: ShellCompDirectiveNoFileComp, ShellCompDirectiveKeepOrder\n"
 
-	// --iops values run from 3000 to 256000 in steps of 1000.
-	var iopsValues strings.Builder
-	for v := 3000; v <= 256000; v += 1000 {
-		fmt.Fprintf(&iopsValues, "%d\n", v)
+	// iopsSteps renders the --iops candidates from one value to another, one
+	// per line in increments of 1000, as the completion lists them.
+	iopsSteps := func(from, to int) string {
+		var b strings.Builder
+		for v := from; v <= to; v += 1000 {
+			fmt.Fprintf(&b, "%d\n", v)
+		}
+		return b.String()
 	}
 
 	listServices := func(m *mocks.MockClientWithResponsesInterface) {
@@ -340,7 +344,7 @@ func TestCompletion(t *testing.T) {
 			name:       "--iops flag values for branch create",
 			args:       []string{"__complete", "branch", "create", "--iops", ""},
 			opts:       []runOption{withExperimental()},
-			wantStdout: iopsValues.String() + keepOrder,
+			wantStdout: iopsSteps(3000, 256000) + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
@@ -349,6 +353,16 @@ func TestCompletion(t *testing.T) {
 			args:       []string{"__complete", "branch", "resize", "--memory", ""},
 			opts:       []runOption{withExperimental()},
 			wantStdout: "2\n4\n8\n16\n32\n64\n128\n256\n" + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// The widest range across every plan, platform, and CPU/memory
+			// allocation: the API validates the value.
+			name:       "--iops flag values",
+			args:       []string{"__complete", "service", "create", "--iops", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: iopsSteps(3000, 256000) + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
