@@ -105,6 +105,16 @@ func setPlatformSchemaProperties(schema *jsonschema.Schema, experimental bool) {
 	schema.Properties["platform"].Enum = []any{api.ServicePlatformSTANDARD, api.ServicePlatformFLUID}
 }
 
+// setBranchCountSchemaProperties describes a service's branch count, or
+// removes it outside the experimental gate, since branches are a preview.
+func setBranchCountSchemaProperties(schema *jsonschema.Schema, experimental bool) {
+	if !experimental {
+		delete(schema.Properties, "branch_count")
+		return
+	}
+	schema.Properties["branch_count"].Description = "Number of branches of the service (only returned by service_get, for Fluid Services)"
+}
+
 // setIOPSSchemaProperties sets a tool's iops input property. IOPS are a
 // preview parameter, so without the experimental gate the property is removed,
 // and the schema rejects it as an unknown property. defaultDescription, if
@@ -192,6 +202,7 @@ type ServiceDetail struct {
 	Environment      string        `json:"environment"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
 	Replicas         int           `json:"replicas"`
+	BranchCount      *int          `json:"branch_count,omitempty"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
 	PoolerEndpoint   string        `json:"pooler_endpoint,omitempty"`
 	Password         string        `json:"password,omitempty"`
@@ -215,6 +226,7 @@ func (ServiceDetail) Schema(experimental bool) *jsonschema.Schema {
 	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
 
 	schema.Properties["replicas"].Description = "Number of HA replicas (0=single node/no HA, 1+=HA enabled)"
+	setBranchCountSchemaProperties(schema, experimental)
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint"
 	schema.Properties["pooler_endpoint"].Description = "Connection pooler endpoint"
 	schema.Properties["password"].Description = "Password for tsdbadmin user (only included if with_password=true)"
@@ -285,6 +297,16 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	}
 
 	return detail
+}
+
+// branchIDHelp is the sentence a db tool's service_id description gains for
+// branches, saying what passing a branch ID does. Branches are a preview, so
+// it is empty without the experimental gate.
+func branchIDHelp(experimental bool, does string) string {
+	if !experimental {
+		return ""
+	}
+	return " A branch ID is also accepted — passing one " + does + " instead. Use branch_list to find branch IDs."
 }
 
 // setBranchIDSchemaProperties sets common branch_id schema properties. Like

@@ -84,6 +84,16 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 		Service: s.convertToServiceDetail(cfg, *resp.JSON200, input.WithPassword),
 	}
 
+	// Branches are a preview, so they're counted only behind the gate. The
+	// rest of the output doesn't depend on the count.
+	if s.app.Experimental && common.CanHaveBranches(*resp.JSON200) {
+		if count, err := common.CountBranches(ctx, client, projectID, input.ServiceID); err != nil {
+			s.logger.Error("MCP: Failed to count branches", slog.Any("error", err))
+		} else {
+			output.Service.BranchCount = &count
+		}
+	}
+
 	// Check if password was requested but not available
 	if input.WithPassword && output.Service.Password == "" {
 		return nil, ServiceGetOutput{}, fmt.Errorf("requested password but password not available")
