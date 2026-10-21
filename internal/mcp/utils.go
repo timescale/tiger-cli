@@ -314,7 +314,7 @@ func setBranchIDSchemaProperties(schema *jsonschema.Schema) {
 // offering only the combinations a branch can have.
 func setBranchCPUMemorySchemaProperties(schema *jsonschema.Schema, description string) {
 	schema.Properties["cpu_memory"].Description = description
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.BranchCPUMemoryConfigs().Strings())
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.FluidCPUMemoryConfigs().Strings())
 }
 
 // resolveBranchByID looks up the branch with the given ID, through the API's
@@ -417,10 +417,10 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch) Br
 // names. The schema's enum already rejects anything else, so an error here
 // means the two have drifted apart.
 func parseBranchCPUMemory(cpuMemory string) (common.CPUMemoryConfig, error) {
-	for _, c := range common.BranchCPUMemoryConfigs() {
+	for _, c := range common.FluidCPUMemoryConfigs() {
 		if c.String() == cpuMemory {
 			return c, nil
 		}
 	}
-	return common.CPUMemoryConfig{}, fmt.Errorf("invalid CPU/Memory specification '%s'. Valid options: %s", cpuMemory, common.BranchCPUMemoryConfigs())
+	return common.CPUMemoryConfig{}, fmt.Errorf("invalid CPU/Memory specification '%s'. Valid options: %s", cpuMemory, common.FluidCPUMemoryConfigs())
 }

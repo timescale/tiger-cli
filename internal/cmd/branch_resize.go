@@ -67,7 +67,7 @@ given, the branch keeps its current CPU and memory.`,
 			if cpu == "" && memory == "" && !iopsSet {
 				return errors.New("must specify at least one of --cpu, --memory, or --iops")
 			}
-			cpuMemoryCfg, err := common.BranchCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
+			cpuMemoryCfg, err := common.FluidCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
 			if err != nil {
 				return err
 			}

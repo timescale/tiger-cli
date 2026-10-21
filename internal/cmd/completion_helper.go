@@ -304,11 +304,11 @@ func memoryCompletion(shared, experimental bool) cobra.CompletionFunc {
 }
 
 // branchCPUCompletion and branchMemoryCompletion complete the --cpu and
-// --memory flags of the branch commands, which only take the configurations
-// in common.BranchCPUMemoryConfigs.
+// --memory flags of the branch commands, which take the fluid platform's
+// configurations, since only fluid services can be branched.
 var (
-	branchCPUCompletion    = sizeCompletion(branchConfigs, cpuMillis)
-	branchMemoryCompletion = sizeCompletion(branchConfigs, memoryGBs)
+	branchCPUCompletion    = sizeCompletion(fluidConfigs, cpuMillis)
+	branchMemoryCompletion = sizeCompletion(fluidConfigs, memoryGBs)
 )
 
 func cpuMillis(c common.CPUMemoryConfig) int { return c.CPUMillis }
@@ -322,8 +322,8 @@ func serviceConfigs(shared, experimental bool) func(*cobra.Command) common.CPUMe
 	}
 }
 
-func branchConfigs(*cobra.Command) common.CPUMemoryConfigs {
-	return common.BranchCPUMemoryConfigs()
+func fluidConfigs(*cobra.Command) common.CPUMemoryConfigs {
+	return common.FluidCPUMemoryConfigs()
 }
 
 // sizeCompletion completes the sizes size reads off the allowed

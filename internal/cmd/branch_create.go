@@ -82,7 +82,7 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 				return err
 			}
 
-			cpuMemoryCfg, err := common.BranchCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
+			cpuMemoryCfg, err := common.FluidCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
 			if err != nil {
 				return err
 			}

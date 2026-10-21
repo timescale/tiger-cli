@@ -17,13 +17,6 @@ import (
 // them.
 const BranchEnvironmentTag = api.EnvironmentTagDEV
 
-// BranchCPUMemoryConfigs returns the CPU/Memory configurations a branch can be
-// created or resized onto. Only fluid services can be branched, so these are
-// the fluid platform's.
-func BranchCPUMemoryConfigs() CPUMemoryConfigs {
-	return FluidCPUMemoryConfigs()
-}
-
 // ResolveBranch resolves ref, a branch ID or name, to the branch it names.
 // The branch carries its parent's ID, which every other branch endpoint needs.
 func ResolveBranch(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string) (*api.Branch, error) {
