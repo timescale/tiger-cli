@@ -57,6 +57,12 @@ Integration tests run via `./scripts/test-integration.sh [-v] [-run Pattern] [an
 
 To upgrade dependencies, run `go get -u -t ./... tool` followed by `go mod tidy`. The `-t` flag and the `tool` target ensure test and tool dependencies are upgraded too, not just those imported by the main build. Then run `go generate ./...` to regenerate the API client and mocks with the new tool versions (CI fails on a stale regeneration), run the pre-commit checks from [Build & Test](#build--test), and commit the regenerated files with the `go.mod`/`go.sum` changes. If a transitive dependency breaks the build or generation, pin it back with `go get <module>@<version>` rather than skipping the upgrade.
 
+### Renovate
+
+Renovate (the hosted Mend app, configured in `renovate.json`) opens dependency update PRs every Monday morning, Eastern time, for releases at least three days old. Non-major updates are grouped into one PR each for Go modules, the build-time tools in `go.mod`'s `tool` block, the Go version (`go.mod`'s `go` directive together with the Dockerfile's `GO_VERSION`, which carries a `# renovate:` comment for this), and GitHub Actions. Major updates get their own PRs. Security fixes, from GitHub's Dependabot alerts and OSV, skip the schedule and the release age and always get their own PRs. The Dependency Dashboard issue lists pending updates and can trigger one early.
+
+Renovate runs `go mod tidy` but can't run `go generate`, so a PR that changes generated output (typically the tools group, or a cobra update that changes `docs/cli/`) fails CI. Check out its branch, run `go generate ./...` and the pre-commit checks, fix what they report, and push to the branch. Renovate stops rebasing a branch once someone else has pushed to it.
+
 ## Code Generation
 
 The API client and mocks in `internal/api/` are generated from `openapi.yaml`, which is itself a verbatim copy of the Tiger Cloud API's own spec — the single source of truth. Nothing in this chain is edited by hand in this repo: not `client.go`, `types.go`, or `mocks/mock_client.go`, and not `openapi.yaml` either. If the CLI needs something the spec lacks, or the API returns something the spec doesn't describe, the change lands in the upstream spec first; then sync `openapi.yaml` from it and run `go generate ./...` to regenerate everything (CI enforces this — see [CI](#ci)). If the mock is stale, `go vet` will report that it no longer implements the client interface.
