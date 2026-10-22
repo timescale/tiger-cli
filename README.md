@@ -129,6 +129,7 @@ Tiger CLI provides the following commands:
   - `uri` - Get connection URI for a service (alias: `connection-string`)
   - `ping` - Test database connectivity (aliases: `test`, `test-connection`)
   - `schema` - Display database schema information (tables, views, indexes, functions, TimescaleDB hypertables, and more)
+  - `extensions list` - List the PostgreSQL extensions installed in a database, with their versions and schemas (aliases: `ext ls`)
   - `save-password` - Save a database password to configured password storage (keyring, pgpass, or none)
   - `create role` - Create a new database role, with optional read-only enforcement, inherited grants (`--from`), and statement timeout (alias: `create user`)
 - `tiger config` - Configuration management (alias: `cfg`)
@@ -238,6 +239,7 @@ The MCP server exposes the following tools to AI assistants:
 **Database Operations:**
 - `db_query` - Execute SQL queries against a database service, passed inline or as a path to a SQL file, with support for parameterized queries, custom timeouts, and connection pooling
 - `db_schema` - Display a service's database schema (tables, views, materialized views, enums, functions, procedures, indexes, triggers, and TimescaleDB hypertable/continuous aggregate metadata) as readable text for an agent's context
+- `db_extensions_list` - List the PostgreSQL extensions installed in a service database, with each extension's version, schema, and description
 
 **Feedback:**
 - `feedback` - Submit feedback or a bug report to the Tiger Data team

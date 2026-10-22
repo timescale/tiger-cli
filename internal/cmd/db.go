@@ -23,6 +23,7 @@ func buildDbCmd(app *common.App) *cobra.Command {
 	cmd.AddCommand(buildDbSavePasswordCmd(app))
 	cmd.AddCommand(buildDbCreateCmd(app))
 	cmd.AddCommand(buildDbSchemaCmd(app))
+	cmd.AddCommand(buildDbExtensionsCmd(app))
 	cmd.AddCommand(buildDbQueryCmd(app))
 
 	return cmd

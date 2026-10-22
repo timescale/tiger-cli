@@ -10,6 +10,7 @@ import (
 
 func TestMCPListCmd(t *testing.T) {
 	defaultTools := []string{
+		"db_extensions_list",
 		"db_query",
 		"db_schema",
 		"feedback",
@@ -32,6 +33,7 @@ func TestMCPListCmd(t *testing.T) {
 	wantText := `┌──────┬───────────────────────────┐
 │ TYPE │           NAME            │
 ├──────┼───────────────────────────┤
+│ tool │ db_extensions_list        │
 │ tool │ db_query                  │
 │ tool │ db_schema                 │
 │ tool │ feedback                  │
@@ -57,6 +59,7 @@ func TestMCPListCmd(t *testing.T) {
 	wantTextReadOnly := `┌──────┬───────────────────────────┐
 │ TYPE │           NAME            │
 ├──────┼───────────────────────────┤
+│ tool │ db_extensions_list        │
 │ tool │ db_query                  │
 │ tool │ db_schema                 │
 │ tool │ feedback                  │
@@ -74,6 +77,7 @@ func TestMCPListCmd(t *testing.T) {
 	wantTextExperimental := `┌──────┬──────────────────────────────┐
 │ TYPE │             NAME             │
 ├──────┼──────────────────────────────┤
+│ tool │ db_extensions_list           │
 │ tool │ db_query                     │
 │ tool │ db_schema                    │
 │ tool │ feedback                     │

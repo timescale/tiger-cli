@@ -27,6 +27,7 @@ Database-specific operations including connection management, testing, and confi
 
 * [tiger](tiger.md)	 - Tiger CLI - Tiger Cloud Platform command-line interface
 * [tiger db create](tiger_db_create.md)	 - Create database resources
+* [tiger db extensions](tiger_db_extensions.md)	 - Manage PostgreSQL extensions
 * [tiger db ping](tiger_db_ping.md)	 - Test database connectivity
 * [tiger db psql](tiger_db_psql.md)	 - Connect to a database with psql
 * [tiger db query](tiger_db_query.md)	 - Execute a SQL query on a database

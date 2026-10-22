@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -434,6 +435,26 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		t.Logf("psql command with updated password succeeded")
+	})
+
+	t.Run("DatabaseExtensions", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		output, err := executeIntegrationCommand(t.Context(), "db", "extensions", "list", serviceID, "-o", "json")
+		if err != nil {
+			t.Fatalf("db extensions list failed: %v\nOutput: %s", err, output)
+		}
+
+		var extensions []common.Extension
+		if err := json.Unmarshal([]byte(output), &extensions); err != nil {
+			t.Fatalf("failed to parse extensions output as JSON: %v\nOutput: %s", err, output)
+		}
+		// Every Tiger Cloud service has TimescaleDB installed.
+		if !slices.ContainsFunc(extensions, func(e common.Extension) bool { return e.Name == "timescaledb" }) {
+			t.Errorf("expected timescaledb among the installed extensions, got: %s", output)
+		}
 	})
 
 	// These run against the service this test created, so the password
