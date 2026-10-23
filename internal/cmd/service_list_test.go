@@ -92,6 +92,20 @@ func TestServiceListCmd(t *testing.T) {
 			wantStderr: noServicesStderr,
 		},
 		{
+			// Structured output is always structured, so an empty list is
+			// still a list rather than a message.
+			name:       "empty list json",
+			args:       []string{"service", "list", "-o", "json"},
+			mock:       setupList(nil),
+			wantStdout: "[]\n",
+		},
+		{
+			name:       "empty list yaml",
+			args:       []string{"service", "list", "-o", "yaml"},
+			mock:       setupList(nil),
+			wantStdout: "[]\n",
+		},
+		{
 			name: "table output",
 			args: []string{"service", "list"},
 			mock: setupList(services),

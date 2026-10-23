@@ -216,25 +216,15 @@ func TestDbURICmd(t *testing.T) {
 			name:       "with-password includes stored password",
 			args:       []string{"db", "uri", "svc-12345", "--with-password"},
 			mock:       setupGet,
-			opts:       []runOption{withStoredPassword(sampleService(), "secret-pw")},
+			opts:       []runOption{withStoredPassword(common.ServicePasswordTarget(sampleService()), "secret-pw")},
 			wantStdout: "postgresql://tsdbadmin:secret-pw@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
 		},
 		{
 			name:       "replica uses primary credentials",
 			args:       []string{"db", "uri", "rep-67890", "--with-password"},
 			mock:       setupGetReplica,
-			opts:       []runOption{withStoredPassword(sampleService(), "primary-pw")},
+			opts:       []runOption{withStoredPassword(common.ServicePasswordTarget(sampleService()), "primary-pw")},
 			wantStdout: "postgresql://tsdbadmin:primary-pw@rep-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
 		},
-	})
-}
-
-// withStoredPassword seeds a password for svc in the mock keyring before the
-// command runs.
-func withStoredPassword(svc api.Service, password string) runOption {
-	return withSetup(func(t *testing.T) {
-		if err := (&common.KeyringStorage{}).Save(svc, password, "tsdbadmin"); err != nil {
-			t.Fatalf("failed to seed password: %v", err)
-		}
 	})
 }

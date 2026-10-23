@@ -125,7 +125,7 @@ read-only while leaving DEV services writable.`,
 				Pooled: pooled,
 				// --read-only only adds to whatever read-only mode already
 				// imposes, which under prod mode depends on the target's tag.
-				ReadOnly: readOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)) != nil,
+				ReadOnly: readOnly || common.CheckReadOnly(cfg, target.Environment) != nil,
 			})
 			if err != nil {
 				return handleDatabaseError(err, target)
