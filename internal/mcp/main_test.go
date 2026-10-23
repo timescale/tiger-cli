@@ -469,25 +469,22 @@ func sampleService(overrides ...func(*api.Service)) api.Service {
 	return svc
 }
 
-// sampleReplica returns a paused standby read replica of sampleService, shaped
-// the way GetService returns it when given a read replica set ID. A replica
-// connects to its own endpoint but borrows the parent primary's credentials,
-// so resolving one fetches both services.
-func sampleReplica(overrides ...func(*api.Service)) api.Service {
-	svc := sampleService(func(s *api.Service) {
-		s.ServiceID = "u8me885b93"
-		s.Name = "replica-service"
-		s.Status = api.DeployStatusPAUSED
-		s.ForkedFrom = &api.ForkSpec{
-			IsStandby: new(true),
-			ProjectID: new(testProjectID),
-			ServiceID: new("e6ue9697jf"),
-		}
-	})
-	for _, o := range overrides {
-		o(&svc)
+// sampleReplica returns a still-creating read replica set of sampleService, as
+// the resolve endpoint returns it. A replica connects to its own endpoint but
+// borrows the parent primary's credentials, so resolving one fetches the
+// parent too.
+func sampleReplica(overrides ...func(*api.ReadReplicaSet)) api.ReadReplicaSet {
+	replica := api.ReadReplicaSet{
+		ID:        "u8me885b93",
+		ServiceID: "e6ue9697jf",
+		Name:      "replica-service",
+		Status:    api.ReadReplicaSetStatusCreating,
+		Nodes:     1,
 	}
-	return svc
+	for _, o := range overrides {
+		o(&replica)
+	}
+	return replica
 }
 
 // The readiness errors handleDatabaseError returns before a tool connects,
