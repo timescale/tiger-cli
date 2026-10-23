@@ -79,6 +79,9 @@ func cpuMemoryHelp(shared, experimental bool) string {
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service
+	// BranchCount is set only by service get, behind the experimental gate,
+	// for a service that can have branches.
+	BranchCount *int `json:"branch_count,omitempty"`
 	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty"`
 	ConsoleURL       string `json:"console_url,omitempty"`
@@ -93,6 +96,8 @@ type serviceOutputOptions struct {
 	WithPassword bool
 	// RequirePassword fails the output when WithPassword finds no password.
 	RequirePassword bool
+	// BranchCount is the service's branch count, if it was counted.
+	BranchCount *int
 }
 
 // outputService outputs a single service in the configured output format.
@@ -178,6 +183,10 @@ func outputServiceTable(output io.Writer, service OutputService) error {
 		}
 	}
 
+	if service.BranchCount != nil {
+		table.Append("Branches", fmt.Sprintf("%d", *service.BranchCount))
+	}
+
 	// Endpoint information
 	if service.Endpoint != nil && service.Endpoint.Host != nil && service.Endpoint.Port != nil {
 		table.Append("Direct Endpoint", fmt.Sprintf("%s:%d", *service.Endpoint.Host, *service.Endpoint.Port))
@@ -215,7 +224,8 @@ func outputServiceTable(output io.Writer, service OutputService) error {
 // opts.Experimental is set.
 func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, opts serviceOutputOptions) OutputService {
 	outputSvc := OutputService{
-		Service: service,
+		Service:     service,
+		BranchCount: opts.BranchCount,
 	}
 	outputSvc.Service.InitialPassword = nil
 	if !opts.Experimental {

@@ -34,7 +34,7 @@ local psql installation.
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. You can also pass a read replica set ID to
-query that replica.
+query that replica.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to query that branch.") + `
 
 The query comes from --command, from the SQL file named by --file, or, if
 neither is given, from stdin.
@@ -95,12 +95,7 @@ read-only while leaving DEV services writable.`,
 				return err
 			}
 
-			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
-			if err != nil {
-				return err
-			}
-
-			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *service)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
 			if err != nil {
 				return err
 			}
