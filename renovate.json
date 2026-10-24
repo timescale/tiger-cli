@@ -1,0 +1,44 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "customManagers:dockerfileVersions"],
+  "timezone": "America/New_York",
+  "schedule": ["before 10am on monday"],
+  "minimumReleaseAge": "3 days",
+  "osvVulnerabilityAlerts": true,
+  "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"],
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "Go modules"
+    },
+    {
+      "description": "Build-time tools from go.mod's tool block. Their updates often need `go generate ./...` or code fixes, so they're kept out of the main group.",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": [
+        "github.com/oapi-codegen/oapi-codegen/v2",
+        "go.uber.org/mock",
+        "golang.org/x/vuln",
+        "honnef.co/go/tools",
+        "mvdan.cc/gofumpt"
+      ],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "Go tools"
+    },
+    {
+      "description": "Keep go.mod's go directive and the Dockerfile's GO_VERSION in step.",
+      "matchDepNames": ["go", "golang"],
+      "groupName": "Go"
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["golang"],
+      "rangeStrategy": "bump"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "GitHub Actions"
+    }
+  ]
+}

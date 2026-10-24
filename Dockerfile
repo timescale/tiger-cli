@@ -1,3 +1,4 @@
+# renovate: datasource=docker depName=golang versioning=docker
 ARG GO_VERSION=1.27
 ARG BINARY_SOURCE=builder
 
