@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -626,6 +627,61 @@ func readStoredCredentials(t *testing.T, configDir string) (*config.Credentials,
 // checks, but any code path that reads the body would panic.
 func httpResponse(statusCode int) *http.Response {
 	return &http.Response{StatusCode: statusCode}
+}
+
+// expectResolve registers resolving ref through the resolve endpoint,
+// restricted to resolveType (nil for none), answered with v: an api.Service,
+// api.Branch, or api.ReadReplicaSet, whose Go type picks the discriminator.
+func expectResolve(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, v any) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(&api.ResolveRefResponse{
+			HTTPResponse: httpResponse(http.StatusOK),
+			JSON200:      resolveResult(v),
+		}, nil)
+}
+
+// expectResolveStatus registers a resolve answered with status. A nil apiErr
+// stands in for a response with no body.
+func expectResolveStatus(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, status int, apiErr *api.ClientError) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(&api.ResolveRefResponse{
+			HTTPResponse: httpResponse(status),
+			JSON4XX:      apiErr,
+		}, nil)
+}
+
+// expectResolveError registers a resolve that never reaches the API.
+func expectResolveError(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, err error) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(nil, err)
+}
+
+// resolveResult encodes v as the resolve endpoint's union, discriminated by
+// v's Go type. Each member is its plain type plus the discriminator.
+func resolveResult(v any) *api.ResolveResult {
+	var resolveType api.ResolveType
+	switch v.(type) {
+	case api.Service:
+		resolveType = api.ResolveTypeSERVICE
+	case api.Branch:
+		resolveType = api.ResolveTypeBRANCH
+	case api.ReadReplicaSet:
+		resolveType = api.ResolveTypeREADREPLICASET
+	default:
+		panic(fmt.Sprintf("resolveResult: unsupported type %T", v))
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(util.Must(json.Marshal(v)), &body); err != nil {
+		panic(err)
+	}
+	body["type"] = resolveType
+
+	var result api.ResolveResult
+	if err := result.UnmarshalJSON(util.Must(json.Marshal(body))); err != nil {
+		panic(err)
+	}
+	return &result
 }
 
 // expectResolveRef registers the resolve call a command makes for its service
