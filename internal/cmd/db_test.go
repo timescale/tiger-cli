@@ -11,26 +11,54 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-// sampleReplica returns a standby read replica of sampleService, shaped the way
-// GetService returns it when given a read replica set ID.
-func sampleReplica(overrides ...func(*api.Service)) api.Service {
-	svc := sampleService(func(s *api.Service) {
-		s.ServiceID = "rep-67890"
-		s.Name = "replica-service"
-		s.Endpoint = &api.Endpoint{
+// sampleReplica returns an active read replica set of sampleService, as the
+// resolve endpoint returns it.
+func sampleReplica(overrides ...func(*api.ReadReplicaSet)) api.ReadReplicaSet {
+	replica := api.ReadReplicaSet{
+		ID:        "rep-67890",
+		ServiceID: "svc-12345",
+		Name:      "replica-service",
+		Status:    api.ReadReplicaSetStatusActive,
+		Nodes:     1,
+		Endpoint: &api.Endpoint{
 			Host: new("rep-67890.project.tsdb.cloud.timescale.com"),
 			Port: new(5432),
-		}
-		s.ForkedFrom = &api.ForkSpec{
-			IsStandby: new(true),
-			ProjectID: new(testProjectID),
-			ServiceID: new("svc-12345"),
-		}
-	})
-	for _, o := range overrides {
-		o(&svc)
+		},
 	}
-	return svc
+	for _, o := range overrides {
+		o(&replica)
+	}
+	return replica
+}
+
+// expectResolveTarget registers the unrestricted resolve a `tiger db` command
+// makes for what it connects to, answered with v (see expectResolve).
+func expectResolveTarget(m *mocks.MockClientWithResponsesInterface, ref string, v any) {
+	expectResolve(m, ref, nil, v)
+}
+
+// expectTaggedTarget is expectTaggedService for a `tiger db` command: the
+// resolution of svc-12345 onto a service carrying the given environment tag.
+func expectTaggedTarget(tag string) func(*mocks.MockClientWithResponsesInterface) {
+	return func(m *mocks.MockClientWithResponsesInterface) {
+		expectResolveTarget(m, "svc-12345", sampleService(envTag(tag)))
+	}
+}
+
+// expectResolveTargetNotFound registers a ref that matches nothing.
+func expectResolveTargetNotFound(m *mocks.MockClientWithResponsesInterface, ref string) {
+	expectResolveStatus(m, ref, nil, http.StatusNotFound, &api.ClientError{Message: new("resource not found")})
+}
+
+// expectResolveTargetError registers a resolution that never reaches the API.
+func expectResolveTargetError(m *mocks.MockClientWithResponsesInterface, ref string, err error) {
+	expectResolveError(m, ref, nil, err)
+}
+
+// expectResolveTargetStatus registers a resolution answered with status. A
+// nil apiErr stands in for a response with no body.
+func expectResolveTargetStatus(m *mocks.MockClientWithResponsesInterface, ref string, status int, apiErr *api.ClientError) {
+	expectResolveStatus(m, ref, nil, status, apiErr)
 }
 
 // pausedMsg and notReadyMsg build the readiness errors handleDatabaseError
