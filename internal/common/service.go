@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/timescale/tiger-cli/internal/api"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // GenerateServiceName matches the front-end logic for generating a random
@@ -26,11 +25,7 @@ func ServiceEnvironmentTag(service api.Service) api.EnvironmentTag {
 	if service.Metadata == nil {
 		return api.EnvironmentTagDEV
 	}
-
-	if strings.EqualFold(util.DerefStr(service.Metadata.Environment), string(api.EnvironmentTagPROD)) {
-		return api.EnvironmentTagPROD
-	}
-	return api.EnvironmentTagDEV
+	return environmentTag(service.Metadata.Environment)
 }
 
 // GetService fetches a single service by ID. The API resolves both primary

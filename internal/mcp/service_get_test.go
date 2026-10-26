@@ -143,6 +143,33 @@ func TestServiceGetTool(t *testing.T) {
 			wantOutput: full,
 		},
 		{
+			// No port is guessed, for the direct endpoint or the pooler, so
+			// an endpoint without one isn't returned or connected to.
+			name: "endpoints without a port",
+			tool: toolServiceGet,
+			args: args,
+			mock: setupGet(sampleService(func(s *api.Service) {
+				s.Created = created
+				s.Endpoint = &api.Endpoint{Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com")}
+				s.ConnectionPooler = &api.ConnectionPooler{
+					Endpoint: &api.Endpoint{Host: new("e6ue9697jf.project.pooler.tsdb.cloud.timescale.com")},
+				}
+			})),
+			wantOutput: map[string]any{
+				"service": map[string]any{
+					"id":                "e6ue9697jf",
+					"name":              "test-service",
+					"status":            "READY",
+					"type":              "TIMESCALEDB",
+					"region":            "us-east-1",
+					"created":           "2025-01-15T09:30:00Z",
+					"environment":       "DEV",
+					"replicas":          float64(0),
+					"connection_string": "",
+				},
+			},
+		},
+		{
 			// The platform and IOPS are preview fields: the case above carries
 			// them and drops them, while this one returns them.
 			name: "experimental returns the platform and IOPS",

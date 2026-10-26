@@ -72,11 +72,11 @@ func outputAuthInfo(cmd *cobra.Command, authInfo api.AuthInfo, format string) er
 	case "yaml":
 		return util.SerializeToYAML(outputWriter, authInfo)
 	default: // table format (default)
-		return outputAuthInfoTable(authInfo, outputWriter)
+		return outputAuthInfoTable(outputWriter, authInfo)
 	}
 }
 
-func outputAuthInfoTable(authInfo api.AuthInfo, output io.Writer) error {
+func outputAuthInfoTable(output io.Writer, authInfo api.AuthInfo) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 	table.Append("Status", "Logged in")

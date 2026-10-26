@@ -222,7 +222,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	// This ensures the password is stored even if the wait fails or is interrupted
 	var passwordStorage *common.PasswordStorageResult
 	if service.InitialPassword != nil {
-		result, err := common.SavePasswordWithResult(cfg, api.Service(service), *service.InitialPassword, "tsdbadmin")
+		result, err := common.SavePasswordWithResult(cfg, common.ServicePasswordTarget(service), *service.InitialPassword, "tsdbadmin")
 		passwordStorage = &result
 		if err != nil {
 			s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))

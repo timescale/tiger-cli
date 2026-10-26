@@ -78,11 +78,6 @@ service from your configuration.`,
 				backups = *resp.JSON200
 			}
 
-			if len(backups) == 0 {
-				cmd.PrintErrln("No backups found.")
-				return nil
-			}
-
 			return outputBackups(cmd, backups, cfg.Output)
 		},
 	}
@@ -104,13 +99,17 @@ func outputBackups(cmd *cobra.Command, backups []api.Backup, format string) erro
 	case "env":
 		return fmt.Errorf("environment variable output is not supported for backups")
 	default:
-		return outputBackupsTable(backups, out)
+		if len(backups) == 0 {
+			cmd.PrintErrln("No backups found.")
+			return nil
+		}
+		return outputBackupsTable(out, backups)
 	}
 }
 
 // outputBackupsTable omits the label: it repeats STARTED and TYPE, and no command
 // takes it as input. It stays in the json and yaml output.
-func outputBackupsTable(backups []api.Backup, output io.Writer) error {
+func outputBackupsTable(output io.Writer, backups []api.Backup) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("STARTED", "TYPE", "DURATION", "SIZE", "REGIONS")
 

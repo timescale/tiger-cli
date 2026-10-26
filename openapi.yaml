@@ -36,6 +36,8 @@ tags:
     description: Manage services and their associated actions.
   - name: Read Replica Sets
     description: Manage read replica sets and their associated actions.
+  - name: Branches
+    description: Manage branches of a Fluid Service and their associated actions.
   - name: Backups
     description: View the backups taken for a service.
   - name: Exporters
@@ -1467,6 +1469,334 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/branches:
+    get:
+      operationId: getProjectBranches
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      x-tigerdata-internal: true
+      tags:
+        - Branches
+      summary: List All Branches in a Project
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves a list of all branches within a specific project, regardless
+        of parent service.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: A list of branches.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches:
+    get:
+      operationId: getBranches
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: List All Branches
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves a list of all branches created from a service within a project.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - name: ref
+          in: query
+          required: false
+          description: |
+            Returns only the branch this reference matches: one whose ID
+            equals it, or whose name equals it, exactly and case-sensitively,
+            with no precedence between the two. A reference matching nothing
+            returns an empty list.
+          schema:
+            type: string
+            minLength: 1
+            example: "my-production-db-pr-412"
+      responses:
+        '200':
+          description: A list of branches.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+    post:
+      operationId: createBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Create a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Creates a new branch from the service identified by `service_id`. A
+        branch shares its parent's data at the moment of creation and gets
+        its own, independently-sized compute. This is an asynchronous
+        operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BranchCreate'
+      responses:
+        '202':
+          description: Branch creation request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}:
+    get:
+      operationId: getBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Get a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves the details of a specific branch by its ID.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      responses:
+        '200':
+          description: Branch details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+    delete:
+      operationId: deleteBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Delete a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Deletes a specific branch. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      responses:
+        '202':
+          description: Deletion request has been accepted.
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/start:
+    post:
+      operationId: startBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Start a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Starts a stopped branch. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      responses:
+        '202':
+          description: Branch start request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/stop:
+    post:
+      operationId: stopBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Stop a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Stops a running branch. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      responses:
+        '202':
+          description: Branch stop request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/resize:
+    post:
+      operationId: resizeBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Resize a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Changes the compute allocation for a specific branch.
+        Storage size is shared with the parent and is not resized through
+        this operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BranchResizeInput'
+      responses:
+        '202':
+          description: Resize request has been accepted and is in progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/updatePassword:
+    post:
+      operationId: updateBranchPassword
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Update Branch Password
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Sets a new master password for the branch.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePasswordInput'
+      responses:
+        '204':
+          description: Password updated successfully. No content returned.
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/rename:
+    post:
+      operationId: renameBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Rename a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Updates the name of a specific branch.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BranchRename'
+      responses:
+        '200':
+          description: Branch renamed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/resolve:
+    get:
+      operationId: resolveRef
+      x-tigerdata-owner: platform
+      x-tigerdata-internal: true
+      tags:
+        - Services
+      summary: Resolve a Service, Branch, or Read Replica Set
+      description: Resolves `ref` to the service, branch, or read replica set it names.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: ref
+          in: query
+          required: true
+          description: |
+            The ID or name to resolve, exactly and case-sensitively. A ref
+            matching more than one resource is an error.
+          schema:
+            type: string
+            minLength: 1
+            example: "my-production-db"
+        - name: type
+          in: query
+          required: false
+          description: Only match resources of this kind.
+          schema:
+            $ref: '#/components/schemas/ResolveType'
+      responses:
+        '200':
+          description: The resolved service, branch, or read replica set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveResult'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/exporters:
     get:
       operationId: getExporters
@@ -1778,6 +2108,14 @@ components:
         type: string
         minLength: 3
         example: "alb8jicdpr"
+    BranchId:
+      name: branch_id
+      in: path
+      required: true
+      description: The unique identifier of the branch.
+      schema:
+        type: string
+        example: "br4nch1d9x"
     BackupRegionCode:
       name: region_code
       in: path
@@ -2415,6 +2753,7 @@ components:
       description: A set of read replicas for a service.
       required:
         - id
+        - service_id
         - name
         - status
         - nodes
@@ -2425,6 +2764,10 @@ components:
           type: string
           description: The unique identifier for the read replica set.
           example: "alb8jicdpr"
+        service_id:
+          type: string
+          description: The ID of the parent service this read replica set was created from.
+          example: "d1k5vk7hf2"
         name:
           type: string
           description: The name of the read replica set.
@@ -2471,6 +2814,182 @@ components:
           type: string
           description: Environment tag for the read replica set.
           example: "PROD"
+    Branch:
+      x-tigerdata-preview: true
+      type: object
+      description: A branch of a Fluid Service.
+      required:
+        - id
+        - project_id
+        - service_id
+        - name
+        - created
+        - status
+        - cpu_millis
+        - memory_gbs
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the branch.
+          example: "br4nch1d9x"
+        project_id:
+          type: string
+          description: The project this branch belongs to.
+          example: "rp1pz7uyae"
+        service_id:
+          type: string
+          description: The service this branch was created from.
+          example: "4rwj1h3fd0"
+        name:
+          type: string
+          description: The name of the branch.
+          example: "my-production-db-pr-412"
+        created:
+          type: string
+          format: date-time
+          description: Creation timestamp.
+          example: "2026-09-01T09:30:00Z"
+        initial_password:
+          type: string
+          description: The initial password for the branch.
+          format: password
+          example: "a-very-secure-initial-password"
+        status:
+          allOf:
+            - $ref: '#/components/schemas/DeployStatus'
+          description: Current status of the branch.
+        cpu_millis:
+          type: integer
+          description: CPU allocation in milli-cores.
+          example: 500
+        memory_gbs:
+          type: integer
+          description: Memory allocation in gigabytes.
+          example: 4
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          description: Provisioned IOPS for the storage volume.
+          example: 3000
+        endpoint:
+          $ref: '#/components/schemas/Endpoint'
+    ResolveType:
+      x-tigerdata-internal: true
+      type: string
+      description: What kind of resource a resolved ref is, or should be restricted to.
+      enum: [SERVICE, BRANCH, READ_REPLICA_SET]
+    ResolveResult:
+      x-tigerdata-internal: true
+      description: A service, branch, or read replica set resolved by ref. `type` determines which.
+      oneOf:
+        - $ref: '#/components/schemas/ResolvedService'
+        - $ref: '#/components/schemas/ResolvedBranch'
+        - $ref: '#/components/schemas/ResolvedReadReplicaSet'
+      discriminator:
+        propertyName: type
+        mapping:
+          SERVICE: '#/components/schemas/ResolvedService'
+          BRANCH: '#/components/schemas/ResolvedBranch'
+          READ_REPLICA_SET: '#/components/schemas/ResolvedReadReplicaSet'
+    ResolvedService:
+      x-tigerdata-internal: true
+      description: A Service resolved by ref.
+      allOf:
+        - $ref: '#/components/schemas/Service'
+        - type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Always "SERVICE" for a resolved Service.
+              enum: [SERVICE]
+    ResolvedBranch:
+      x-tigerdata-internal: true
+      description: A Branch resolved by ref.
+      allOf:
+        - $ref: '#/components/schemas/Branch'
+        - type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Always "BRANCH" for a resolved Branch.
+              enum: [BRANCH]
+    ResolvedReadReplicaSet:
+      x-tigerdata-internal: true
+      description: A ReadReplicaSet resolved by ref.
+      allOf:
+        - $ref: '#/components/schemas/ReadReplicaSet'
+        - type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Always "READ_REPLICA_SET" for a resolved ReadReplicaSet.
+              enum: [READ_REPLICA_SET]
+    BranchCreate:
+      x-tigerdata-preview: true
+      type: object
+      description: Parameters for creating a branch of the service identified by `service_id` in the path.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: A human-readable name for the branch. If not provided, defaults to "branch-<parent name>", with "-1", "-2", ... appended if that name is already in use in the project.
+          example: "my-production-db-pr-412"
+        cpu_millis:
+          type: integer
+          minimum: 1
+          description: The initial CPU allocation in milli-cores. Defaults to 250 if not provided.
+          example: 250
+        memory_gbs:
+          type: integer
+          minimum: 1
+          description: The initial memory allocation in gigabytes. Defaults to 2 if not provided.
+          example: 2
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: Requested provisioned IOPS for the branch's storage.
+          example: 4000
+    BranchRename:
+      type: object
+      description: Parameters for renaming a branch.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The new name for the branch.
+          example: "my-production-db-pr-412"
+    BranchResizeInput:
+      type: object
+      minProperties: 1
+      properties:
+        cpu_millis:
+          type: string
+          pattern: "^[0-9]+$"
+          description: The new CPU allocation in milli-cores.
+          example: "1000"
+        memory_gbs:
+          type: string
+          pattern: "^[0-9]+$"
+          description: The new memory allocation in gigabytes.
+          example: "4"
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: The new provisioned IOPS for the branch's storage.
+          example: 4000
+      description: >-
+        At least one of cpu_millis, memory_gbs, or iops must be provided.
+        cpu_millis and memory_gbs must be provided together.
     ServiceCreate:
       type: object
       description: Parameters for creating a service.

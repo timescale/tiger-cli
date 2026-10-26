@@ -125,6 +125,17 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			wantErr: "'rep-67890' is a read replica; create the role on its primary service 'svc-12345' instead",
 		},
 		{
+			// With no --password or TIGER_NEW_PASSWORD, the password is
+			// generated before connecting.
+			name: "password generation fails",
+			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
+			opts: []runOption{withGenerateSecurePassword(32, "", errors.New("entropy unavailable"))},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+			},
+			wantErr: "failed to determine password: entropy unavailable",
+		},
+		{
 			name: "endpoint not available",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
