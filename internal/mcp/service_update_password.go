@@ -147,11 +147,11 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
 	}
-	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusNoContent {
+	if resp.StatusCode() != http.StatusNoContent {
 		return nil, ServiceUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	storage, err := common.SavePasswordWithResult(cfg, *service, password, "tsdbadmin")
+	storage, err := common.SavePasswordWithResult(cfg, common.ServicePasswordTarget(*service), password, "tsdbadmin")
 	if err != nil {
 		s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
 	} else {

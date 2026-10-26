@@ -424,6 +424,23 @@ func withIsTerminal(isTerminal bool) runOption {
 	})
 }
 
+// withGenerateSecurePassword stubs common.GenerateSecurePassword, asserting the
+// requested length and returning password and err in place of a random
+// password, so a case can expect the exact update request and stored password.
+func withGenerateSecurePassword(wantLength int, password string, err error) runOption {
+	return withSetup(func(t *testing.T) {
+		original := common.GenerateSecurePassword
+		common.GenerateSecurePassword = func(length int) (string, error) {
+			t.Helper()
+			if length != wantLength {
+				t.Errorf("GenerateSecurePassword length = %d, want %d", length, wantLength)
+			}
+			return password, err
+		}
+		t.Cleanup(func() { common.GenerateSecurePassword = original })
+	})
+}
+
 // withReadPassword makes util.ReadPassword return the given password. The real
 // implementation needs stdin to be an *os.File, so password prompts can't be
 // driven with withStdin.
@@ -522,6 +539,32 @@ func checkDefaultService(want string) checkFunc {
 		}
 		if cfg.ServiceID != want {
 			t.Errorf("default service_id = %q, want %q", cfg.ServiceID, want)
+		}
+	}
+}
+
+// withStoredPassword seeds a password for target in the mock keyring before
+// the command runs.
+func withStoredPassword(target common.PasswordTarget, password string) runOption {
+	return withSetup(func(t *testing.T) {
+		if err := (&common.KeyringStorage{}).Save(target, password, "tsdbadmin"); err != nil {
+			t.Fatalf("failed to seed password: %v", err)
+		}
+	})
+}
+
+// checkStoredPassword returns a check asserting the password stored in the
+// (mock) keyring for the given service.
+func checkStoredPassword(serviceID, want string) checkFunc {
+	return func(t *testing.T, result cmdResult) {
+		t.Helper()
+		target := common.PasswordTarget{ID: serviceID, ProjectID: testProjectID}
+		got, err := (&common.KeyringStorage{}).Get(target, "tsdbadmin")
+		if err != nil {
+			t.Fatalf("failed to read stored password: %v", err)
+		}
+		if got != want {
+			t.Errorf("stored password = %q, want %q", got, want)
 		}
 	}
 }

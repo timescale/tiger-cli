@@ -82,7 +82,7 @@ func outputProjects(cmd *cobra.Command, projects []api.Project, currentProjectID
 		// but TIGER_OUTPUT and the config file aren't validated on load.
 		return fmt.Errorf("environment variable output is not supported for multiple projects")
 	default: // table format (default)
-		return outputProjectsTable(outputProjects, outputWriter)
+		return outputProjectsTable(outputWriter, outputProjects)
 	}
 }
 
@@ -99,7 +99,7 @@ func prepareProjectsForOutput(projects []api.Project, currentProjectID string) [
 }
 
 // outputProjectsTable outputs projects in a formatted table using tablewriter
-func outputProjectsTable(projects []OutputProject, output io.Writer) error {
+func outputProjectsTable(output io.Writer, projects []OutputProject) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("PROJECT ID", "NAME", "CURRENT")
 
