@@ -142,6 +142,70 @@ status: READY
 			wantStdout: sampleBranchEnv,
 		},
 		{
+			name:       "env with password",
+			args:       []string{"branch", "get", "br-12345", "-o", "env", "--with-password"},
+			opts:       []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
+			mock:       getSample,
+			wantStdout: sampleBranchEnv + "PGPASSWORD=branch-pw\n",
+		},
+		{
+			name: "table with password",
+			args: []string{"branch", "get", "br-12345", "--with-password"},
+			opts: []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
+			mock: getSample,
+			wantStdout: `┌───────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                                         VALUE                                                         │
+├───────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Branch ID         │ br-12345                                                                                                              │
+│ Name              │ test-branch                                                                                                           │
+│ Parent Service    │ test-service (svc-12345)                                                                                              │
+│ Status            │ READY                                                                                                                 │
+│ CPU               │ 0.25 cores (250m)                                                                                                     │
+│ Memory            │ 2 GB                                                                                                                  │
+│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                                       │
+│ Created           │ 2025-01-16 09:00:00 UTC                                                                                               │
+│ Password          │ branch-pw                                                                                                             │
+│ Connection String │ postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
+└───────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+		},
+		{
+			// The branch has its own password, so its parent's isn't used.
+			name: "json with password",
+			args: []string{"branch", "get", "br-12345", "-o", "json", "--with-password"},
+			opts: []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"), withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw")},
+			mock: getSample,
+			wantStdout: `{
+  "cpu_millis": 250,
+  "created": "2025-01-16T09:00:00Z",
+  "endpoint": {
+    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+    "port": 36956
+  },
+  "id": "br-12345",
+  "memory_gbs": 2,
+  "name": "test-branch",
+  "project_id": "test-project-123",
+  "service_id": "svc-12345",
+  "status": "READY",
+  "service_name": "test-service",
+  "role": "tsdbadmin",
+  "password": "branch-pw",
+  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+  "port": 36956,
+  "database": "tsdb",
+  "connection_string": "postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require"
+}
+`,
+		},
+		{
+			name:    "with password unavailable",
+			args:    []string{"branch", "get", "br-12345", "--with-password"},
+			opts:    []runOption{withExperimental()},
+			mock:    getSample,
+			wantErr: "password requested but not available for branch br-12345",
+		},
+		{
 			// A branch counts as DEV, so only read_only=all makes its
 			// connection string read-only.
 			name: "read-only all makes the connection string read-only",

@@ -29,6 +29,7 @@ func newBranchCreateCmd(app *common.App, use, commandPath string) *cobra.Command
 	var iops int
 	var noWait bool
 	var waitTimeout time.Duration
+	var withPassword bool
 
 	cmd := &cobra.Command{
 		Use:   use,
@@ -125,12 +126,15 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 				return fmt.Errorf("empty response from API")
 			}
 			branch := *resp.JSON202
+			// Kept aside, since waiting replaces the branch with one that has
+			// no password.
+			initialPassword := util.Deref(branch.InitialPassword)
 
 			cmd.PrintErrf("Branch ID: %s\n", branch.ID)
 
 			// Saved before any waiting, so the password is stored even if the
 			// wait fails or is interrupted.
-			passwordSaved := handlePasswordSaving(cmd, cfg, common.BranchPasswordTarget(branch), util.Deref(branch.InitialPassword))
+			passwordSaved := handlePasswordSaving(cmd, cfg, common.BranchPasswordTarget(branch), initialPassword)
 
 			var waitErr error
 			if noWait {
@@ -157,7 +161,11 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 				}
 			}
 
-			if err := outputBranch(cmd, cfg, branch, branchOutputOptions{ServiceName: parent.Name}); err != nil {
+			if err := outputBranch(cmd, cfg, branch, branchOutputOptions{
+				ServiceName:     parent.Name,
+				WithPassword:    withPassword,
+				InitialPassword: initialPassword,
+			}); err != nil {
 				cmd.PrintErrf("Warning: failed to output branch details: %v\n", err)
 			}
 
@@ -173,6 +181,7 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the branch to be ready")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))
