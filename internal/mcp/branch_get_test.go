@@ -7,6 +7,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
 func TestBranchGetTool(t *testing.T) {
@@ -101,6 +102,35 @@ func TestBranchGetTool(t *testing.T) {
 			opts:       []runOption{experimental},
 			mock:       getBranch(sampleBranch()),
 			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetail(api.DeployStatusREADY))},
+		},
+		{
+			// The branch has its own password, so its parent's isn't used.
+			name: "with password",
+			tool: toolBranchGet,
+			args: map[string]any{"branch_id": "br4nch1d9x", "with_password": true},
+			opts: []runOption{
+				experimental,
+				withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"),
+				withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw"),
+			},
+			mock: getBranch(sampleBranch()),
+			wantOutput: map[string]any{"branch": func() map[string]any {
+				detail := withServiceName(sampleBranchDetail(api.DeployStatusREADY))
+				detail["password"] = "branch-pw"
+				detail["connection_string"] = "postgresql://tsdbadmin:branch-pw@br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require"
+				return detail
+			}()},
+		},
+		{
+			// Refused before the parent's name is fetched.
+			name: "with password unavailable",
+			tool: toolBranchGet,
+			args: map[string]any{"branch_id": "br4nch1d9x", "with_password": true},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, sampleBranch())
+			},
+			wantErr: "requested password but password not available",
 		},
 		{
 			// The IOPS go in resources, as they do for services.

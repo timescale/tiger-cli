@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -13,12 +14,14 @@ import (
 
 // BranchGetInput represents input for branch_get
 type BranchGetInput struct {
-	BranchID string `json:"branch_id"`
+	BranchID     string `json:"branch_id"`
+	WithPassword bool   `json:"with_password,omitempty"`
 }
 
 func (BranchGetInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[BranchGetInput](nil))
 	setBranchIDSchemaProperties(schema)
+	setWithPasswordSchemaProperties(schema)
 	return schema
 }
 
@@ -65,7 +68,10 @@ func (s *Server) handleBranchGet(ctx context.Context, req *mcp.CallToolRequest, 
 		return nil, BranchGetOutput{}, err
 	}
 
-	detail := s.convertToBranchDetail(cfg, *branch)
+	detail := s.convertToBranchDetail(cfg, *branch, input.WithPassword, "")
+	if input.WithPassword && detail.Password == "" {
+		return nil, BranchGetOutput{}, fmt.Errorf("requested password but password not available")
+	}
 
 	// The branch carries only its parent's ID, so the name takes a second
 	// fetch. The rest of the output doesn't depend on it.

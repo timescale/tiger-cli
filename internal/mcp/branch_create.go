@@ -17,11 +17,12 @@ import (
 
 // BranchCreateInput represents input for branch_create
 type BranchCreateInput struct {
-	ServiceID string `json:"service_id"`
-	Name      string `json:"name,omitempty"`
-	CPUMemory string `json:"cpu_memory,omitempty"`
-	IOPS      *int   `json:"iops,omitempty"`
-	Wait      bool   `json:"wait,omitempty"`
+	ServiceID    string `json:"service_id"`
+	Name         string `json:"name,omitempty"`
+	CPUMemory    string `json:"cpu_memory,omitempty"`
+	IOPS         *int   `json:"iops,omitempty"`
+	Wait         bool   `json:"wait,omitempty"`
+	WithPassword bool   `json:"with_password,omitempty"`
 }
 
 func (BranchCreateInput) Schema() *jsonschema.Schema {
@@ -39,6 +40,8 @@ func (BranchCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["wait"].Description = "Whether to wait for the branch to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying the branch. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
+
+	setWithPasswordSchemaProperties(schema)
 
 	return schema
 }
@@ -129,6 +132,9 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchCreateOutput{}, fmt.Errorf("empty response from API")
 	}
 	branch := *resp.JSON202
+	// Kept aside, since waiting replaces the branch with one that has no
+	// password.
+	initialPassword := util.Deref(branch.InitialPassword)
 
 	// Saved before any waiting, so the password is stored even if the wait
 	// fails or is interrupted.
@@ -159,7 +165,7 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 		}
 	}
 	return nil, BranchCreateOutput{
-		Branch:          s.convertToBranchDetail(cfg, branch),
+		Branch:          s.convertToBranchDetail(cfg, branch, input.WithPassword, initialPassword),
 		Message:         message,
 		PasswordStorage: passwordStorage,
 	}, nil

@@ -76,7 +76,7 @@ func (s *Server) handleBranchList(ctx context.Context, req *mcp.CallToolRequest,
 
 	branches := make([]BranchDetail, len(*resp.JSON200))
 	for i, branch := range *resp.JSON200 {
-		branches[i] = s.convertToBranchDetail(cfg, branch)
+		branches[i] = s.convertToBranchDetail(cfg, branch, false, "")
 	}
 
 	return nil, BranchListOutput{Branches: branches}, nil

@@ -330,6 +330,7 @@ type BranchDetail struct {
 	Created          string        `json:"created,omitempty"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
+	Password         string        `json:"password,omitempty"`
 	ConnectionString string        `json:"connection_string,omitempty"`
 }
 
@@ -349,13 +350,16 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
 
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint (absent while the branch is still provisioning)"
-	schema.Properties["connection_string"].Description = "PostgreSQL connection string, without a password"
+	schema.Properties["password"].Description = "Password for the branch's tsdbadmin user (only included if with_password=true)"
+	schema.Properties["connection_string"].Description = "PostgreSQL connection string (password embedded only if with_password=true)"
 
 	return schema
 }
 
-// convertToBranchDetail converts an API Branch to MCP BranchDetail
-func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch) BranchDetail {
+// convertToBranchDetail converts an API Branch to MCP BranchDetail. With
+// withPassword, the branch's stored password is included, or initialPassword
+// (from the create response) when none is stored.
+func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, withPassword bool, initialPassword string) BranchDetail {
 	detail := BranchDetail{
 		BranchID:  branch.ID,
 		Name:      branch.Name,
@@ -377,12 +381,15 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch) Br
 		detail.DirectEndpoint = fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port)
 	}
 	if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), common.ConnectionDetailsOptions{
-		Role:     "tsdbadmin",
-		ReadOnly: common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
+		Role:            "tsdbadmin",
+		WithPassword:    withPassword,
+		InitialPassword: initialPassword,
+		ReadOnly:        common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
 	}); err != nil {
 		s.logger.Error("MCP: Failed to build connection string", slog.Any("error", err))
 	} else {
 		detail.ConnectionString = details.String()
+		detail.Password = details.Password
 	}
 
 	return detail

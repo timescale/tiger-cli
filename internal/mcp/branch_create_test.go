@@ -188,6 +188,33 @@ func TestBranchCreateTool(t *testing.T) {
 			},
 		},
 		{
+			// Waiting replaces the branch with one fetched from the API, which
+			// carries no password, so the create response's has to survive it.
+			name:     "with password survives the wait",
+			synctest: true,
+			tool:     toolBranchCreate,
+			args:     map[string]any{"service_id": "e6ue9697jf", "wait": true, "with_password": true},
+			opts:     []runOption{experimental, withConfig(map[string]any{"password_storage": "none"})},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectCreate(baseReq, created)(m)
+				expectGetBranch(m, sampleBranch())
+			},
+			wantOutput: map[string]any{
+				"branch": func() map[string]any {
+					detail := sampleBranchDetail(api.DeployStatusREADY)
+					detail["password"] = "branch-pw"
+					detail["connection_string"] = "postgresql://tsdbadmin:branch-pw@br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require"
+					return detail
+				}(),
+				"message": "Branch is ready.",
+				"password_storage": map[string]any{
+					"success": false,
+					"method":  "none",
+					"message": "Password not saved (--password-storage=none). Make sure to store it securely.",
+				},
+			},
+		},
+		{
 			name:     "wait polls until ready",
 			synctest: true,
 			tool:     toolBranchCreate,
