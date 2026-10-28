@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -50,6 +51,13 @@ service from your configuration.`,
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if tail <= 0 {
+				return fmt.Errorf("tail must be positive, got %d", tail)
+			}
+			if node < 0 {
+				return fmt.Errorf("node must be non-negative, got %d", node)
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err

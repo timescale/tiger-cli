@@ -55,6 +55,21 @@ func TestServiceLogsCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			name:    "zero tail",
+			args:    []string{"service", "logs", "svc-12345", "--tail", "0"},
+			wantErr: "tail must be positive, got 0",
+		},
+		{
+			name:    "negative tail",
+			args:    []string{"service", "logs", "svc-12345", "--tail=-1"},
+			wantErr: "tail must be positive, got -1",
+		},
+		{
+			name:    "negative node",
+			args:    []string{"service", "logs", "svc-12345", "--node=-1"},
+			wantErr: "node must be non-negative, got -1",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"service", "logs", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
