@@ -373,11 +373,7 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, wi
 		},
 	}
 
-	// A branch that's still provisioning may have no endpoint yet.
-	if branch.Endpoint == nil {
-		return detail
-	}
-	if branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
+	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
 		detail.DirectEndpoint = fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port)
 	}
 	if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), common.ConnectionDetailsOptions{

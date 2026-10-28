@@ -192,7 +192,9 @@ func TestBranchGetTool(t *testing.T) {
 			}},
 		},
 		{
-			name: "provisioning branch without an endpoint",
+			// As for a service, the failure to build a connection string is
+			// logged, and the rest of the branch is still returned.
+			name: "branch without an endpoint",
 			tool: toolBranchGet,
 			args: args,
 			opts: []runOption{experimental},
