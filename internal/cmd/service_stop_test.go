@@ -64,7 +64,7 @@ func TestServiceStopCmd(t *testing.T) {
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock: setupStop(api.DeployStatusPAUSING, envTag("DEV")),
 			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
-				"Use 'tiger service get' to check service status.\n",
+				"Use 'tiger service get svc-12345' to check service status.\n",
 		},
 		{
 			name:    "missing service id",
@@ -135,7 +135,7 @@ func TestServiceStopCmd(t *testing.T) {
 			args: []string{"service", "stop", "svc-12345", "--no-wait"},
 			mock: setupStop(api.DeployStatusPAUSING),
 			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
-				"Use 'tiger service get' to check service status.\n",
+				"Use 'tiger service get svc-12345' to check service status.\n",
 		},
 		{
 			name: "wait returns immediately when already paused",
@@ -192,14 +192,14 @@ func TestServiceStopCmd(t *testing.T) {
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock: setupStop(api.DeployStatusPAUSING),
 			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
-				"Use 'tiger service get' to check service status.\n",
+				"Use 'tiger service get svc-12345' to check service status.\n",
 		},
 		{
 			name: "pause alias",
 			args: []string{"service", "pause", "svc-12345", "--no-wait"},
 			mock: setupStop(api.DeployStatusPAUSING),
 			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
-				"Use 'tiger service get' to check service status.\n",
+				"Use 'tiger service get svc-12345' to check service status.\n",
 		},
 	})
 }

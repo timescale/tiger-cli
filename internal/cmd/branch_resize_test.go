@@ -25,7 +25,7 @@ func TestBranchResizeCmd(t *testing.T) {
 	req2000 := api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}
 	noWaitStderr := "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
 		"Resize request accepted for branch 'test-branch' (br-12345).\n" +
-		"Use 'tiger branch get' to check branch status.\n"
+		"Use 'tiger branch get br-12345' to check branch status.\n"
 
 	runCmdTests(t, []cmdTest{
 		{
@@ -113,7 +113,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			mock: setupResize(api.BranchResizeInput{Iops: new(16000)}, api.DeployStatusCONFIGURING),
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 16000 IOPS...\n" +
 				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
-				"Use 'tiger branch get' to check branch status.\n",
+				"Use 'tiger branch get br-12345' to check branch status.\n",
 		},
 		{
 			name: "cpu and iops",
@@ -122,7 +122,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			mock: setupResize(api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16"), Iops: new(16000)}, api.DeployStatusCONFIGURING),
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB, 16000 IOPS...\n" +
 				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
-				"Use 'tiger branch get' to check branch status.\n",
+				"Use 'tiger branch get br-12345' to check branch status.\n",
 		},
 		{
 			name:       "no-wait with cpu only",

@@ -152,7 +152,7 @@ other will be automatically configured).` + iopsSectionHelp,
 
 			// If not waiting, return early
 			if noWait {
-				cmd.PrintErrln("Use 'tiger service get' to check service status.")
+				cmd.PrintErrf("Use 'tiger service get %s' to check service status.\n", resolved.ServiceID)
 				return nil
 			}
 

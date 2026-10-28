@@ -64,7 +64,7 @@ func TestServiceStartCmd(t *testing.T) {
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock: setupStart(api.DeployStatusRESUMING, envTag("DEV")),
 			wantStderr: "Start request accepted for service 'test-service' (svc-12345).\n" +
-				"Use 'tiger service get' to check service status.\n",
+				"Use 'tiger service get svc-12345' to check service status.\n",
 		},
 		{
 			name:    "missing service id",
@@ -135,7 +135,7 @@ func TestServiceStartCmd(t *testing.T) {
 			args: []string{"service", "start", "svc-12345", "--no-wait"},
 			mock: setupStart(api.DeployStatusRESUMING),
 			wantStderr: "Start request accepted for service 'test-service' (svc-12345).\n" +
-				"Use 'tiger service get' to check service status.\n",
+				"Use 'tiger service get svc-12345' to check service status.\n",
 		},
 		{
 			name: "wait returns immediately when already ready",
@@ -192,14 +192,14 @@ func TestServiceStartCmd(t *testing.T) {
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock: setupStart(api.DeployStatusRESUMING),
 			wantStderr: "Start request accepted for service 'test-service' (svc-12345).\n" +
-				"Use 'tiger service get' to check service status.\n",
+				"Use 'tiger service get svc-12345' to check service status.\n",
 		},
 		{
 			name: "resume alias",
 			args: []string{"service", "resume", "svc-12345", "--no-wait"},
 			mock: setupStart(api.DeployStatusRESUMING),
 			wantStderr: "Start request accepted for service 'test-service' (svc-12345).\n" +
-				"Use 'tiger service get' to check service status.\n",
+				"Use 'tiger service get svc-12345' to check service status.\n",
 		},
 	})
 }

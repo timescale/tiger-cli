@@ -96,7 +96,7 @@ CPU/memory allocation. See the Tiger Data documentation for details. If only
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -226,7 +226,7 @@ Service resized to 2 CPU/8 GB.
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -243,7 +243,7 @@ Use 'tiger service get' to check service status.
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -259,7 +259,7 @@ Use 'tiger service get' to check service status.
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 4 CPU/16 GB...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -275,7 +275,7 @@ Use 'tiger service get' to check service status.
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -294,7 +294,7 @@ Use 'tiger service get' to check service status.
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 12000 IOPS...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{

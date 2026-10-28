@@ -23,7 +23,7 @@ func TestBranchStartCmd(t *testing.T) {
 		}
 	}
 	noWaitStderr := "Start request accepted for branch 'test-branch' (br-12345).\n" +
-		"Use 'tiger branch get' to check branch status.\n"
+		"Use 'tiger branch get br-12345' to check branch status.\n"
 
 	runCmdTests(t, []cmdTest{
 		{

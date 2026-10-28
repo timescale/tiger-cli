@@ -70,7 +70,7 @@ The branch can be given by ID or name.`,
 			cmd.PrintErrf("Stop request accepted for branch %s.\n", branchLabel(*resolved))
 
 			if noWait {
-				cmd.PrintErrln("Use 'tiger branch get' to check branch status.")
+				cmd.PrintErrf("Use 'tiger branch get %s' to check branch status.\n", resolved.ID)
 				return nil
 			}
 

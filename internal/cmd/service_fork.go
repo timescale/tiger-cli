@@ -208,7 +208,7 @@ default service from your configuration.`,
 			// Handle wait behavior
 			var waitErr error
 			if noWait {
-				cmd.PrintErrf("Service is being forked. Use 'tiger service list' to check status.\n")
+				cmd.PrintErrf("Service is being forked. Use 'tiger service get %s' to check service status.\n", forkedServiceID)
 			} else {
 				// Wait for service to be ready
 				cmd.PrintErrf("Waiting for fork to be ready (timeout: %v)...\n", waitTimeout)

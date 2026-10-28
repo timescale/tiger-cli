@@ -204,7 +204,7 @@ other will be automatically configured).` + iopsSectionHelp,
 			// Handle wait behavior
 			var waitErr error
 			if noWait {
-				cmd.PrintErrf("Service is being created. Use 'tiger service list' to check status.\n")
+				cmd.PrintErrf("Service is being created. Use 'tiger service get %s' to check service status.\n", serviceID)
 			} else {
 				// Wait for service to be ready
 				cmd.PrintErrf("Waiting for service to be ready (timeout: %v)...\n", waitTimeout)

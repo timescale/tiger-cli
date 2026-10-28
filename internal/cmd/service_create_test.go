@@ -159,7 +159,7 @@ allocation.`),
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
 Default service set to svc-12345.
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 			checks: []checkFunc{checkDefaultService("svc-12345")},
 		},
@@ -279,7 +279,7 @@ Connect with: tiger db psql svc-12345
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
 Default service set to svc-12345.
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 			checks: []checkFunc{checkDefaultService("svc-12345")},
 		},
@@ -361,7 +361,7 @@ Error: wait timeout reached after 30m0s - service may still be provisioning
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
 Default service set to svc-12345.
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -378,7 +378,7 @@ Service is being created. Use 'tiger service list' to check status.
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
 Default service set to svc-12345.
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -399,7 +399,7 @@ PGUSER=tsdbadmin
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
 Default service set to svc-12345.
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -425,7 +425,7 @@ PGPASSWORD=init-pass-123
 Service ID: svc-12345
 Password saved to system keyring
 Default service set to svc-12345.
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -458,7 +458,7 @@ PGUSER=tsdbadmin
 `,
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -481,7 +481,7 @@ PGUSER=tsdbadmin
 `,
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -520,7 +520,7 @@ Service is being created. Use 'tiger service list' to check status.
 `,
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -545,7 +545,7 @@ PGUSER=tsdbadmin
 `,
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -569,7 +569,7 @@ PGUSER=tsdbadmin
 `,
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -587,7 +587,7 @@ Service is being created. Use 'tiger service list' to check status.
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345
 Default service set to svc-12345.
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				// setDefaultService rewrites the config file; the -o flag must
@@ -621,7 +621,7 @@ PGUSER=tsdbadmin
 `,
 			wantStderr: `Creating service 'db-42424'...
 Service ID: svc-12345
-Service is being created. Use 'tiger service list' to check status.
+Service is being created. Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 	})

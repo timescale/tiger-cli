@@ -37,7 +37,7 @@ PGUSER=tsdbadmin
 	noWaitStderr := func(firstLine string) string {
 		return firstLine + `
 Service ID: svc-67890
-Service is being forked. Use 'tiger service list' to check status.
+Service is being forked. Use 'tiger service get svc-67890' to check service status.
 `
 	}
 
