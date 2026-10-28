@@ -22,11 +22,6 @@ The server automatically uses the CLI's stored authentication and configuration.
 No additional setup is required beyond running 'tiger auth login'.
 
 Use 'tiger mcp start' to launch the MCP server.`,
-		Args: cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			// Show help when no subcommand is specified
-			cmd.Help()
-		},
 	}
 
 	// Add subcommands
