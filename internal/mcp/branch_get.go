@@ -68,7 +68,7 @@ func (s *Server) handleBranchGet(ctx context.Context, req *mcp.CallToolRequest, 
 		return nil, BranchGetOutput{}, err
 	}
 
-	detail := s.convertToBranchDetail(cfg, *branch, input.WithPassword, "")
+	detail := s.convertToBranchDetail(cfg, *branch, input.WithPassword)
 	if input.WithPassword && detail.Password == "" {
 		return nil, BranchGetOutput{}, fmt.Errorf("requested password but password not available")
 	}

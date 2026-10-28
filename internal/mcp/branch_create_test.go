@@ -188,8 +188,8 @@ func TestBranchCreateTool(t *testing.T) {
 			},
 		},
 		{
-			// Waiting replaces the branch with one fetched from the API, which
-			// carries no password, so the create response's has to survive it.
+			// The polls never carry the password, so waiting must keep the
+			// create response's.
 			name:     "with password survives the wait",
 			synctest: true,
 			tool:     toolBranchCreate,

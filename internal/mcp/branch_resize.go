@@ -147,7 +147,7 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 		}
 	}
 
-	detail := s.convertToBranchDetail(cfg, branch, false, "")
+	detail := s.convertToBranchDetail(cfg, branch, false)
 	return nil, BranchResizeOutput{
 		Status:    detail.Status,
 		Resources: detail.Resources,

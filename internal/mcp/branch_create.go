@@ -132,9 +132,6 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchCreateOutput{}, fmt.Errorf("empty response from API")
 	}
 	branch := *resp.JSON202
-	// Kept aside, since waiting replaces the branch with one that has no
-	// password.
-	initialPassword := util.Deref(branch.InitialPassword)
 
 	// Saved before any waiting, so the password is stored even if the wait
 	// fails or is interrupted.
@@ -165,7 +162,7 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 		}
 	}
 	return nil, BranchCreateOutput{
-		Branch:          s.convertToBranchDetail(cfg, branch, input.WithPassword, initialPassword),
+		Branch:          s.convertToBranchDetail(cfg, branch, input.WithPassword),
 		Message:         message,
 		PasswordStorage: passwordStorage,
 	}, nil

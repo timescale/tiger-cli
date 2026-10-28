@@ -13,9 +13,15 @@ func TestBranchResizeTool(t *testing.T) {
 	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x", "cpu_memory": "2 CPU/16 GB"}
 	req := api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}
-	expectResizeWith := func(req api.BranchResizeInput, status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
+	// The resized branch, as the API reports it once the new spec is applied.
+	resized := func(status api.DeployStatus) api.Branch {
+		return sampleBranch(branchStatus(status), func(b *api.Branch) {
+			b.CPUMillis = 2000
+			b.MemoryGbs = 16
+		})
+	}
+	expectResizeWith := func(req api.BranchResizeInput, branch api.Branch) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			branch := sampleBranch(branchStatus(status))
 			expectResolveBranch(m, sampleBranch())
 			m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", req).
 				Return(&api.ResizeBranchResponse{
@@ -25,14 +31,11 @@ func TestBranchResizeTool(t *testing.T) {
 		}
 	}
 	expectResize := func(status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
-		return expectResizeWith(req, status)
+		return expectResizeWith(req, resized(status))
 	}
-	// The response's resources are the sample's, since the resize hasn't
-	// landed yet.
-	resources := map[string]any{"cpu": "0.25 cores", "memory": "2 GB"}
 	accepted := map[string]any{
 		"status":    "CONFIGURING",
-		"resources": resources,
+		"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
 		"message":   "Resize request accepted. The branch may still be resizing.",
 	}
 
@@ -91,12 +94,18 @@ func TestBranchResizeTool(t *testing.T) {
 		},
 		{
 			// CPU and memory are left out, so the API keeps the current ones.
-			name:       "iops only omits cpu and memory",
-			tool:       toolBranchResize,
-			args:       map[string]any{"branch_id": "br4nch1d9x", "iops": 16000},
-			opts:       []runOption{experimental},
-			mock:       expectResizeWith(api.BranchResizeInput{Iops: new(16000)}, api.DeployStatusCONFIGURING),
-			wantOutput: accepted,
+			name: "iops only omits cpu and memory",
+			tool: toolBranchResize,
+			args: map[string]any{"branch_id": "br4nch1d9x", "iops": 16000},
+			opts: []runOption{experimental},
+			mock: expectResizeWith(api.BranchResizeInput{Iops: new(16000)}, sampleBranch(branchStatus(api.DeployStatusCONFIGURING), func(b *api.Branch) {
+				b.Iops = new(16000)
+			})),
+			wantOutput: map[string]any{
+				"status":    "CONFIGURING",
+				"resources": map[string]any{"cpu": "0.25 cores", "memory": "2 GB", "iops": float64(16000)},
+				"message":   "Resize request accepted. The branch may still be resizing.",
+			},
 		},
 		{
 			name:       "resizes without waiting by default",
@@ -114,10 +123,7 @@ func TestBranchResizeTool(t *testing.T) {
 			opts:     []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResize(api.DeployStatusCONFIGURING)(m)
-				expectGetBranch(m, sampleBranch(func(b *api.Branch) {
-					b.CPUMillis = 2000
-					b.MemoryGbs = 16
-				}))
+				expectGetBranch(m, resized(api.DeployStatusREADY))
 			},
 			wantOutput: map[string]any{
 				"status":    "READY",

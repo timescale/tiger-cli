@@ -357,9 +357,9 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 }
 
 // convertToBranchDetail converts an API Branch to MCP BranchDetail. With
-// withPassword, the branch's stored password is included, or initialPassword
-// (from the create response) when none is stored.
-func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, withPassword bool, initialPassword string) BranchDetail {
+// withPassword, the branch's stored password is included, or the create
+// response's when none is stored.
+func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, withPassword bool) BranchDetail {
 	detail := BranchDetail{
 		BranchID:  branch.ID,
 		Name:      branch.Name,
@@ -383,7 +383,7 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, wi
 	if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
-		InitialPassword: initialPassword,
+		InitialPassword: util.Deref(branch.InitialPassword),
 		ReadOnly:        common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
 	}); err != nil {
 		s.logger.Error("MCP: Failed to build connection string", slog.Any("error", err))
