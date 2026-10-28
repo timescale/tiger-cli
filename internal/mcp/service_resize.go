@@ -161,7 +161,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	service := *resp.JSON202
 
 	// If wait is requested, wait for resize to complete
-	message := "Resize request accepted. The service may still be resizing."
+	message := "Service resize request accepted. The service may still be resizing."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
 			Client:       client,

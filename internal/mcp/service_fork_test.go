@@ -67,7 +67,7 @@ func TestServiceForkTool(t *testing.T) {
 
 	const (
 		acceptedMsg = "Service fork request accepted. The forked service may still be provisioning."
-		readyMsg    = "Forked service is ready."
+		readyMsg    = "Service is ready."
 	)
 	accepted := map[string]any{"service": baseDetail, "message": acceptedMsg}
 	ready := map[string]any{"service": baseDetail, "message": readyMsg}

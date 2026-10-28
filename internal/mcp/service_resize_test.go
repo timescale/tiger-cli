@@ -46,7 +46,7 @@ func TestServiceResizeTool(t *testing.T) {
 	accepted := map[string]any{
 		"status":    "CONFIGURING",
 		"resources": resources,
-		"message":   "Resize request accepted. The service may still be resizing.",
+		"message":   "Service resize request accepted. The service may still be resizing.",
 	}
 	resized := map[string]any{
 		"status":    "READY",
@@ -243,7 +243,7 @@ func TestServiceResizeTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"status":    "CONFIGURING",
 				"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
-				"message":   "Resize request accepted. The service may still be resizing.",
+				"message":   "Service resize request accepted. The service may still be resizing.",
 			},
 		},
 		{
@@ -273,7 +273,7 @@ func TestServiceResizeTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"status":    "READY",
 				"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB", "iops": float64(12000)},
-				"message":   "Resize request accepted. The service may still be resizing.",
+				"message":   "Service resize request accepted. The service may still be resizing.",
 			},
 		},
 		{
