@@ -50,6 +50,23 @@ CPU/memory allocation. See the Tiger Data documentation for details. If only
 --iops is given, the service keeps its current CPU and memory.`),
 		},
 		{
+			name:    "missing cpu and memory",
+			args:    []string{"service", "resize", "svc-12345"},
+			wantErr: "must specify at least one of --cpu or --memory",
+		},
+		{
+			// --iops is a preview flag, so without the gate it doesn't exist.
+			name:    "iops flag rejected without experimental",
+			args:    []string{"service", "resize", "svc-12345", "--iops", "12000"},
+			wantErr: "unknown flag: --iops",
+		},
+		{
+			name:    "experimental missing cpu, memory, and iops",
+			args:    []string{"service", "resize", "svc-12345"},
+			opts:    []runOption{experimental},
+			wantErr: "must specify at least one of --cpu, --memory, or --iops",
+		},
+		{
 			name:    "zero wait timeout",
 			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--wait-timeout", "0s"},
 			wantErr: "wait timeout must be positive, got 0s",
@@ -103,23 +120,6 @@ Use 'tiger service get svc-12345' to check service status.
 			name:    "missing service id",
 			args:    []string{"service", "resize", "--cpu", "2000", "--memory", "8"},
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
-		},
-		{
-			name:    "missing cpu and memory",
-			args:    []string{"service", "resize", "svc-12345"},
-			wantErr: "must specify at least one of --cpu or --memory",
-		},
-		{
-			// --iops is a preview flag, so without the gate it doesn't exist.
-			name:    "iops flag rejected without experimental",
-			args:    []string{"service", "resize", "svc-12345", "--iops", "12000"},
-			wantErr: "unknown flag: --iops",
-		},
-		{
-			name:    "experimental missing cpu, memory, and iops",
-			args:    []string{"service", "resize", "svc-12345"},
-			opts:    []runOption{experimental},
-			wantErr: "must specify at least one of --cpu, --memory, or --iops",
 		},
 		{
 			name: "ambiguous name refused",

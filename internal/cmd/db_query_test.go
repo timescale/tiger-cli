@@ -84,6 +84,11 @@ func TestDbQueryCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			name:    "negative timeout",
+			args:    []string{"db", "query", "svc-12345", "-c", "SELECT 1", "--timeout", "-5s"},
+			wantErr: "timeout must be positive or zero, got -5s",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
 			opts:    []runOption{withNotLoggedIn()},
@@ -104,11 +109,6 @@ func TestDbQueryCmd(t *testing.T) {
 			mock:    setupGetService,
 			opts:    []runOption{withStdin("")},
 			wantErr: "query cannot be empty",
-		},
-		{
-			name:    "negative timeout",
-			args:    []string{"db", "query", "svc-12345", "-c", "SELECT 1", "--timeout", "-5s"},
-			wantErr: "timeout must be positive or zero, got -5s",
 		},
 		{
 			name:    "command and file are mutually exclusive",

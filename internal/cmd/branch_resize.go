@@ -57,21 +57,21 @@ given, the branch keeps its current CPU and memory.`,
 				return err
 			}
 
+			iopsSet := cmd.Flags().Changed("iops")
+			if cpu == "" && memory == "" && !iopsSet {
+				return errors.New("must specify at least one of --cpu, --memory, or --iops")
+			}
+			cpuMemoryCfg, err := common.FluidCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
+			if err != nil {
+				return err
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
 			branchRef, err := getBranchRef(args)
-			if err != nil {
-				return err
-			}
-
-			iopsSet := cmd.Flags().Changed("iops")
-			if cpu == "" && memory == "" && !iopsSet {
-				return errors.New("must specify at least one of --cpu, --memory, or --iops")
-			}
-			cpuMemoryCfg, err := common.FluidCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
 			if err != nil {
 				return err
 			}

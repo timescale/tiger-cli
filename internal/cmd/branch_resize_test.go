@@ -29,6 +29,18 @@ func TestBranchResizeCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			name:    "missing cpu and memory",
+			args:    []string{"branch", "resize", "br-12345"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "must specify at least one of --cpu, --memory, or --iops",
+		},
+		{
+			name:    "invalid cpu/memory combination",
+			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000", "--memory", "8"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
+		},
+		{
 			name:    "zero wait timeout",
 			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000", "--wait-timeout", "0s"},
 			opts:    []runOption{withExperimental()},
@@ -53,18 +65,6 @@ func TestBranchResizeCmd(t *testing.T) {
 			args:    []string{"branch", "resize", "--cpu", "2000"},
 			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
 			wantErr: "branch name or ID is required",
-		},
-		{
-			name:    "missing cpu and memory",
-			args:    []string{"branch", "resize", "br-12345"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "must specify at least one of --cpu, --memory, or --iops",
-		},
-		{
-			name:    "invalid cpu/memory combination",
-			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000", "--memory", "8"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name:    "read-only all refuses",

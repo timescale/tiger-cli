@@ -50,6 +50,12 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			wantErr: "if any flags in the group [new-password auto-generate] are set none of the others can be; [auto-generate new-password] were all set",
 		},
 		{
+			name:    "env password and auto-generate conflict",
+			args:    []string{"service", "update-password", "svc-12345", "--auto-generate"},
+			opts:    []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pass-456")},
+			wantErr: "cannot use --auto-generate and --new-password together",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
 			opts:    []runOption{withNotLoggedIn()},
@@ -87,12 +93,6 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			name:    "missing service id",
 			args:    []string{"service", "update-password", "--new-password", "newpass123"},
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
-		},
-		{
-			name:    "env password and auto-generate conflict",
-			args:    []string{"service", "update-password", "svc-12345", "--auto-generate"},
-			opts:    []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pass-456")},
-			wantErr: "cannot use --auto-generate and --new-password together",
 		},
 		{
 			name: "network error on resolve",

@@ -79,6 +79,16 @@ other will be automatically configured).` + iopsSectionHelp,
 				return err
 			}
 
+			// --iops only exists behind the experimental gate
+			iopsSet := app.Experimental && cmd.Flags().Changed("iops")
+
+			if cpu == "" && memory == "" && !iopsSet {
+				if app.Experimental {
+					return errors.New("must specify at least one of --cpu, --memory, or --iops")
+				}
+				return errors.New("must specify at least one of --cpu or --memory")
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
@@ -88,16 +98,6 @@ other will be automatically configured).` + iopsSectionHelp,
 			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
-			}
-
-			// --iops only exists behind the experimental gate
-			iopsSet := app.Experimental && cmd.Flags().Changed("iops")
-
-			if cpu == "" && memory == "" && !iopsSet {
-				if app.Experimental {
-					return errors.New("must specify at least one of --cpu, --memory, or --iops")
-				}
-				return errors.New("must specify at least one of --cpu or --memory")
 			}
 
 			resolved, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)

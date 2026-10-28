@@ -52,11 +52,6 @@ so update the password on the primary instead.`,
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, client, projectID, err := app.GetAll()
-			if err != nil {
-				return err
-			}
-
 			// The password comes from the flag, falling back to the env var
 			password := newPassword
 			if password == "" {
@@ -64,6 +59,11 @@ so update the password on the primary instead.`,
 			}
 			if autoGenerate && password != "" {
 				return errors.New("cannot use --auto-generate and --new-password together")
+			}
+
+			cfg, client, projectID, err := app.GetAll()
+			if err != nil {
+				return err
 			}
 
 			// Determine the service ref

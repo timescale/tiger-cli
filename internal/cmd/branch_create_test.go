@@ -50,6 +50,12 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			wantErr: "unknown flag: --no-set-default",
 		},
 		{
+			name:    "invalid cpu/memory combination",
+			args:    []string{"branch", "create", "svc-12345", "--cpu", "1000", "--memory", "4"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
+		},
+		{
 			name:    "zero wait timeout",
 			args:    []string{"branch", "create", "svc-12345", "--wait-timeout", "0s"},
 			opts:    []runOption{withExperimental()},
@@ -90,12 +96,6 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			},
 			wantStdout: sampleBranchEnv,
 			wantStderr: defaultNoWaitStderr,
-		},
-		{
-			name:    "invalid cpu/memory combination",
-			args:    []string{"branch", "create", "svc-12345", "--cpu", "1000", "--memory", "4"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name:    "missing service id",

@@ -75,6 +75,11 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 				return err
 			}
 
+			cpuMemoryCfg, err := common.FluidCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
+			if err != nil {
+				return err
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
@@ -84,11 +89,6 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 			// mode, branching a PROD service is allowed, as forking one into
 			// a DEV fork is.
 			if err := common.CheckReadOnly(cfg, common.BranchEnvironmentTag); err != nil {
-				return err
-			}
-
-			cpuMemoryCfg, err := common.FluidCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
-			if err != nil {
 				return err
 			}
 

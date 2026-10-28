@@ -79,13 +79,13 @@ read-only while leaving DEV services writable.`,
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if timeout < 0 {
+				return fmt.Errorf("timeout must be positive or zero, got %v", timeout)
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
-			}
-
-			if timeout < 0 {
-				return fmt.Errorf("timeout must be positive or zero, got %v", timeout)
 			}
 
 			// Resolve the service before reading the query: with no --command

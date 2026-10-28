@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -88,6 +89,15 @@ PostgreSQL Configuration Parameters That May Be Set:
 			// Validate arguments
 			if name == "" {
 				return errors.New("--name is required")
+			}
+			if slices.Contains(from, "tsdbadmin") {
+				if !readOnly {
+					return errors.New("roles inheriting from tsdbadmin must be read-only (use --read-only flag)")
+				}
+				// Roles created by create_bare_readonly_role can't be altered.
+				if statementTimeout > 0 {
+					return errors.New("cannot use --statement-timeout with --from tsdbadmin (permission denied to alter special roles)")
+				}
 			}
 
 			cfg, client, projectID, err := app.GetAll()
@@ -231,17 +241,6 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 
 	// If tsdbadmin is requested, use special TimescaleDB Cloud functions
 	if hasTsdbadmin {
-		// Enforce read-only requirement when inheriting from tsdbadmin
-		if !readOnly {
-			return errors.New("roles inheriting from tsdbadmin must be read-only (use --read-only flag)")
-		}
-
-		// Cannot set statement_timeout on roles created with create_bare_readonly_role
-		// due to permission restrictions on altering special roles
-		if statementTimeout > 0 {
-			return errors.New("cannot use --statement-timeout with --from tsdbadmin (permission denied to alter special roles)")
-		}
-
 		// Use timescale_functions.create_bare_readonly_role to create the role
 		// This function creates a read-only role that can inherit tsdbadmin privileges
 		if _, err := tx.Exec(ctx, "SELECT timescale_functions.create_bare_readonly_role($1, $2)",
