@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -40,7 +41,7 @@ func buildConfigListCmd(app *common.App) *cobra.Command {
 			}
 
 			output := cmd.OutOrStdout()
-			switch cfg.Output {
+			switch strings.ToLower(cfg.Output) {
 			case "json":
 				return util.SerializeToJSON(output, cfgOut)
 			case "yaml":

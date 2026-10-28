@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -126,7 +127,7 @@ read-only while leaving DEV services writable.`,
 				return handleDatabaseError(err, target)
 			}
 
-			switch cfg.Output {
+			switch strings.ToLower(cfg.Output) {
 			case "json":
 				return util.SerializeToJSON(cmd.OutOrStdout(), newDbQueryOutput(result))
 			case "yaml":
