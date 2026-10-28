@@ -52,7 +52,7 @@ type ServiceLogsOutput struct {
 
 func (ServiceLogsOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceLogsOutput](nil))
-	schema.Properties["logs"].Description = "Log lines ordered from oldest to newest. Each line is prefixed with an RFC3339 timestamp followed by the log message."
+	schema.Properties["logs"].Description = "Log lines ordered from oldest to newest. Each line is the log message, prefixed with its UTC timestamp (e.g. 2024-01-15 09:00:00 UTC) when the entry has one."
 	return schema
 }
 
