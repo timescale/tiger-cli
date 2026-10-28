@@ -330,7 +330,7 @@ MCP tool tests live in `internal/mcp`, one test file per tool file, table-driven
 
 ## Documentation
 
-After changing commands, MCP tools, config options, or flags, check and update **README.md** (user-facing documentation), **CLAUDE.md** (this file), and **docs/development.md** (development guide) to keep them in sync with the implementation, and run `go generate ./...` to regenerate the CLI reference in `docs/cli/`.
+After changing commands, MCP tools, config options, or flags, check and update **README.md** (user-facing documentation), **AGENTS.md** (this file), and **docs/development.md** (development guide) to keep them in sync with the implementation, and run `go generate ./...` to regenerate the CLI reference in `docs/cli/`.
 
 ### Public Repository
 

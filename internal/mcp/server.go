@@ -155,7 +155,7 @@ func NewServer(ctx context.Context, app *common.App, logger *slog.Logger) (*Serv
 	// Register all tools (including proxied docs tools). The read-only mode and
 	// experimental gate are captured here and threaded through registration only.
 	// experimental follows the ghost pattern — env-var only, undocumented; see
-	// CLAUDE.md's "Experimental Feature Gating".
+	// AGENTS.md's "Experimental Feature Gating".
 	server.registerTools(ctx, cfg.ReadOnly, app.Experimental)
 
 	// Add analytics tracking middleware

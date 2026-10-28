@@ -17,7 +17,7 @@ import (
 // buildServiceCmd creates the main service command with all subcommands.
 // experimental still gates `backups` and `branch`, which are backed by gateway
 // endpoints marked `x-tigerdata-preview: true`; when false, they are not added
-// to the tree at all. See CLAUDE.md's "Experimental Feature Gating".
+// to the tree at all. See AGENTS.md's "Experimental Feature Gating".
 func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service",

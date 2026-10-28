@@ -14,7 +14,7 @@ import (
 // server stops, so the command must still exit successfully.
 //
 // The "server ..." lines come from the MCP SDK rather than from us: they are
-// asserted because they land on the same stream as our own (see CLAUDE.md's
+// asserted because they land on the same stream as our own (see AGENTS.md's
 // "Logging Architecture"), so a change in what an operator sees is a change
 // worth noticing.
 func TestMCPStartCmd(t *testing.T) {
