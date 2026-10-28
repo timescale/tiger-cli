@@ -67,7 +67,7 @@ If no client is specified, you'll be prompted to select one interactively.`, gen
 			if len(args) == 0 {
 				// No client specified, prompt user to select one
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return fmt.Errorf("TTY not detected - specify a client as an argument (e.g. 'tiger mcp install claude-code')")
+					return errors.New("TTY not detected - specify a client as an argument (e.g. 'tiger mcp install claude-code')")
 				}
 				var err error
 				clientName, err = selectClientInteractively(cmd)
@@ -75,7 +75,7 @@ If no client is specified, you'll be prompted to select one interactively.`, gen
 					return fmt.Errorf("failed to select client: %w", err)
 				}
 				if clientName == "" {
-					return fmt.Errorf("no client selected")
+					return errors.New("no client selected")
 				}
 			} else {
 				clientName = args[0]
@@ -150,16 +150,16 @@ func SupportedClients() []ClientInfo {
 func InstallMCPForClient(opts InstallOptions) error {
 	// Validate required options
 	if opts.ClientName == "" {
-		return fmt.Errorf("missing required option: ClientName")
+		return errors.New("missing required option: ClientName")
 	}
 	if opts.ServerName == "" {
-		return fmt.Errorf("missing required option: ServerName")
+		return errors.New("missing required option: ServerName")
 	}
 	if opts.Command == "" {
-		return fmt.Errorf("missing required option: Command")
+		return errors.New("missing required option: Command")
 	}
 	if opts.Args == nil {
-		return fmt.Errorf("missing required option: Args")
+		return errors.New("missing required option: Args")
 	}
 
 	// Find the client configuration by name
@@ -309,7 +309,7 @@ func findClientConfigFile(configPaths []string) (string, error) {
 
 	// If no existing config found, use the first path as default
 	if len(configPaths) == 0 {
-		return "", fmt.Errorf("no config paths provided")
+		return "", errors.New("no config paths provided")
 	}
 
 	defaultPath := util.ExpandPath(configPaths[0]) // Use first path as default
@@ -381,7 +381,7 @@ func selectClientInteractively(cmd *cobra.Command) (string, error) {
 
 	result := finalModel.(clientSelectModel)
 	if result.selected == "" {
-		return "", fmt.Errorf("no editor selected")
+		return "", errors.New("no editor selected")
 	}
 
 	return result.selected, nil

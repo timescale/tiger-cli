@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -154,7 +155,7 @@ func (t *ConnectionTarget) Details(cfg *config.Config, opts ConnectionDetailsOpt
 		return nil, fmt.Errorf("failed to build connection string: %w", err)
 	}
 	if opts.Pooled && !details.IsPooler && t.Kind != TargetReadReplica {
-		return nil, fmt.Errorf("connection pooler not available for this service")
+		return nil, errors.New("connection pooler not available for this service")
 	}
 	return details, nil
 }

@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -134,11 +135,11 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	switch input.ForkStrategy {
 	case api.ForkStrategyPITR:
 		if input.TargetTime == nil {
-			return nil, ServiceForkOutput{}, fmt.Errorf("target_time is required when fork_strategy is 'PITR'")
+			return nil, ServiceForkOutput{}, errors.New("target_time is required when fork_strategy is 'PITR'")
 		}
 	default:
 		if input.TargetTime != nil {
-			return nil, ServiceForkOutput{}, fmt.Errorf("target_time cannot be specified when fork_strategy is not 'PITR'")
+			return nil, ServiceForkOutput{}, errors.New("target_time cannot be specified when fork_strategy is not 'PITR'")
 		}
 	}
 
@@ -199,7 +200,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	if resp.JSON202 == nil {
-		return nil, ServiceForkOutput{}, fmt.Errorf("empty response from API")
+		return nil, ServiceForkOutput{}, errors.New("empty response from API")
 	}
 
 	service := *resp.JSON202

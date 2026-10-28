@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -56,7 +57,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 
 			if !confirm {
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
+					return errors.New("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
 				}
 				cmd.PrintErrf("Are you sure you want to delete branch %s? This operation cannot be undone.\n", branchLabel(*branch))
 				cmd.PrintErrf("Type the branch ID '%s' to confirm: ", branch.ID)

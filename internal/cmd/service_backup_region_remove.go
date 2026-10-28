@@ -58,7 +58,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 
 			if !removeConfirm {
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
+					return errors.New("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
 				}
 				// Show both forms, but take only the ID, as service delete does.
 				cmd.PrintErrf("Are you sure you want to stop copying backups of service %s to '%s'? Backup copies in that region will be deleted.\n", serviceLabel(*service), region)

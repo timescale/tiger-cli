@@ -46,7 +46,7 @@ func buildStatusCmd(app *common.App) *cobra.Command {
 			}
 
 			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 
 			authInfo := *resp.JSON200

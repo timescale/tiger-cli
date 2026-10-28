@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -41,7 +42,7 @@ func GetService(ctx context.Context, client api.ClientWithResponsesInterface, pr
 		return nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("empty response from API")
+		return nil, errors.New("empty response from API")
 	}
 	return resp.JSON200, nil
 }

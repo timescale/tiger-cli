@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -91,7 +92,7 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 	}
 
 	if resp.JSON202 == nil {
-		return nil, ServiceStartOutput{}, fmt.Errorf("empty response from API")
+		return nil, ServiceStartOutput{}, errors.New("empty response from API")
 	}
 
 	service := *resp.JSON202

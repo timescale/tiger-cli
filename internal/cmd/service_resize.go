@@ -144,7 +144,7 @@ other will be automatically configured).` + iopsSectionHelp,
 			}
 
 			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 			service := *resp.JSON202
 

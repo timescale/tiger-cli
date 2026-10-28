@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -77,7 +78,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	}
 
 	if resp.JSON200 == nil {
-		return nil, ServiceGetOutput{}, fmt.Errorf("empty response from API")
+		return nil, ServiceGetOutput{}, errors.New("empty response from API")
 	}
 
 	output := ServiceGetOutput{
@@ -86,7 +87,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 
 	// Check if password was requested but not available
 	if input.WithPassword && output.Service.Password == "" {
-		return nil, ServiceGetOutput{}, fmt.Errorf("requested password but password not available")
+		return nil, ServiceGetOutput{}, errors.New("requested password but password not available")
 	}
 
 	return nil, output, nil

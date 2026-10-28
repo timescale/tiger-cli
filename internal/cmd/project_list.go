@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -52,7 +53,7 @@ output. Use 'tiger project use' to switch to another one.`,
 			}
 
 			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 			projects := *resp.JSON200
 
@@ -80,7 +81,7 @@ func outputProjects(cmd *cobra.Command, projects []api.Project, currentProjectID
 	case "env":
 		// Not reachable through --output (outputFlag rejects it at parse time),
 		// but TIGER_OUTPUT and the config file aren't validated on load.
-		return fmt.Errorf("environment variable output is not supported for multiple projects")
+		return errors.New("environment variable output is not supported for multiple projects")
 	default: // table format (default)
 		return outputProjectsTable(outputWriter, outputProjects)
 	}

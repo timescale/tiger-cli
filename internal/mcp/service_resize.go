@@ -155,7 +155,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	if resp.JSON202 == nil {
-		return nil, ServiceResizeOutput{}, fmt.Errorf("empty response from API")
+		return nil, ServiceResizeOutput{}, errors.New("empty response from API")
 	}
 
 	service := *resp.JSON202

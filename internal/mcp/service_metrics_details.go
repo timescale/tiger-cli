@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -103,7 +104,7 @@ func (s *Server) handleServiceMetricsDetails(ctx context.Context, req *mcp.CallT
 	}
 
 	if resp.JSON200 == nil {
-		return nil, ServiceMetricsDetailsOutput{}, fmt.Errorf("empty response from API")
+		return nil, ServiceMetricsDetailsOutput{}, errors.New("empty response from API")
 	}
 
 	return nil, ServiceMetricsDetailsOutput{Details: *resp.JSON200}, nil

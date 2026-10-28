@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -42,7 +43,7 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 			}
 
 			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 			return outputServices(cmd, cfg, *resp.JSON200, serviceOutputOptions{Experimental: app.Experimental})
 		},
@@ -66,7 +67,7 @@ func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Servi
 	case "yaml":
 		return util.SerializeToYAML(outputWriter, outputServices)
 	case "env":
-		return fmt.Errorf("environment variable output is not supported for multiple services")
+		return errors.New("environment variable output is not supported for multiple services")
 	default: // table format (default)
 		if len(outputServices) == 0 {
 			cmd.PrintErrln("No services found.")

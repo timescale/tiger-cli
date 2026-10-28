@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -62,7 +63,7 @@ so update the password on the primary instead.`,
 				password = os.Getenv("TIGER_NEW_PASSWORD")
 			}
 			if autoGenerate && password != "" {
-				return fmt.Errorf("cannot use --auto-generate and --new-password together")
+				return errors.New("cannot use --auto-generate and --new-password together")
 			}
 
 			// Determine the service ref
@@ -95,7 +96,7 @@ so update the password on the primary instead.`,
 			} else if password == "" {
 				// Interactive prompt - check if we're in a terminal
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return fmt.Errorf("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
+					return errors.New("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
 				}
 				_, err := promptAndResetPassword(ctx, cmd, cfg, client, common.ServiceCredentials(service), "tsdbadmin")
 				if err != nil {

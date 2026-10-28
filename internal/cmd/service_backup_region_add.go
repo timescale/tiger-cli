@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -60,7 +61,7 @@ service from your configuration.`,
 			}
 
 			if resp.JSON201 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 
 			cmd.PrintErrf("Backups for service %s will now be copied to '%s'.\n", serviceLabel(*service), region)

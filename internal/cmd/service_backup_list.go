@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -68,7 +69,7 @@ service from your configuration.`,
 			}
 
 			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 
 			// Default to a non-nil slice so a JSON null marshals to `[]` rather
@@ -97,7 +98,7 @@ func outputBackups(cmd *cobra.Command, backups []api.Backup, format string) erro
 	case "yaml":
 		return util.SerializeToYAML(out, backups)
 	case "env":
-		return fmt.Errorf("environment variable output is not supported for backups")
+		return errors.New("environment variable output is not supported for backups")
 	default:
 		if len(backups) == 0 {
 			cmd.PrintErrln("No backups found.")

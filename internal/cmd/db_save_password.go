@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -78,7 +79,7 @@ The password will be saved according to your --password-storage setting
 				// --password flag was provided
 				passwordToSave = password
 				if passwordToSave == "" {
-					return fmt.Errorf("password cannot be empty when provided via --password flag")
+					return errors.New("password cannot be empty when provided via --password flag")
 				}
 			} else if envPassword := os.Getenv("TIGER_NEW_PASSWORD"); envPassword != "" {
 				// Use environment variable
@@ -86,7 +87,7 @@ The password will be saved according to your --password-storage setting
 			} else {
 				// Interactive prompt - check if we're in a terminal
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return fmt.Errorf("TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable")
+					return errors.New("TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable")
 				}
 
 				cmd.PrintErr("Enter password: ")
@@ -96,7 +97,7 @@ The password will be saved according to your --password-storage setting
 				}
 				cmd.PrintErrln() // Print newline after hidden input
 				if passwordToSave == "" {
-					return fmt.Errorf("password cannot be empty")
+					return errors.New("password cannot be empty")
 				}
 			}
 

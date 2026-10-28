@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -74,7 +75,7 @@ service from your configuration.`,
 			}
 
 			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 			service := *resp.JSON202
 

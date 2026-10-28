@@ -233,7 +233,7 @@ func TestIsConnectionRejected(t *testing.T) {
 		},
 		{
 			name: "non-postgres error",
-			err:  fmt.Errorf("dial tcp: connection refused"),
+			err:  errors.New("dial tcp: connection refused"),
 			want: false,
 		},
 	}

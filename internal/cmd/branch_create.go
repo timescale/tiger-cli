@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -126,7 +127,7 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 			branch := *resp.JSON202
 

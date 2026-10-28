@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -63,7 +64,7 @@ service from your configuration.`,
 			}
 
 			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 
 			// Default to a non-nil slice so a JSON null marshals to `[]` rather
@@ -92,7 +93,7 @@ func outputBackupRegions(cmd *cobra.Command, regions []api.BackupRegion, format 
 	case "yaml":
 		return util.SerializeToYAML(out, regions)
 	case "env":
-		return fmt.Errorf("environment variable output is not supported for backup regions")
+		return errors.New("environment variable output is not supported for backup regions")
 	default:
 		if len(regions) == 0 {
 			cmd.PrintErrln("No backup regions configured for this service.")

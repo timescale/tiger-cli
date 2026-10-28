@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -186,7 +187,7 @@ default service from your configuration.`,
 			}
 
 			if forkResp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 			forkedService := *forkResp.JSON202
 			forkedServiceID := forkedService.ServiceID

@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -72,7 +73,7 @@ func (s *Server) handleServiceBackupRegionList(ctx context.Context, req *mcp.Cal
 	}
 
 	if resp.JSON200 == nil {
-		return nil, ServiceBackupRegionListOutput{}, fmt.Errorf("empty response from API")
+		return nil, ServiceBackupRegionListOutput{}, errors.New("empty response from API")
 	}
 
 	// Default to a non-nil slice so a JSON null marshals to `[]` rather than

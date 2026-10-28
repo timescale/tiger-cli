@@ -120,7 +120,7 @@ func TestCheckReadOnlyByServiceID(t *testing.T) {
 
 func TestExitCodeError(t *testing.T) {
 	// Test the ExitCodeError type
-	originalErr := fmt.Errorf("test error")
+	originalErr := errors.New("test error")
 	exitErr := ExitWithCode(42, originalErr)
 
 	if exitErr.Error() != "test error" {
@@ -153,7 +153,7 @@ func TestExitCodeError_NilError(t *testing.T) {
 }
 
 func TestExitAuthenticationError(t *testing.T) {
-	originalErr := fmt.Errorf("authentication failed: invalid API key")
+	originalErr := errors.New("authentication failed: invalid API key")
 	exitErr := ExitWithCode(ExitAuthenticationError, originalErr)
 
 	if exitErr.Error() != "authentication failed: invalid API key" {
@@ -173,7 +173,7 @@ func TestExitAuthenticationError(t *testing.T) {
 }
 
 func TestExitPermissionDenied(t *testing.T) {
-	originalErr := fmt.Errorf("permission denied: insufficient access to service")
+	originalErr := errors.New("permission denied: insufficient access to service")
 	exitErr := ExitWithCode(ExitPermissionDenied, originalErr)
 
 	if exitErr.Error() != "permission denied: insufficient access to service" {

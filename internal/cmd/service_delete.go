@@ -69,7 +69,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 			}
 
 			if !confirm && (!util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr())) {
-				return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
+				return errors.New("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
 			}
 
 			branches := listBranchesToDelete(cmd, client, projectID, *service)

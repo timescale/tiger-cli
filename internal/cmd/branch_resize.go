@@ -107,7 +107,7 @@ given, the branch keeps its current CPU and memory.`,
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 			branch := *resp.JSON202
 

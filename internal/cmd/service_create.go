@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -104,7 +105,7 @@ other will be automatically configured).` + iopsSectionHelp,
 				return err
 			}
 			if replicas < 0 {
-				return fmt.Errorf("replica count must be non-negative (--replicas)")
+				return errors.New("replica count must be non-negative (--replicas)")
 			}
 
 			// Validate and normalize environment tag (case-insensitive)
@@ -181,7 +182,7 @@ other will be automatically configured).` + iopsSectionHelp,
 			}
 
 			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 			service := *resp.JSON202
 			serviceID := service.ServiceID

@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -90,7 +91,7 @@ func (s *Server) handleServiceBackupRegionAdd(ctx context.Context, req *mcp.Call
 	}
 
 	if resp.JSON201 == nil {
-		return nil, ServiceBackupRegionAddOutput{}, fmt.Errorf("empty response from API")
+		return nil, ServiceBackupRegionAddOutput{}, errors.New("empty response from API")
 	}
 
 	return nil, ServiceBackupRegionAddOutput{

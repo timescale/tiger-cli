@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -86,7 +87,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments
 			if name == "" {
-				return fmt.Errorf("--name is required")
+				return errors.New("--name is required")
 			}
 
 			cfg, client, projectID, err := app.GetAll()
@@ -232,13 +233,13 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 	if hasTsdbadmin {
 		// Enforce read-only requirement when inheriting from tsdbadmin
 		if !readOnly {
-			return fmt.Errorf("roles inheriting from tsdbadmin must be read-only (use --read-only flag)")
+			return errors.New("roles inheriting from tsdbadmin must be read-only (use --read-only flag)")
 		}
 
 		// Cannot set statement_timeout on roles created with create_bare_readonly_role
 		// due to permission restrictions on altering special roles
 		if statementTimeout > 0 {
-			return fmt.Errorf("cannot use --statement-timeout with --from tsdbadmin (permission denied to alter special roles)")
+			return errors.New("cannot use --statement-timeout with --from tsdbadmin (permission denied to alter special roles)")
 		}
 
 		// Use timescale_functions.create_bare_readonly_role to create the role
@@ -268,7 +269,7 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 		// Use standard CREATE ROLE for non-tsdbadmin cases
 		// Fail if password contains a single quote (we don't support escaping)
 		if strings.Contains(rolePassword, "'") {
-			return fmt.Errorf("password cannot contain single quotes")
+			return errors.New("password cannot contain single quotes")
 		}
 		// Wrap password in single quotes for SQL literal
 		quotedPassword := "'" + rolePassword + "'"
