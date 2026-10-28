@@ -259,6 +259,30 @@ status: READY
 			wantStderr: "Warning: failed to get connection details: endpoint port not available\n",
 		},
 		{
+			// As for a service, a missing endpoint is warned about rather
+			// than silently leaving out the connection details.
+			name: "endpoint not available",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(branchStatus(api.DeployStatusQUEUED), func(b *api.Branch) { b.Endpoint = nil }))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: `┌────────────────┬──────────────────────────┐
+│    PROPERTY    │          VALUE           │
+├────────────────┼──────────────────────────┤
+│ Branch ID      │ br-12345                 │
+│ Name           │ test-branch              │
+│ Parent Service │ test-service (svc-12345) │
+│ Status         │ QUEUED                   │
+│ CPU            │ 0.25 cores (250m)        │
+│ Memory         │ 2 GB                     │
+│ Created        │ 2025-01-16 09:00:00 UTC  │
+└────────────────┴──────────────────────────┘
+`,
+			wantStderr: "Warning: failed to get connection details: endpoint not available\n",
+		},
+		{
 			name: "by name",
 			args: []string{"branch", "get", "test-branch", "-o", "env"},
 			opts: []runOption{withExperimental()},

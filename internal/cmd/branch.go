@@ -141,23 +141,19 @@ func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.B
 	}
 	outputBr.Branch.InitialPassword = nil
 
-	// A branch that's still provisioning may have no endpoint yet, which
-	// isn't worth a warning.
-	if branch.Endpoint != nil {
-		detailsOpts := common.ConnectionDetailsOptions{
-			Role:            "tsdbadmin",
-			WithPassword:    opts.WithPassword,
-			InitialPassword: util.Deref(branch.InitialPassword),
-			ReadOnly:        common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
+	detailsOpts := common.ConnectionDetailsOptions{
+		Role:            "tsdbadmin",
+		WithPassword:    opts.WithPassword,
+		InitialPassword: util.Deref(branch.InitialPassword),
+		ReadOnly:        common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
+	}
+	if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), detailsOpts); err != nil {
+		if cmd != nil {
+			cmd.PrintErrf("Warning: failed to get connection details: %v\n", err)
 		}
-		if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), detailsOpts); err != nil {
-			if cmd != nil {
-				cmd.PrintErrf("Warning: failed to get connection details: %v\n", err)
-			}
-		} else {
-			outputBr.ConnectionDetails = *details
-			outputBr.ConnectionString = details.String()
-		}
+	} else {
+		outputBr.ConnectionDetails = *details
+		outputBr.ConnectionString = details.String()
 	}
 
 	// TODO: add a Console URL once the Console supports branches.

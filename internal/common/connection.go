@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -69,7 +70,7 @@ const readOnlyConnectionOption = "options=-c%20tsdb_admin.read_only_connection%3
 // wanted. ConnectionTarget.Details adds the pooler check connecting needs.
 func GetConnectionDetails(cfg *config.Config, target *ConnectionTarget, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
 	if target.Endpoint == nil {
-		return nil, fmt.Errorf("service endpoint not available")
+		return nil, errors.New("endpoint not available")
 	}
 
 	endpoint := target.Endpoint
