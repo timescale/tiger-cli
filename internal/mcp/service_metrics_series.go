@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -121,14 +120,6 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 	if err != nil {
 		return nil, nil, err
 	}
-
-	s.logger.Info("MCP: Fetching metric series",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("metric", input.MetricName),
-		slog.String("from", input.From),
-		slog.String("to", input.To),
-	)
 
 	fromTime, err := time.Parse(time.RFC3339, input.From)
 	if err != nil {

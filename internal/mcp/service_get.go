@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -61,10 +60,6 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	if err != nil {
 		return nil, ServiceGetOutput{}, err
 	}
-
-	s.logger.Info("MCP: Getting service details",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
 
 	// Make API call to get service details
 	resp, err := client.GetServiceWithResponse(ctx, projectID, input.ServiceID)

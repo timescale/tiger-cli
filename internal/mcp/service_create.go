@@ -163,19 +163,6 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		cpuMillis, memoryGBs = &cpuMillisStr, &memoryGBsStr
 	}
 
-	s.logger.Info("MCP: Creating service",
-		slog.String("project_id", projectID),
-		slog.String("name", input.Name),
-		slog.Any("addons", input.Addons),
-		slog.Any("region", input.Region),
-		slog.Any("cpu", cpuMillis),
-		slog.Any("memory", memoryGBs),
-		slog.Int("replicas", input.Replicas),
-		slog.String("environment", string(input.Environment)),
-		slog.String("platform", input.Platform),
-		slog.Any("iops", input.IOPS),
-	)
-
 	// Prepare service creation request
 	serviceCreateReq := api.ServiceCreate{
 		Name:           input.Name,
@@ -214,8 +201,6 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		if _, err := cfg.Set("service_id", serviceID); err != nil {
 			// Log warning but don't fail the service creation
 			s.logger.Warn("MCP: Failed to set service as default", slog.Any("error", err))
-		} else {
-			s.logger.Info("MCP: Set service as default", slog.String("service_id", serviceID))
 		}
 	}
 
@@ -227,8 +212,6 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		passwordStorage = &result
 		if err != nil {
 			s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
-		} else {
-			s.logger.Info("MCP: Password saved successfully", slog.String("method", result.Method))
 		}
 	}
 

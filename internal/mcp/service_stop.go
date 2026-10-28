@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -75,10 +74,6 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 	if err := common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, input.ServiceID); err != nil {
 		return nil, ServiceStopOutput{}, err
 	}
-
-	s.logger.Info("MCP: Stopping service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
 
 	// Make API call to stop service
 	resp, err := client.StopServiceWithResponse(ctx, projectID, input.ServiceID)

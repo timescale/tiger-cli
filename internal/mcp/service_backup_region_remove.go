@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -113,12 +112,6 @@ func (s *Server) handleServiceBackupRegionRemove(ctx context.Context, req *mcp.C
 			}, nil
 		}
 	}
-
-	s.logger.Info("MCP: Removing service backup region",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("region_code", input.RegionCode),
-	)
 
 	resp, err := client.DeleteBackupRegionWithResponse(ctx, projectID, input.ServiceID, input.RegionCode)
 	if err != nil {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -75,10 +74,6 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 	if err := common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, input.ServiceID); err != nil {
 		return nil, ServiceStartOutput{}, err
 	}
-
-	s.logger.Info("MCP: Starting service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
 
 	// Make API call to start service
 	resp, err := client.StartServiceWithResponse(ctx, projectID, input.ServiceID)

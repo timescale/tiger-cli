@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -57,11 +56,6 @@ func (s *Server) handleServiceBackupRegionList(ctx context.Context, req *mcp.Cal
 	if err != nil {
 		return nil, ServiceBackupRegionListOutput{}, err
 	}
-
-	s.logger.Info("MCP: Listing service backup regions",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-	)
 
 	resp, err := client.GetBackupRegionsWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {

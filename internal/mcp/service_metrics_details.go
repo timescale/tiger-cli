@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -87,12 +86,6 @@ func (s *Server) handleServiceMetricsDetails(ctx context.Context, req *mcp.CallT
 	if err != nil {
 		return nil, ServiceMetricsDetailsOutput{}, err
 	}
-
-	s.logger.Info("MCP: Getting metric details",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("metric", input.MetricName),
-	)
 
 	resp, err := client.GetServiceMetricDetailsWithResponse(ctx, projectID, input.ServiceID, input.MetricName)
 	if err != nil {

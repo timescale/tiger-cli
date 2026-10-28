@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -94,17 +93,6 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 	if err != nil {
 		return nil, DBSchemaOutput{}, err
 	}
-
-	s.logger.Info("MCP: Getting database schema",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("schema", input.SchemaName),
-		slog.Bool("internal", input.Internal),
-		slog.Bool("definitions", input.Definitions),
-		slog.Bool("comments", input.Comments),
-		slog.String("role", input.Role),
-		slog.Bool("pooled", input.Pooled),
-	)
 
 	// service_id may name a service or one of its read replicas.
 	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID)

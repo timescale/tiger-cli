@@ -160,17 +160,6 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		cpuMillis, memoryGBs = &cpuMillisStr, &memoryGBsStr
 	}
 
-	s.logger.Info("MCP: Forking service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("name", input.Name),
-		slog.String("fork_strategy", string(input.ForkStrategy)),
-		slog.Any("cpu", cpuMillis),
-		slog.Any("memory", memoryGBs),
-		slog.String("environment", string(input.Environment)),
-		slog.Any("iops", input.IOPS),
-	)
-
 	// Prepare service fork request
 	forkReq := api.ForkServiceCreate{
 		ForkStrategy:   input.ForkStrategy,
@@ -214,8 +203,6 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		passwordStorage = &result
 		if err != nil {
 			s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
-		} else {
-			s.logger.Info("MCP: Password saved successfully", slog.String("method", result.Method))
 		}
 	}
 
@@ -224,8 +211,6 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		if _, err := cfg.Set("service_id", serviceID); err != nil {
 			// Log warning but don't fail the service fork
 			s.logger.Warn("MCP: Failed to set service as default", slog.Any("error", err))
-		} else {
-			s.logger.Info("MCP: Set service as default", slog.String("service_id", serviceID))
 		}
 	}
 

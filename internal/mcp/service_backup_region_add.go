@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -72,12 +71,6 @@ func (s *Server) handleServiceBackupRegionAdd(ctx context.Context, req *mcp.Call
 	if err := common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, input.ServiceID); err != nil {
 		return nil, ServiceBackupRegionAddOutput{}, err
 	}
-
-	s.logger.Info("MCP: Adding service backup region",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("region_code", input.RegionCode),
-	)
 
 	resp, err := client.CreateBackupRegionWithResponse(ctx, projectID, input.ServiceID, api.BackupRegionCreate{
 		RegionCode: input.RegionCode,

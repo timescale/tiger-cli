@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -82,10 +81,6 @@ func (s *Server) handleServiceRename(ctx context.Context, req *mcp.CallToolReque
 	if err := common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, input.ServiceID); err != nil {
 		return nil, ServiceRenameOutput{}, err
 	}
-
-	s.logger.Info("MCP: Renaming service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
 
 	resp, err := client.RenameServiceWithResponse(ctx, projectID, input.ServiceID, api.ServiceRename{Name: name})
 	if err != nil {

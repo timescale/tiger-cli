@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -112,10 +111,6 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 			}, nil
 		}
 	}
-
-	s.logger.Info("MCP: Deleting service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
 
 	resp, err := client.DeleteServiceWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -58,11 +57,6 @@ func (s *Server) handleServiceBackupList(ctx context.Context, req *mcp.CallToolR
 	if err != nil {
 		return nil, ServiceBackupListOutput{}, err
 	}
-
-	s.logger.Info("MCP: Listing service backups",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-	)
 
 	resp, err := client.GetBackupsWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {

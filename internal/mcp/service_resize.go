@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -109,13 +108,6 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(*current)); err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
-
-	s.logger.Info("MCP: Resizing service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("cpu_memory", input.CPUMemory),
-		slog.Any("iops", input.IOPS),
-	)
 
 	// The schema requires cpu_memory unless the experimental gate adds iops.
 	// An IOPS-only resize omits CPU and memory, which the API leaves unchanged.
