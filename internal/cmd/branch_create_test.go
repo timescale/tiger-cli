@@ -80,6 +80,12 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			wantStderr: defaultNoWaitStderr,
 		},
 		{
+			name:    "zero wait timeout",
+			args:    []string{"branch", "create", "svc-12345", "--wait-timeout", "0s"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
 			name:    "invalid cpu/memory combination",
 			args:    []string{"branch", "create", "svc-12345", "--cpu", "1000", "--memory", "4"},
 			opts:    []runOption{withExperimental()},

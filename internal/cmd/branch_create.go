@@ -71,6 +71,10 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if waitTimeout <= 0 {
+				return fmt.Errorf("wait timeout must be positive, got %v", waitTimeout)
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
