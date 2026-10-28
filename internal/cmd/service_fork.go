@@ -196,7 +196,7 @@ default service from your configuration.`,
 			if !noSetDefault {
 				if err := setDefaultService(cmd, cfg, forkedServiceID); err != nil {
 					// Log warning but don't fail the command
-					cmd.PrintErrf("Warning: Failed to set service as default: %v\n", err)
+					cmd.PrintErrf("Warning: failed to set service as default: %v\n", err)
 				}
 			}
 
@@ -229,7 +229,7 @@ default service from your configuration.`,
 				Experimental: app.Experimental,
 				WithPassword: withPassword,
 			}); err != nil {
-				cmd.PrintErrf("Warning: Failed to output service details: %v\n", err)
+				cmd.PrintErrf("Warning: failed to output service details: %v\n", err)
 			}
 
 			// Return error for sake of exit code, but silence it since it was already output above

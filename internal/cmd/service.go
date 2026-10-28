@@ -242,7 +242,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 
 	if connectionDetails, err := common.GetConnectionDetails(cfg, common.NewServiceConnectionTarget(service), detailsOpts); err != nil {
 		if cmd != nil {
-			cmd.PrintErrf("Warning: Failed to get connection details: %v\n", err)
+			cmd.PrintErrf("Warning: failed to get connection details: %v\n", err)
 		}
 	} else {
 		outputSvc.ConnectionDetails = *connectionDetails

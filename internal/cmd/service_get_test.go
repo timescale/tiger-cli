@@ -497,7 +497,7 @@ status: READY
 │ Console URL │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345 │
 └─────────────┴──────────────────────────────────────────────────────────────────┘
 `,
-			wantStderr: "Warning: Failed to get connection details: service endpoint not available\n",
+			wantStderr: "Warning: failed to get connection details: service endpoint not available\n",
 		},
 		{
 			// No port is guessed, for the direct endpoint or the pooler, so
@@ -524,7 +524,7 @@ status: READY
 │ Console URL │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345 │
 └─────────────┴──────────────────────────────────────────────────────────────────┘
 `,
-			wantStderr: "Warning: Failed to get connection details: endpoint port not available\n",
+			wantStderr: "Warning: failed to get connection details: endpoint port not available\n",
 		},
 		{
 			// The ref reaches the API as typed: no client-side classification

@@ -29,7 +29,7 @@ func TestServiceRenameTool(t *testing.T) {
 	}
 
 	output := map[string]any{
-		"message":    "Service renamed successfully.",
+		"message":    `Service "e6ue9697jf" renamed to "renamed-service".`,
 		"service_id": "e6ue9697jf",
 		"name":       "renamed-service",
 	}
@@ -53,6 +53,13 @@ func TestServiceRenameTool(t *testing.T) {
 			tool:    toolServiceRename,
 			args:    map[string]any{"service_id": "e6ue9697jf"},
 			wantErr: `validating "arguments": validating root: required: missing properties: ["name"]`,
+		},
+		{
+			// Refused before the read-only gate or the rename reach the API.
+			name:    "blank name",
+			tool:    toolServiceRename,
+			args:    map[string]any{"service_id": "e6ue9697jf", "name": "   "},
+			wantErr: "new name cannot be empty",
 		},
 		{
 			// The tool isn't registered under read_only=all at startup; this is
@@ -137,7 +144,7 @@ func TestServiceRenameTool(t *testing.T) {
 					}, nil)
 			},
 			wantOutput: map[string]any{
-				"message":    "Service renamed successfully.",
+				"message":    `Service "e6ue9697jf" renamed to "renamed-service-1".`,
 				"service_id": "e6ue9697jf",
 				"name":       "renamed-service-1",
 			},
