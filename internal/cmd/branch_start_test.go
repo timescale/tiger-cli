@@ -27,6 +27,18 @@ func TestBranchStartCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			name:    "zero wait timeout",
+			args:    []string{"branch", "start", "br-12345", "--wait-timeout", "0s"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
+			name:    "negative wait timeout",
+			args:    []string{"branch", "start", "br-12345", "--wait-timeout=-30m"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got -30m0s",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"branch", "start", "br-12345"},
 			opts:    []runOption{withExperimental(), withNotLoggedIn()},

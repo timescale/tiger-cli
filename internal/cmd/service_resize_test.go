@@ -50,6 +50,16 @@ CPU/memory allocation. See the Tiger Data documentation for details. If only
 --iops is given, the service keeps its current CPU and memory.`),
 		},
 		{
+			name:    "zero wait timeout",
+			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--wait-timeout", "0s"},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
+			name:    "negative wait timeout",
+			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--wait-timeout=-30m"},
+			wantErr: "wait timeout must be positive, got -30m0s",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			opts:    []runOption{withNotLoggedIn()},

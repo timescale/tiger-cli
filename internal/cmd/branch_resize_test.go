@@ -29,6 +29,18 @@ func TestBranchResizeCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			name:    "zero wait timeout",
+			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000", "--wait-timeout", "0s"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
+			name:    "negative wait timeout",
+			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000", "--wait-timeout=-30m"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got -30m0s",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000"},
 			opts:    []runOption{withExperimental(), withNotLoggedIn()},

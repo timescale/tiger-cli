@@ -130,9 +130,8 @@ other will be automatically configured).` + iopsSectionHelp,
 				return err
 			}
 
-			// Validate wait timeout (Cobra handles parsing automatically)
-			if waitTimeout <= 0 {
-				return fmt.Errorf("wait timeout must be positive, got %v", waitTimeout)
+			if err := validateWaitTimeout(waitTimeout); err != nil {
+				return err
 			}
 
 			cfg, client, projectID, err := app.GetAll()

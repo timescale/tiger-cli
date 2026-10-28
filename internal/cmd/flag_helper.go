@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -38,6 +39,15 @@ func registerFlagCompletion(cmd *cobra.Command, flag string, f cobra.CompletionF
 	if err := cmd.RegisterFlagCompletionFunc(flag, f); err != nil {
 		panic(fmt.Sprintf("%s: %v", cmd.CommandPath(), err))
 	}
+}
+
+// validateWaitTimeout rejects a --wait-timeout that isn't positive, which would
+// fail the wait before it began.
+func validateWaitTimeout(timeout time.Duration) error {
+	if timeout <= 0 {
+		return fmt.Errorf("wait timeout must be positive, got %v", timeout)
+	}
+	return nil
 }
 
 // outputFlag implements the [github.com/spf13/pflag.Value] interface. These

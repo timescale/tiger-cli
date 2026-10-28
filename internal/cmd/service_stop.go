@@ -38,6 +38,10 @@ service from your configuration.`,
 		Args:              cobra.MaximumNArgs(1),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateWaitTimeout(waitTimeout); err != nil {
+				return err
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err

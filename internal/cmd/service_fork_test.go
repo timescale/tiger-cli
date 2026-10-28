@@ -90,6 +90,16 @@ is not given, the fork inherits the source service's IOPS.`),
 			wantErr: "environment must be one of: DEV, PROD (got 'STAGING')",
 		},
 		{
+			name:    "zero wait timeout",
+			args:    []string{"service", "fork", "svc-12345", "--wait-timeout", "0s"},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
+			name:    "negative wait timeout",
+			args:    []string{"service", "fork", "svc-12345", "--wait-timeout=-30m"},
+			wantErr: "wait timeout must be positive, got -30m0s",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"service", "fork", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},

@@ -94,6 +94,10 @@ default service from your configuration.`,
 				return fmt.Errorf("environment must be one of: %s (got '%s')", strings.Join(validEnvironmentTags, ", "), environment)
 			}
 
+			if err := validateWaitTimeout(waitTimeout); err != nil {
+				return err
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err

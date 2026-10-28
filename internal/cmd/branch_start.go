@@ -34,6 +34,10 @@ The branch can be given by ID or name.`,
 		ValidArgsFunction: branchRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateWaitTimeout(waitTimeout); err != nil {
+				return err
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err

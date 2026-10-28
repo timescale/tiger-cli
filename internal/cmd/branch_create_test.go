@@ -50,6 +50,18 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			wantErr: "unknown flag: --no-set-default",
 		},
 		{
+			name:    "zero wait timeout",
+			args:    []string{"branch", "create", "svc-12345", "--wait-timeout", "0s"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
+			name:    "negative wait timeout",
+			args:    []string{"branch", "create", "svc-12345", "--wait-timeout=-30m"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got -30m0s",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"branch", "create", "svc-12345"},
 			opts:    []runOption{withExperimental(), withNotLoggedIn()},

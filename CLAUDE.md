@@ -138,7 +138,7 @@ Further conventions:
 - Flags use kebab-case, prefer clarity over brevity, and avoid abbreviations (`--no-wait`, not `--nowait`).
 - **Boolean flags** follow the GitHub CLI pattern: the positive behavior is the default (no flag needed), and an explicit `--no-<feature>` flag disables it. Don't create mutually exclusive `--enable-X`/`--disable-X` pairs.
 - **Destructive operations** (delete, password rotation) require an explicit service ID with no default fallback, prompt the user to type the resource ID to confirm, and offer a `--confirm` flag to skip the prompt for automation. The prompt must be TTY-gated (see [Reading Stdin](#reading-stdin)), and the help text should include a "Note for AI agents: always confirm with the user before performing this destructive operation" warning.
-- **Long-running operations** wait for completion by default, with `--no-wait` to return immediately and `--wait-timeout` (a duration) to bound the wait; a timeout exits with code 2 (`common.ExitTimeout`). Use `common.WaitForService`, which shows a spinner on a TTY and plain progress lines otherwise, writing progress to stderr.
+- **Long-running operations** wait for completion by default, with `--no-wait` to return immediately and `--wait-timeout` (a duration) to bound the wait, which `validateWaitTimeout` requires to be positive; a timeout exits with code 2 (`common.ExitTimeout`). Use `common.WaitForService` (or `common.WaitForBranch`), which shows a spinner on a TTY and plain progress lines otherwise, writing progress to stderr.
 - **Help text** should document the default behavior and explain how to override it, with examples of common usage in the command's `Example` field rather than in `Long`.
 
 ### Service Refs
