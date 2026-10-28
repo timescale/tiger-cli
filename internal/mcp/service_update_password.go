@@ -129,7 +129,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		if !serviceIDConfirmed(answer, input.ServiceID) {
 			return nil, ServiceUpdatePasswordOutput{
 				Updated: false,
-				Message: fmt.Sprintf("Password update cancelled: the user did not confirm updating the password of PROD service %q by typing its ID.", input.ServiceID),
+				Message: fmt.Sprintf("Password update cancelled: the user did not confirm updating the password of PROD service '%s' by typing its ID.", input.ServiceID),
 			}, nil
 		}
 	}
@@ -172,7 +172,7 @@ func promptProdUpdatePassword(req *mcp.CallToolRequest, service api.Service) (*m
 	}
 	return serviceIDConfirmationRequest(
 		updatePasswordConfirmationKey,
-		fmt.Sprintf("Update the password of PRODUCTION service %q (%s)? The tsdbadmin password is replaced with a newly generated one: existing connections may be terminated, and applications using the old password will fail to authenticate.", service.Name, service.ServiceID),
+		fmt.Sprintf("Update the password of PRODUCTION service '%s' (%s)? The tsdbadmin password is replaced with a newly generated one: existing connections may be terminated, and applications using the old password will fail to authenticate.", service.Name, service.ServiceID),
 		service.ServiceID,
 	), nil
 }

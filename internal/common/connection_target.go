@@ -181,7 +181,7 @@ func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponses
 		replica := *resolved.ReadReplicaSet
 		parent, err := GetService(ctx, client, projectID, replica.ServiceID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", replica.ServiceID, err)
+			return nil, fmt.Errorf("failed to fetch parent service '%s' for read replica: %w", replica.ServiceID, err)
 		}
 		return NewReplicaConnectionTarget(replica, ServiceCredentials(*parent)), nil
 	default:
@@ -229,7 +229,7 @@ func NewConnectionTarget(ctx context.Context, client api.ClientWithResponsesInte
 
 	parent, err := GetService(ctx, client, projectID, parentID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", parentID, err)
+		return nil, fmt.Errorf("failed to fetch parent service '%s' for read replica: %w", parentID, err)
 	}
 	target.Credentials = ServiceCredentials(*parent)
 	return target, nil

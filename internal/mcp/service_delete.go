@@ -107,7 +107,7 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 			return nil, ServiceDeleteOutput{
 				ServiceID: input.ServiceID,
 				Deleted:   false,
-				Message:   fmt.Sprintf("Deletion cancelled: the user did not confirm deleting PROD service %q by typing its ID.", input.ServiceID),
+				Message:   fmt.Sprintf("Deletion cancelled: the user did not confirm deleting PROD service '%s' by typing its ID.", input.ServiceID),
 			}, nil
 		}
 	}
@@ -123,7 +123,7 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 	return nil, ServiceDeleteOutput{
 		ServiceID: input.ServiceID,
 		Deleted:   true,
-		Message:   fmt.Sprintf("Service %q has been deleted.", input.ServiceID),
+		Message:   fmt.Sprintf("Service '%s' has been deleted.", input.ServiceID),
 	}, nil
 }
 
@@ -137,7 +137,7 @@ func promptProdDelete(req *mcp.CallToolRequest, service api.Service) (*mcp.CallT
 	}
 	return serviceIDConfirmationRequest(
 		deleteConfirmationKey,
-		fmt.Sprintf("Delete PRODUCTION service %q (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID),
+		fmt.Sprintf("Delete PRODUCTION service '%s' (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID),
 		service.ServiceID,
 	), nil
 }

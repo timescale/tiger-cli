@@ -97,7 +97,7 @@ func (s *Server) handleServiceRename(ctx context.Context, req *mcp.CallToolReque
 	service := *resp.JSON200
 
 	output := ServiceRenameOutput{
-		Message:   fmt.Sprintf("Service %q renamed to %q.", service.ServiceID, service.Name),
+		Message:   fmt.Sprintf("Service '%s' renamed to '%s'.", service.ServiceID, service.Name),
 		ServiceID: service.ServiceID,
 		Name:      service.Name,
 	}

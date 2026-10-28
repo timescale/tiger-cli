@@ -151,7 +151,7 @@ func TestDBSchemaTool(t *testing.T) {
 						JSON4XX:      &api.ClientError{Message: new("service not found")},
 					}, nil)
 			},
-			wantErr: `failed to fetch parent service "e6ue9697jf" for read replica: service not found`,
+			wantErr: `failed to fetch parent service 'e6ue9697jf' for read replica: service not found`,
 		},
 		{
 			name:    "ready service without an endpoint",
@@ -226,7 +226,7 @@ func TestDBSchemaTool(t *testing.T) {
 			},
 			wantOutput: map[string]any{
 				"schema":  schemaText,
-				"warning": `read replica "replica-service" has no connection pooler; connecting directly instead`,
+				"warning": `read replica 'replica-service' has no connection pooler; connecting directly instead`,
 			},
 		},
 	})

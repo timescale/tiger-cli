@@ -105,7 +105,7 @@ func TestDbPsqlCmd(t *testing.T) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: `failed to fetch parent service "svc-12345" for read replica: failed to fetch service details: connection refused`,
+			wantErr: `failed to fetch parent service 'svc-12345' for read replica: failed to fetch service details: connection refused`,
 		},
 		{
 			name: "psql not found",

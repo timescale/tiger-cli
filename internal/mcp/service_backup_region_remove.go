@@ -108,7 +108,7 @@ func (s *Server) handleServiceBackupRegionRemove(ctx context.Context, req *mcp.C
 		if !serviceIDConfirmed(answer, input.ServiceID) {
 			return nil, ServiceBackupRegionRemoveOutput{
 				Removed: false,
-				Message: fmt.Sprintf("Removal cancelled: the user did not confirm removing backup region %q from PROD service %q by typing its ID.", input.RegionCode, input.ServiceID),
+				Message: fmt.Sprintf("Removal cancelled: the user did not confirm removing backup region '%s' from PROD service '%s' by typing its ID.", input.RegionCode, input.ServiceID),
 			}, nil
 		}
 	}
@@ -139,7 +139,7 @@ func promptProdBackupRegionRemove(req *mcp.CallToolRequest, service api.Service,
 	}
 	return serviceIDConfirmationRequest(
 		removeBackupRegionConfirmationKey,
-		fmt.Sprintf("Stop copying PRODUCTION service %q (%s) backups to %q? Backup copies in that region will be deleted.", service.Name, service.ServiceID, regionCode),
+		fmt.Sprintf("Stop copying PRODUCTION service '%s' (%s) backups to '%s'? Backup copies in that region will be deleted.", service.Name, service.ServiceID, regionCode),
 		service.ServiceID,
 	), nil
 }

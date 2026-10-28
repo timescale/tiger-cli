@@ -29,7 +29,7 @@ func TestServiceRenameTool(t *testing.T) {
 	}
 
 	output := map[string]any{
-		"message":    `Service "e6ue9697jf" renamed to "renamed-service".`,
+		"message":    `Service 'e6ue9697jf' renamed to 'renamed-service'.`,
 		"service_id": "e6ue9697jf",
 		"name":       "renamed-service",
 	}
@@ -144,7 +144,7 @@ func TestServiceRenameTool(t *testing.T) {
 					}, nil)
 			},
 			wantOutput: map[string]any{
-				"message":    `Service "e6ue9697jf" renamed to "renamed-service-1".`,
+				"message":    `Service 'e6ue9697jf' renamed to 'renamed-service-1'.`,
 				"service_id": "e6ue9697jf",
 				"name":       "renamed-service-1",
 			},

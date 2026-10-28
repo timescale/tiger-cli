@@ -24,7 +24,7 @@ func ReplicaPoolerWarning(target *ConnectionTarget, pooled bool) string {
 	if target.Kind != TargetReadReplica || !pooled || hasPooler(target.Pooler) {
 		return ""
 	}
-	return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", target.Name)
+	return fmt.Sprintf("read replica '%s' has no connection pooler; connecting directly instead", target.Name)
 }
 
 // ConnectionDetailsOptions configures how the connection string is built
