@@ -79,6 +79,10 @@ func outputProjects(cmd *cobra.Command, projects []api.Project, currentProjectID
 	case "yaml":
 		return util.SerializeToYAML(outputWriter, outputProjects)
 	default: // table format (default)
+		if len(outputProjects) == 0 {
+			cmd.PrintErrln("No projects found.")
+			return nil
+		}
 		return outputProjectsTable(outputWriter, outputProjects)
 	}
 }

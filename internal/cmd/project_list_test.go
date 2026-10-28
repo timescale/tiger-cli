@@ -88,13 +88,10 @@ func TestProjectListCmd(t *testing.T) {
 `,
 		},
 		{
-			name: "empty list",
-			args: []string{"project", "list"},
-			mock: setupList([]api.Project{}),
-			wantStdout: `┌────────────┬──────┬─────────┐
-│ PROJECT ID │ NAME │ CURRENT │
-└────────────┴──────┴─────────┘
-`,
+			name:       "empty list",
+			args:       []string{"project", "list"},
+			mock:       setupList([]api.Project{}),
+			wantStderr: "No projects found.\n",
 		},
 		{
 			name: "json output",
