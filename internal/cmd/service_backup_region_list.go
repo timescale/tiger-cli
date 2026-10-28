@@ -92,8 +92,6 @@ func outputBackupRegions(cmd *cobra.Command, regions []api.BackupRegion, format 
 		return util.SerializeToJSON(out, regions)
 	case "yaml":
 		return util.SerializeToYAML(out, regions)
-	case "env":
-		return errors.New("environment variable output is not supported for backup regions")
 	default:
 		if len(regions) == 0 {
 			cmd.PrintErrln("No backup regions configured for this service.")

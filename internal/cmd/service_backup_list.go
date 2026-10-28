@@ -97,8 +97,6 @@ func outputBackups(cmd *cobra.Command, backups []api.Backup, format string) erro
 		return util.SerializeToJSON(out, backups)
 	case "yaml":
 		return util.SerializeToYAML(out, backups)
-	case "env":
-		return errors.New("environment variable output is not supported for backups")
 	default:
 		if len(backups) == 0 {
 			cmd.PrintErrln("No backups found.")

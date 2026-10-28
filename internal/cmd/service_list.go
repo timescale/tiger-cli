@@ -66,8 +66,6 @@ func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Servi
 		return util.SerializeToJSON(outputWriter, outputServices)
 	case "yaml":
 		return util.SerializeToYAML(outputWriter, outputServices)
-	case "env":
-		return errors.New("environment variable output is not supported for multiple services")
 	default: // table format (default)
 		if len(outputServices) == 0 {
 			cmd.PrintErrln("No services found.")

@@ -182,12 +182,13 @@ func TestServiceBackupRegionListCmd(t *testing.T) {
 		},
 		{
 			// The flag rejects env at parse time, but a hand-edited config file
-			// can still reach outputBackupRegions' env branch.
-			name:    "env output from config file",
-			args:    []string{"service", "backup", "region", "list", "svc-12345"},
-			opts:    []runOption{experimental, withConfig(map[string]any{"output": "env"})},
-			mock:    setupList(regions),
-			wantErr: "environment variable output is not supported for backup regions",
+			// can still set it, and an unsupported format falls through to the
+			// table.
+			name:       "env output from config file",
+			args:       []string{"service", "backup", "region", "list", "svc-12345"},
+			opts:       []runOption{experimental, withConfig(map[string]any{"output": "env"})},
+			mock:       setupList(regions),
+			wantStdout: regionsTable,
 		},
 	})
 }

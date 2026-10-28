@@ -133,12 +133,19 @@ func TestProjectListCmd(t *testing.T) {
 		},
 		{
 			// --output rejects env at parse time, but TIGER_OUTPUT isn't
-			// validated on load.
-			name:    "env output from env var",
-			args:    []string{"project", "list"},
-			opts:    []runOption{withEnv("TIGER_OUTPUT", "env")},
-			mock:    bothProjects,
-			wantErr: "environment variable output is not supported for multiple projects",
+			// validated on load, and an unsupported format falls through to
+			// the table.
+			name: "env output from env var",
+			args: []string{"project", "list"},
+			opts: []runOption{withEnv("TIGER_OUTPUT", "env")},
+			mock: bothProjects,
+			wantStdout: `┌──────────────────┬─────────────────┬─────────┐
+│    PROJECT ID    │      NAME       │ CURRENT │
+├──────────────────┼─────────────────┼─────────┤
+│ project-other    │ Other Project   │         │
+│ test-project-123 │ Current Project │ *       │
+└──────────────────┴─────────────────┴─────────┘
+`,
 		},
 		{
 			name: "ls alias",

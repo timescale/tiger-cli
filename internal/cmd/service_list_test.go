@@ -189,12 +189,19 @@ func TestServiceListCmd(t *testing.T) {
 		},
 		{
 			// "env" is rejected at flag-parse time for list, but can still
-			// reach the output switch via a hand-edited config file.
-			name:    "env output format from config",
-			args:    []string{"service", "list"},
-			mock:    setupList(services),
-			opts:    []runOption{withConfig(map[string]any{"output": "env"})},
-			wantErr: "environment variable output is not supported for multiple services",
+			// reach the output switch via a hand-edited config file, where an
+			// unsupported format falls through to the table.
+			name: "env output format from config",
+			args: []string{"service", "list"},
+			mock: setupList(services),
+			opts: []runOption{withConfig(map[string]any{"output": "env"})},
+			wantStdout: `┌────────────┬──────────────┬────────┬─────────────┬───────────┬──────────────────┐
+│ SERVICE ID │     NAME     │ STATUS │    TYPE     │  REGION   │     CREATED      │
+├────────────┼──────────────┼────────┼─────────────┼───────────┼──────────────────┤
+│ svc-12345  │ test-service │ READY  │ TIMESCALEDB │ us-east-1 │ 2025-01-15 10:30 │
+│ svc-67890  │ analytics-db │ PAUSED │ POSTGRES    │ eu-west-1 │ 2025-02-01 08:00 │
+└────────────┴──────────────┴────────┴─────────────┴───────────┴──────────────────┘
+`,
 		},
 		{
 			name:    "env output flag rejected",

@@ -78,10 +78,6 @@ func outputProjects(cmd *cobra.Command, projects []api.Project, currentProjectID
 		return util.SerializeToJSON(outputWriter, outputProjects)
 	case "yaml":
 		return util.SerializeToYAML(outputWriter, outputProjects)
-	case "env":
-		// Not reachable through --output (outputFlag rejects it at parse time),
-		// but TIGER_OUTPUT and the config file aren't validated on load.
-		return errors.New("environment variable output is not supported for multiple projects")
 	default: // table format (default)
 		return outputProjectsTable(outputWriter, outputProjects)
 	}
