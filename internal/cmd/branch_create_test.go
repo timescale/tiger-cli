@@ -194,8 +194,8 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 `,
 		},
 		{
-			// Waiting replaces the branch with one fetched from the API, which
-			// carries no password, so the create response's has to survive it.
+			// The polls never carry the password, so waiting must keep the
+			// create response's.
 			name:     "with password survives the wait",
 			synctest: true,
 			args:     []string{"branch", "create", "svc-12345", "--password-storage", "none", "--with-password", "-o", "env"},

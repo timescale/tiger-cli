@@ -65,10 +65,6 @@ type branchOutputOptions struct {
 	WithPassword bool
 	// RequirePassword fails the output when WithPassword finds no password.
 	RequirePassword bool
-	// InitialPassword is the password the create response carried. It's
-	// passed separately because waiting replaces the branch with one fetched
-	// from the API, which never returns the password again.
-	InitialPassword string
 }
 
 // outputBranch outputs a single branch in the configured output format.
@@ -151,7 +147,7 @@ func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.B
 		detailsOpts := common.ConnectionDetailsOptions{
 			Role:            "tsdbadmin",
 			WithPassword:    opts.WithPassword,
-			InitialPassword: opts.InitialPassword,
+			InitialPassword: util.Deref(branch.InitialPassword),
 			ReadOnly:        common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
 		}
 		if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), detailsOpts); err != nil {

@@ -126,15 +126,12 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 				return fmt.Errorf("empty response from API")
 			}
 			branch := *resp.JSON202
-			// Kept aside, since waiting replaces the branch with one that has
-			// no password.
-			initialPassword := util.Deref(branch.InitialPassword)
 
 			cmd.PrintErrf("Branch ID: %s\n", branch.ID)
 
 			// Saved before any waiting, so the password is stored even if the
 			// wait fails or is interrupted.
-			passwordSaved := handlePasswordSaving(cmd, cfg, common.BranchPasswordTarget(branch), initialPassword)
+			passwordSaved := handlePasswordSaving(cmd, cfg, common.BranchPasswordTarget(branch), util.Deref(branch.InitialPassword))
 
 			var waitErr error
 			if noWait {
@@ -162,9 +159,8 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 			}
 
 			if err := outputBranch(cmd, cfg, branch, branchOutputOptions{
-				ServiceName:     parent.Name,
-				WithPassword:    withPassword,
-				InitialPassword: initialPassword,
+				ServiceName:  parent.Name,
+				WithPassword: withPassword,
 			}); err != nil {
 				cmd.PrintErrf("Warning: failed to output branch details: %v\n", err)
 			}
