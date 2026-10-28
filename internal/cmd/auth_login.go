@@ -385,7 +385,7 @@ func flagOrEnvVar(flagVal, envVarName string) string {
 
 func promptForCredentials(cmd *cobra.Command, consoleURL string, creds credentials) (credentials, error) {
 	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-		return credentials{}, errors.New("TTY not detected - credentials required. Use flags (--public-key, --secret-key) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY)")
+		return credentials{}, errors.New("TTY not detected - cannot prompt for credentials. Use --public-key and --secret-key, or TIGER_PUBLIC_KEY and TIGER_SECRET_KEY")
 	}
 
 	ctx := cmd.Context()
@@ -783,7 +783,7 @@ func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWith
 		return projects[0].ID, nil
 	default:
 		if !util.IsTerminal(l.cmd.InOrStdin()) || !util.IsTerminal(l.cmd.ErrOrStderr()) {
-			return "", fmt.Errorf("TTY not detected - cannot select between %d projects. Log in with API keys instead (--public-key, --secret-key)", len(projects))
+			return "", fmt.Errorf("TTY not detected - cannot prompt to select between %d projects. Use --project-id, or log in with API keys (--public-key, --secret-key)", len(projects))
 		}
 		return selectProjectInteractively(l.cmd, projects)
 	}

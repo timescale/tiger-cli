@@ -140,7 +140,7 @@ func TestMCPInstallCmd(t *testing.T) {
 		{
 			name:    "no client and no TTY",
 			args:    []string{"mcp", "install"},
-			wantErr: "TTY not detected - specify a client as an argument (e.g. 'tiger mcp install claude-code')",
+			wantErr: "TTY not detected - cannot prompt for a client. Specify one as an argument (e.g. 'tiger mcp install claude-code')",
 		},
 		{
 			name:    "unsupported client",

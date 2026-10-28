@@ -87,7 +87,7 @@ The password will be saved according to your --password-storage setting
 			} else {
 				// Interactive prompt - check if we're in a terminal
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return errors.New("TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable")
+					return errors.New("TTY not detected - cannot prompt for a password. Use --password or TIGER_NEW_PASSWORD")
 				}
 
 				cmd.PrintErr("Enter password: ")

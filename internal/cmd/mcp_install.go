@@ -67,7 +67,7 @@ If no client is specified, you'll be prompted to select one interactively.`, gen
 			if len(args) == 0 {
 				// No client specified, prompt user to select one
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return errors.New("TTY not detected - specify a client as an argument (e.g. 'tiger mcp install claude-code')")
+					return errors.New("TTY not detected - cannot prompt for a client. Specify one as an argument (e.g. 'tiger mcp install claude-code')")
 				}
 				var err error
 				clientName, err = selectClientInteractively(cmd)

@@ -143,7 +143,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			name:    "non-interactive without password",
 			args:    []string{"service", "update-password", "svc-12345"},
 			mock:    setupGet,
-			wantErr: "TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable",
+			wantErr: "TTY not detected - cannot prompt for a new password. Use --new-password, --auto-generate, or TIGER_NEW_PASSWORD",
 		},
 		{
 			name: "network error on update",

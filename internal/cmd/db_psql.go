@@ -405,7 +405,7 @@ func connectWithPasswordMenu(
 
 	// Check if we're in a TTY for interactive menu
 	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-		return errors.New("authentication failed and no TTY available for interactive password entry")
+		return errors.New("TTY not detected - cannot prompt for a password. Save the correct one with 'tiger db save-password'")
 	}
 
 	// Password reset is admin-only, and rotating the master password is a

@@ -411,7 +411,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 			name:    "no arguments and no TTY",
 			args:    []string{"skills", "install"},
 			opts:    []runOption{withEnv("HOME", home(nil))},
-			wantErr: "TTY not detected - specify install locations as arguments (e.g. 'tiger skills install universal')",
+			wantErr: "TTY not detected - cannot prompt for install locations. Specify them as arguments (e.g. 'tiger skills install universal')",
 		},
 		{
 			name: "nothing selected in the picker",

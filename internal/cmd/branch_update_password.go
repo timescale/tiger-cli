@@ -75,7 +75,7 @@ The branch can be given by ID or name.`,
 				}
 			} else {
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return errors.New("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
+					return errors.New("TTY not detected - cannot prompt for a new password. Use --new-password, --auto-generate, or TIGER_NEW_PASSWORD")
 				}
 				if _, err := promptAndResetPassword(ctx, cmd, cfg, client, credentials, "tsdbadmin"); err != nil {
 					return err

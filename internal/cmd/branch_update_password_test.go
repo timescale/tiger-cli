@@ -59,7 +59,7 @@ func TestBranchUpdatePasswordCmd(t *testing.T) {
 			args:    []string{"branch", "update-password", "br-12345"},
 			opts:    []runOption{withExperimental()},
 			mock:    func(m *mocks.MockClientWithResponsesInterface) { expectResolveBranch(m, "br-12345", sampleBranch()) },
-			wantErr: "TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable",
+			wantErr: "TTY not detected - cannot prompt for a new password. Use --new-password, --auto-generate, or TIGER_NEW_PASSWORD",
 		},
 		{
 			name: "network error",
