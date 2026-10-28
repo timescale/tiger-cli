@@ -159,6 +159,20 @@ func TestDbPsqlCmd(t *testing.T) {
 			wantStderr: "Warning: could not list read replicas: connection refused\nError: failed to build connection string: service endpoint not available\n",
 		},
 		{
+			name: "replica listing nil response body warns and continues",
+			args: []string{"db", "psql", "svc-12345"},
+			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
+				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetReplicaSetsResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+					}, nil)
+			},
+			wantErr:    "failed to build connection string: service endpoint not available",
+			wantStderr: "Warning: could not list read replicas: empty response from API\nError: failed to build connection string: service endpoint not available\n",
+		},
+		{
 			name: "no replicas skips prompt on a TTY",
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},

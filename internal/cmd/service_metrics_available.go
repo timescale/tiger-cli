@@ -52,7 +52,12 @@ service from your configuration.`,
 				return fmt.Errorf("empty response from API")
 			}
 
-			series := *resp.JSON200
+			// Default to a non-nil slice so a JSON null marshals to `[]` rather
+			// than `null`.
+			series := []string{}
+			if *resp.JSON200 != nil {
+				series = *resp.JSON200
+			}
 
 			out := cmd.OutOrStdout()
 			switch strings.ToLower(cfg.Output) {

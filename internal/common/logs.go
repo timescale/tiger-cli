@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -53,7 +54,7 @@ func FetchServiceLogs(ctx context.Context, args FetchServiceLogsArgs) ([]api.Ser
 		}
 
 		if resp.JSON200 == nil {
-			return nil, fmt.Errorf("unexpected empty response")
+			return nil, errors.New("empty response from API")
 		}
 
 		if resp.JSON200.Entries != nil {

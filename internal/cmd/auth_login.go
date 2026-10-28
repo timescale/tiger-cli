@@ -761,8 +761,11 @@ func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWith
 	if err != nil {
 		return "", fmt.Errorf("failed to get user projects: %w", err)
 	}
-	if resp.JSON200 == nil {
+	if resp.StatusCode() != http.StatusOK {
 		return "", common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	}
+	if resp.JSON200 == nil {
+		return "", errors.New("empty response from API")
 	}
 	projects := *resp.JSON200
 

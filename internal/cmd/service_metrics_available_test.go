@@ -13,15 +13,18 @@ import (
 func TestServiceMetricsAvailableCmd(t *testing.T) {
 	names := []string{"pg_stat_activity_count", "timescale_cloud_system_cpu_usage_millicores"}
 
-	setupAvailable := func(names []string) func(m *mocks.MockClientWithResponsesInterface) {
+	setupAvailableBody := func(body *[]string) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			expectResolveRefID(m, "svc-12345")
 			m.EXPECT().GetServiceMetricsAvailableSeriesWithResponse(validCtx, testProjectID, "svc-12345").
 				Return(&api.GetServiceMetricsAvailableSeriesResponse{
 					HTTPResponse: httpResponse(http.StatusOK),
-					JSON200:      &names,
+					JSON200:      body,
 				}, nil)
 		}
+	}
+	setupAvailable := func(names []string) func(m *mocks.MockClientWithResponsesInterface) {
+		return setupAvailableBody(&names)
 	}
 
 	runCmdTests(t, []cmdTest{
@@ -71,6 +74,12 @@ func TestServiceMetricsAvailableCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
+			name:    "nil response body",
+			args:    []string{"service", "metrics", "available", "svc-12345"},
+			mock:    setupAvailableBody(nil),
+			wantErr: "empty response from API",
+		},
+		{
 			name:       "table output",
 			args:       []string{"service", "metrics", "available", "svc-12345"},
 			mock:       setupAvailable(names),
@@ -88,6 +97,14 @@ func TestServiceMetricsAvailableCmd(t *testing.T) {
 			args:       []string{"service", "metrics", "available", "svc-12345", "-o", "json"},
 			mock:       setupAvailable(names),
 			wantStdout: "[\n  \"pg_stat_activity_count\",\n  \"timescale_cloud_system_cpu_usage_millicores\"\n]\n",
+		},
+		{
+			// A JSON `null` array is normalized to an empty one, so the output
+			// stays a valid array.
+			name:       "null series array json",
+			args:       []string{"service", "metrics", "available", "svc-12345", "-o", "json"},
+			mock:       setupAvailableBody(new([]string)),
+			wantStdout: "[]\n",
 		},
 	})
 }

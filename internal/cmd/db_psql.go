@@ -239,7 +239,7 @@ func fetchReplicaSets(ctx context.Context, client api.ClientWithResponsesInterfa
 	}
 
 	if resp.JSON200 == nil {
-		return nil, nil
+		return nil, errors.New("empty response from API")
 	}
 
 	return *resp.JSON200, nil

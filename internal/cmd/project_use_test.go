@@ -135,6 +135,19 @@ func TestProjectUseCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitGeneralError)},
 		},
 		{
+			name: "nil response body listing projects",
+			args: []string{"project", "use", "project-new"},
+			opts: []runOption{oauthLogin},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetProjectsWithResponse(validCtx).
+					Return(&api.GetProjectsResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+					}, nil)
+			},
+			wantErr: "empty response from API",
+			checks:  []checkFunc{checkStoredProject(testProjectID)},
+		},
+		{
 			name:    "no access to requested project",
 			args:    []string{"project", "use", "project-unknown"},
 			opts:    []runOption{oauthLogin},

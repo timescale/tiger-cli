@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -72,10 +73,14 @@ func (s *Server) handleServiceBackupList(ctx context.Context, req *mcp.CallToolR
 		return nil, ServiceBackupListOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	// Default to a non-nil slice so a missing body or a JSON null marshals to
-	// `[]` rather than `null`.
+	if resp.JSON200 == nil {
+		return nil, ServiceBackupListOutput{}, errors.New("empty response from API")
+	}
+
+	// Default to a non-nil slice so a JSON null marshals to `[]` rather than
+	// `null`.
 	backups := []api.Backup{}
-	if resp.JSON200 != nil && *resp.JSON200 != nil {
+	if *resp.JSON200 != nil {
 		backups = *resp.JSON200
 	}
 

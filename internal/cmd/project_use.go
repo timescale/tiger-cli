@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/spf13/cobra"
 
@@ -59,8 +60,11 @@ cleared when you switch away.`,
 			if err != nil {
 				return fmt.Errorf("failed to list projects: %w", err)
 			}
-			if resp.JSON200 == nil {
+			if resp.StatusCode() != http.StatusOK {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+			if resp.JSON200 == nil {
+				return errors.New("empty response from API")
 			}
 			if err := requireProjectAccess(cmd, *resp.JSON200, targetID); err != nil {
 				return err

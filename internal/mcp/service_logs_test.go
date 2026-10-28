@@ -106,7 +106,7 @@ func TestServiceLogsTool(t *testing.T) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 					Return(logsResponse(nil), nil)
 			},
-			wantErr: "unexpected empty response",
+			wantErr: "empty response from API",
 		},
 		{
 			name:       "no log entries",

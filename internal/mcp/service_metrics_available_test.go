@@ -79,12 +79,11 @@ func TestServiceMetricsAvailableTool(t *testing.T) {
 			wantErr: "unknown error",
 		},
 		{
-			// A 200 with no parsed body is reported as no series, not an error.
-			name:       "nil response body",
-			tool:       toolServiceMetricsAvailable,
-			args:       args,
-			mock:       expectSeries(nil),
-			wantOutput: noSeries,
+			name:    "nil response body",
+			tool:    toolServiceMetricsAvailable,
+			args:    args,
+			mock:    expectSeries(nil),
+			wantErr: "empty response from API",
 		},
 		{
 			// A JSON `null` array is normalized to an empty one, so the output

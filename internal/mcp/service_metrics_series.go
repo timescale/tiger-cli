@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -169,10 +170,14 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 		return nil, nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	// Default to a non-nil slice so a missing body or a JSON null marshals to
-	// `[]` rather than `null`.
+	if resp.JSON200 == nil {
+		return nil, nil, errors.New("empty response from API")
+	}
+
+	// Default to a non-nil slice so a JSON null marshals to `[]` rather than
+	// `null`.
 	series := []api.MetricSeries{}
-	if resp.JSON200 != nil && *resp.JSON200 != nil {
+	if *resp.JSON200 != nil {
 		series = *resp.JSON200
 	}
 

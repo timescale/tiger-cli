@@ -161,7 +161,14 @@ into 1-hour (3600s) intervals unless --bucket-seconds is also given.`,
 				return fmt.Errorf("empty response from API")
 			}
 
-			return renderMetricSeries(cmd, cfg.Output, *resp.JSON200)
+			// Default to a non-nil slice so a JSON null marshals to `[]` rather
+			// than `null`.
+			series := []api.MetricSeries{}
+			if *resp.JSON200 != nil {
+				series = *resp.JSON200
+			}
+
+			return renderMetricSeries(cmd, cfg.Output, series)
 		},
 	}
 

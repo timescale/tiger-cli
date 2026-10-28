@@ -153,7 +153,7 @@ func TestServiceStopTool(t *testing.T) {
 			},
 			wantOutput: map[string]any{
 				"status":  "PAUSING",
-				"message": "Error: no response body returned from API",
+				"message": "Error: empty response from API",
 			},
 		},
 		{
