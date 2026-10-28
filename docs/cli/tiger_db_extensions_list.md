@@ -33,7 +33,7 @@ tiger db extensions list [name-or-id] [flags]
 
 ```
   -h, --help            help for list
-  -o, --output string   Output format (table, json, yaml)
+  -o, --output string   Output format (json, yaml, table)
       --role string     Database role/username (default "tsdbadmin")
 ```
 

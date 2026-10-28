@@ -170,7 +170,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 	cmd.Flags().StringSliceVar(&from, "from", []string{}, "Roles to inherit grants from (e.g., --from app_role --from readonly_role or --from app_role,readonly_role)")
 	cmd.Flags().DurationVar(&statementTimeout, "statement-timeout", 0, "Set statement timeout for the role (e.g., 30s, 5m)")
 	cmd.Flags().StringVar(&password, "password", "", "Password for the role. If not provided, checks TIGER_NEW_PASSWORD environment variable, otherwise auto-generates a secure random password.")
-	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	markFlagRequired(cmd, "name")

@@ -145,8 +145,8 @@ given, the branch keeps its current CPU and memory.`,
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
 	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 
 	registerFlagCompletion(cmd, "cpu", branchCPUCompletion)
 	registerFlagCompletion(cmd, "memory", branchMemoryCompletion)

@@ -253,8 +253,8 @@ other will be automatically configured).` + iopsSectionHelp,
 		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 		registerFlagCompletion(cmd, "iops", iopsCompletion)
 	}
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for operation to complete")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")

@@ -176,8 +176,8 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (default 250)")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes (default 2)")
 	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the branch to be ready")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))

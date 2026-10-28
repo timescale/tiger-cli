@@ -43,7 +43,7 @@ tiger service logs [name-or-id] [flags]
 ```
   -h, --help            help for logs
       --node int        Specific service node to fetch logs from (for services with HA replicas, 0 is valid)
-  -o, --output string   Output format (text, json, yaml)
+  -o, --output string   Output format (json, yaml, table)
       --since time      Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z)
       --tail int        Number of log lines to show (default 100)
       --until time      Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)

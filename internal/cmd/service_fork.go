@@ -245,9 +245,9 @@ default service from your configuration.`,
 
 	// Add flags
 	cmd.Flags().StringVar(&name, "name", "", "Name for the forked service (auto-generated if not provided)")
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for fork operation to complete")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
 	cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set this service as the default service")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 
 	// Timing strategy flags. --now is the default and kept only for backwards
 	// compatibility, so it's hidden from help.

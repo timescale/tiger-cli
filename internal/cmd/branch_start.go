@@ -98,7 +98,7 @@ The branch can be given by ID or name.`,
 	}
 
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 
 	return cmd
 }

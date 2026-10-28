@@ -67,7 +67,7 @@ tiger db query [name-or-id] [flags]
   -c, --command string     SQL query to execute (reads from stdin if neither --command nor --file is given)
   -f, --file string        Path to a SQL file to execute
   -h, --help               help for query
-  -o, --output string      Output format (table, json, yaml)
+  -o, --output string      Output format (json, yaml, table)
       --pooled             Use connection pooling
       --read-only          Open the connection in Tiger Cloud's immutable read-only mode
       --role string        Database role/username (default "tsdbadmin")

@@ -187,8 +187,8 @@ other will be automatically configured).` + iopsSectionHelp,
 		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 		registerFlagCompletion(cmd, "iops", iopsCompletion)
 	}
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 
 	registerFlagCompletion(cmd, "cpu", cpuCompletion(false, app.Experimental))
 	registerFlagCompletion(cmd, "memory", memoryCompletion(false, app.Experimental))

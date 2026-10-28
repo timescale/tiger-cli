@@ -70,7 +70,7 @@ immutable read-only mode.` + branchRefHelp(app.Experimental, "You can also pass 
 	}
 
 	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
-	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (table, json, yaml)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd
