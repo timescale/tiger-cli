@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"errors"
-	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -55,17 +52,10 @@ The branch can be given by ID or name.`,
 				return err
 			}
 
-			resp, err := client.StopBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID)
+			branch, err := common.JSON202(client.StopBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID))
 			if err != nil {
-				return fmt.Errorf("failed to stop branch: %w", err)
+				return err
 			}
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-			if resp.JSON202 == nil {
-				return errors.New("empty response from API")
-			}
-			branch := *resp.JSON202
 
 			cmd.PrintErrf("Stop request accepted for branch %s.\n", branchLabel(*resolved))
 

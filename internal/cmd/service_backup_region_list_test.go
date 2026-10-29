@@ -73,7 +73,7 @@ func TestServiceBackupRegionListCmd(t *testing.T) {
 				m.EXPECT().GetBackupRegionsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to list backup regions: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

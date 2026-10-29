@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/spf13/cobra"
 
@@ -73,13 +72,8 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				}
 			}
 
-			resp, err := client.DeleteBackupRegionWithResponse(cmd.Context(), projectID, service.ServiceID, region)
-			if err != nil {
-				return fmt.Errorf("failed to remove backup region: %w", err)
-			}
-
-			if resp.StatusCode() != http.StatusNoContent {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			if err := common.Status204(client.DeleteBackupRegionWithResponse(cmd.Context(), projectID, service.ServiceID, region)); err != nil {
+				return err
 			}
 
 			cmd.PrintErrf("Backups for service %s will no longer be copied to '%s'.\n", serviceLabel(*service), region)

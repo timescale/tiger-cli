@@ -105,7 +105,7 @@ func TestDbPsqlCmd(t *testing.T) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: `failed to fetch parent service 'svc-12345' for read replica: failed to fetch service details: connection refused`,
+			wantErr: `failed to fetch parent service 'svc-12345' for read replica: failed to call API: connection refused`,
 		},
 		{
 			name: "psql not found",
@@ -156,7 +156,7 @@ func TestDbPsqlCmd(t *testing.T) {
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr:    "failed to build connection string: service endpoint not available",
-			wantStderr: "Warning: could not list read replicas: connection refused\nError: failed to build connection string: service endpoint not available\n",
+			wantStderr: "Warning: could not list read replicas: failed to call API: connection refused\nError: failed to build connection string: service endpoint not available\n",
 		},
 		{
 			name: "replica listing nil response body warns and continues",

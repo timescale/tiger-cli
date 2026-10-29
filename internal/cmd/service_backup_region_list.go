@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"errors"
-	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
@@ -54,24 +51,15 @@ service from your configuration.`,
 				return err
 			}
 
-			resp, err := client.GetBackupRegionsWithResponse(cmd.Context(), projectID, service.ServiceID)
+			regions, err := common.JSON200(client.GetBackupRegionsWithResponse(cmd.Context(), projectID, service.ServiceID))
 			if err != nil {
-				return fmt.Errorf("failed to list backup regions: %w", err)
-			}
-
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON200 == nil {
-				return errors.New("empty response from API")
+				return err
 			}
 
 			// Default to a non-nil slice so a JSON null marshals to `[]` rather
 			// than `null`.
-			regions := []api.BackupRegion{}
-			if *resp.JSON200 != nil {
-				regions = *resp.JSON200
+			if regions == nil {
+				regions = []api.BackupRegion{}
 			}
 
 			return outputBackupRegions(cmd, regions, cfg.Output)

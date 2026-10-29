@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
@@ -57,20 +55,12 @@ service from your configuration.`, strings.Join(common.LegacyMetrics, ", ")),
 				return err
 			}
 
-			resp, err := client.GetServiceMetricDetailsWithResponse(cmd.Context(), projectID, service.ServiceID, metric)
+			details, err := common.JSON200(client.GetServiceMetricDetailsWithResponse(cmd.Context(), projectID, service.ServiceID, metric))
 			if err != nil {
-				return fmt.Errorf("failed to get metric details: %w", err)
+				return err
 			}
 
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON200 == nil {
-				return errors.New("empty response from API")
-			}
-
-			return outputMetricDetails(cmd.OutOrStdout(), cfg.Output, *resp.JSON200)
+			return outputMetricDetails(cmd.OutOrStdout(), cfg.Output, details)
 		},
 	}
 

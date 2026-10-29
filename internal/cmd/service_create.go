@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -171,20 +170,10 @@ other will be automatically configured).` + iopsSectionHelp,
 			// Make API call to create service
 			// All status messages go to stderr
 			cmd.PrintErrf("Creating service '%s'...\n", name)
-			resp, err := client.CreateServiceWithResponse(cmd.Context(), projectID, serviceCreateReq)
+			service, err := common.JSON202(client.CreateServiceWithResponse(cmd.Context(), projectID, serviceCreateReq))
 			if err != nil {
-				return fmt.Errorf("failed to create service: %w", err)
+				return err
 			}
-
-			// Handle API response
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON202 == nil {
-				return errors.New("empty response from API")
-			}
-			service := *resp.JSON202
 			serviceID := service.ServiceID
 
 			cmd.PrintErrf("Service ID: %s\n", serviceID)

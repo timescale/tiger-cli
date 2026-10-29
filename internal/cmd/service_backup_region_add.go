@@ -1,10 +1,6 @@
 package cmd
 
 import (
-	"errors"
-	"fmt"
-	"net/http"
-
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -49,24 +45,16 @@ service from your configuration.`,
 				return err
 			}
 
-			resp, err := client.CreateBackupRegionWithResponse(cmd.Context(), projectID, service.ServiceID, api.BackupRegionCreate{
+			added, err := common.JSON201(client.CreateBackupRegionWithResponse(cmd.Context(), projectID, service.ServiceID, api.BackupRegionCreate{
 				RegionCode: region,
-			})
+			}))
 			if err != nil {
-				return fmt.Errorf("failed to add backup region: %w", err)
-			}
-
-			if resp.StatusCode() != http.StatusCreated {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON201 == nil {
-				return errors.New("empty response from API")
+				return err
 			}
 
 			cmd.PrintErrf("Backups for service %s will now be copied to '%s'.\n", serviceLabel(*service), region)
 
-			return outputBackupRegions(cmd, []api.BackupRegion{*resp.JSON201}, cfg.Output)
+			return outputBackupRegions(cmd, []api.BackupRegion{added}, cfg.Output)
 		},
 	}
 

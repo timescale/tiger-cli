@@ -60,7 +60,7 @@ func TestServiceListCmd(t *testing.T) {
 				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to list services: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

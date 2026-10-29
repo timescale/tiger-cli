@@ -3,9 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -76,21 +74,10 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Make API call to stop service
-	resp, err := client.StopServiceWithResponse(ctx, projectID, input.ServiceID)
+	service, err := common.JSON202(client.StopServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
-		return nil, ServiceStopOutput{}, fmt.Errorf("failed to stop service: %w", err)
+		return nil, ServiceStopOutput{}, err
 	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceStopOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON202 == nil {
-		return nil, ServiceStopOutput{}, errors.New("empty response from API")
-	}
-
-	service := *resp.JSON202
 
 	// If wait is explicitly requested, wait for service to be paused
 	message := "Service stop request accepted. The service may still be stopping."

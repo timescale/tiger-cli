@@ -2,9 +2,6 @@ package mcp
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -58,24 +55,15 @@ func (s *Server) handleServiceBackupList(ctx context.Context, req *mcp.CallToolR
 		return nil, ServiceBackupListOutput{}, err
 	}
 
-	resp, err := client.GetBackupsWithResponse(ctx, projectID, input.ServiceID)
+	backups, err := common.JSON200(client.GetBackupsWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
-		return nil, ServiceBackupListOutput{}, fmt.Errorf("failed to list backups: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceBackupListOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, ServiceBackupListOutput{}, errors.New("empty response from API")
+		return nil, ServiceBackupListOutput{}, err
 	}
 
 	// Default to a non-nil slice so a JSON null marshals to `[]` rather than
 	// `null`.
-	backups := []api.Backup{}
-	if *resp.JSON200 != nil {
-		backups = *resp.JSON200
+	if backups == nil {
+		backups = []api.Backup{}
 	}
 
 	return nil, ServiceBackupListOutput{Backups: backups}, nil

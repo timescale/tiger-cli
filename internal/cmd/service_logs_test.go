@@ -103,7 +103,7 @@ func TestServiceLogsCmd(t *testing.T) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch logs: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name:     "API error",

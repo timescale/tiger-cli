@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -99,17 +98,10 @@ given, the branch keeps its current CPU and memory.`,
 
 			cmd.PrintErrf("Resizing branch %s to %s...\n", branchLabel(*resolved), target)
 
-			resp, err := client.ResizeBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID, resizeReq)
+			branch, err := common.JSON202(client.ResizeBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID, resizeReq))
 			if err != nil {
-				return fmt.Errorf("failed to resize branch: %w", err)
+				return err
 			}
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-			if resp.JSON202 == nil {
-				return errors.New("empty response from API")
-			}
-			branch := *resp.JSON202
 
 			cmd.PrintErrf("Resize request accepted for branch %s.\n", branchLabel(*resolved))
 

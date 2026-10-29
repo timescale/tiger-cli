@@ -122,9 +122,9 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to create branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 			wantStderr: "Creating branch from service 'test-service' (svc-12345)...\n" +
-				"Error: failed to create branch: connection refused\n",
+				"Error: failed to call API: connection refused\n",
 		},
 		{
 			name: "API error",

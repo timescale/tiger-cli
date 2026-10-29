@@ -88,7 +88,7 @@ func TestServiceStopTool(t *testing.T) {
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to stop service: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

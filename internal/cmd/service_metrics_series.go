@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -149,24 +147,15 @@ into 1-hour (3600s) intervals unless --bucket-seconds is also given.`,
 				body.GroupBy = &groupBy
 			}
 
-			resp, err := client.GetServiceMetricsSeriesWithResponse(cmd.Context(), projectID, service.ServiceID, body)
+			series, err := common.JSON200(client.GetServiceMetricsSeriesWithResponse(cmd.Context(), projectID, service.ServiceID, body))
 			if err != nil {
-				return fmt.Errorf("failed to fetch metric series: %w", err)
-			}
-
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON200 == nil {
-				return errors.New("empty response from API")
+				return err
 			}
 
 			// Default to a non-nil slice so a JSON null marshals to `[]` rather
 			// than `null`.
-			series := []api.MetricSeries{}
-			if *resp.JSON200 != nil {
-				series = *resp.JSON200
+			if series == nil {
+				series = []api.MetricSeries{}
 			}
 
 			return renderMetricSeries(cmd, cfg.Output, series)

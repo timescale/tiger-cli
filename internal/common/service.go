@@ -1,11 +1,8 @@
 package common
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"math/rand"
-	"net/http"
 	"slices"
 	"strings"
 
@@ -27,24 +24,6 @@ func ServiceEnvironmentTag(service api.Service) api.EnvironmentTag {
 		return api.EnvironmentTagDEV
 	}
 	return environmentTag(service.Metadata.Environment)
-}
-
-// GetService fetches a single service by ID. The API resolves both primary
-// service IDs and read replica set IDs here; a read replica comes back as a
-// service whose endpoint is the replica's and whose ForkedFrom links to its
-// parent.
-func GetService(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*api.Service, error) {
-	resp, err := client.GetServiceWithResponse(ctx, projectID, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch service details: %w", err)
-	}
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON200 == nil {
-		return nil, errors.New("empty response from API")
-	}
-	return resp.JSON200, nil
 }
 
 // Addon constants - these match the ServiceCreateAddons from the API

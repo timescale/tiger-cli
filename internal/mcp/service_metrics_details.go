@@ -2,9 +2,7 @@ package mcp
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -87,18 +85,10 @@ func (s *Server) handleServiceMetricsDetails(ctx context.Context, req *mcp.CallT
 		return nil, ServiceMetricsDetailsOutput{}, err
 	}
 
-	resp, err := client.GetServiceMetricDetailsWithResponse(ctx, projectID, input.ServiceID, input.MetricName)
+	details, err := common.JSON200(client.GetServiceMetricDetailsWithResponse(ctx, projectID, input.ServiceID, input.MetricName))
 	if err != nil {
-		return nil, ServiceMetricsDetailsOutput{}, fmt.Errorf("failed to get metric details: %w", err)
+		return nil, ServiceMetricsDetailsOutput{}, err
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceMetricsDetailsOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, ServiceMetricsDetailsOutput{}, errors.New("empty response from API")
-	}
-
-	return nil, ServiceMetricsDetailsOutput{Details: *resp.JSON200}, nil
+	return nil, ServiceMetricsDetailsOutput{Details: details}, nil
 }

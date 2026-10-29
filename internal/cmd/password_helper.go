@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/spf13/cobra"
 
@@ -47,24 +46,9 @@ func updateAndSavePassword(
 func updatePassword(ctx context.Context, client api.ClientWithResponsesInterface, credentials common.CredentialOwner, newPassword string) error {
 	input := api.UpdatePasswordInput{Password: newPassword}
 	if credentials.BranchServiceID != "" {
-		resp, err := client.UpdateBranchPasswordWithResponse(ctx, credentials.ProjectID, credentials.BranchServiceID, credentials.ID, input)
-		if err != nil {
-			return fmt.Errorf("failed to update password: %w", err)
-		}
-		if resp.StatusCode() != http.StatusNoContent {
-			return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-		}
-		return nil
+		return common.Status204(client.UpdateBranchPasswordWithResponse(ctx, credentials.ProjectID, credentials.BranchServiceID, credentials.ID, input))
 	}
-
-	resp, err := client.UpdatePasswordWithResponse(ctx, credentials.ProjectID, credentials.ID, input)
-	if err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
-	}
-	if resp.StatusCode() != http.StatusNoContent {
-		return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	return nil
+	return common.Status204(client.UpdatePasswordWithResponse(ctx, credentials.ProjectID, credentials.ID, input))
 }
 
 // resetPassword resets the password of credentials' owner via the API. If

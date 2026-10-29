@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"errors"
-	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -60,24 +57,14 @@ service from your configuration.`,
 			}
 
 			// Make the start request
-			resp, err := client.StartServiceWithResponse(
+			service, err := common.JSON202(client.StartServiceWithResponse(
 				cmd.Context(),
 				api.ProjectID(projectID),
 				api.ServiceID(resolved.ServiceID),
-			)
+			))
 			if err != nil {
-				return fmt.Errorf("failed to start service: %w", err)
+				return err
 			}
-
-			// Handle API response
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON202 == nil {
-				return errors.New("empty response from API")
-			}
-			service := *resp.JSON202
 
 			cmd.PrintErrf("Start request accepted for service %s.\n", serviceLabel(*resolved))
 

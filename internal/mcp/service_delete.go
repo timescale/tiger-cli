@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -87,12 +86,12 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 
 	// The service's tag decides both the prod half of the read-only gate and
 	// whether the user has to confirm, so fetch it unconditionally.
-	service, err := common.GetService(ctx, client, projectID, input.ServiceID)
+	service, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
 		return nil, ServiceDeleteOutput{}, err
 	}
 
-	tag := common.ServiceEnvironmentTag(*service)
+	tag := common.ServiceEnvironmentTag(service)
 	if err := common.CheckReadOnly(cfg, tag); err != nil {
 		return nil, ServiceDeleteOutput{}, err
 	}
@@ -100,7 +99,7 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 	if tag == api.EnvironmentTagPROD {
 		answer, answered := req.Params.InputResponses[deleteConfirmationKey]
 		if !answered {
-			result, err := promptProdDelete(req, *service)
+			result, err := promptProdDelete(req, service)
 			return result, ServiceDeleteOutput{}, err
 		}
 		if !serviceIDConfirmed(answer, input.ServiceID) {
@@ -112,12 +111,8 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 		}
 	}
 
-	resp, err := client.DeleteServiceWithResponse(ctx, projectID, input.ServiceID)
-	if err != nil {
-		return nil, ServiceDeleteOutput{}, fmt.Errorf("failed to delete service: %w", err)
-	}
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceDeleteOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	if err := common.Status202(client.DeleteServiceWithResponse(ctx, projectID, input.ServiceID)); err != nil {
+		return nil, ServiceDeleteOutput{}, err
 	}
 
 	return nil, ServiceDeleteOutput{

@@ -2,9 +2,6 @@ package mcp
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -57,24 +54,15 @@ func (s *Server) handleServiceMetricsAvailable(ctx context.Context, req *mcp.Cal
 		return nil, ServiceMetricsAvailableOutput{}, err
 	}
 
-	resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(ctx, projectID, input.ServiceID)
+	series, err := common.JSON200(client.GetServiceMetricsAvailableSeriesWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
-		return nil, ServiceMetricsAvailableOutput{}, fmt.Errorf("failed to list metric series: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceMetricsAvailableOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, ServiceMetricsAvailableOutput{}, errors.New("empty response from API")
+		return nil, ServiceMetricsAvailableOutput{}, err
 	}
 
 	// Default to a non-nil slice so a JSON null marshals to `[]` rather than
 	// `null`.
-	series := []string{}
-	if *resp.JSON200 != nil {
-		series = *resp.JSON200
+	if series == nil {
+		series = []string{}
 	}
 
 	return nil, ServiceMetricsAvailableOutput{Series: series}, nil

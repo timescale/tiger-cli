@@ -435,7 +435,7 @@ status: READY
 			},
 			opts:       []runOption{experimental},
 			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
-			wantStderr: "Warning: failed to count branches: failed to list branches: connection refused\n",
+			wantStderr: "Warning: failed to count branches: failed to call API: connection refused\n",
 		},
 		{
 			name:       "env output",

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"unicode/utf8"
 
@@ -83,16 +82,11 @@ func (s *Server) handleFeedback(ctx context.Context, req *mcp.CallToolRequest, i
 		return nil, FeedbackOutput{}, err
 	}
 
-	resp, err := client.SubmitFeedbackWithResponse(ctx, api.SubmitFeedbackJSONRequestBody{
+	if err := common.Status204(client.SubmitFeedbackWithResponse(ctx, api.SubmitFeedbackJSONRequestBody{
 		Message: message,
 		Source:  new(api.SubmitFeedbackJSONBodySourceMCP),
-	})
-	if err != nil {
-		return nil, FeedbackOutput{}, fmt.Errorf("failed to submit feedback: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusNoContent {
-		return nil, FeedbackOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	})); err != nil {
+		return nil, FeedbackOutput{}, err
 	}
 
 	return nil, FeedbackOutput{

@@ -165,8 +165,8 @@ Use 'tiger service get svc-12345' to check service status.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr:    "failed to resize service: connection refused",
-			wantStderr: "Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...\nError: failed to resize service: connection refused\n",
+			wantErr:    "failed to call API: connection refused",
+			wantStderr: "Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...\nError: failed to call API: connection refused\n",
 		},
 		{
 			name: "API error",

@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -176,20 +174,10 @@ default service from your configuration.`,
 			}
 
 			// Make API call to fork service
-			forkResp, err := client.ForkServiceWithResponse(cmd.Context(), projectID, source.ServiceID, forkReq)
+			forkedService, err := common.JSON202(client.ForkServiceWithResponse(cmd.Context(), projectID, source.ServiceID, forkReq))
 			if err != nil {
-				return fmt.Errorf("failed to fork service: %w", err)
+				return err
 			}
-
-			// Handle API response
-			if forkResp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(forkResp.StatusCode(), forkResp.JSON4XX)
-			}
-
-			if forkResp.JSON202 == nil {
-				return errors.New("empty response from API")
-			}
-			forkedService := *forkResp.JSON202
 			forkedServiceID := forkedService.ServiceID
 
 			cmd.PrintErrf("Service ID: %s\n", forkedServiceID)

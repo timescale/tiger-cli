@@ -3,10 +3,8 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -179,21 +177,10 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Make API call to create service
-	resp, err := client.CreateServiceWithResponse(ctx, projectID, serviceCreateReq)
+	service, err := common.JSON202(client.CreateServiceWithResponse(ctx, projectID, serviceCreateReq))
 	if err != nil {
-		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to create service: %w", err)
+		return nil, ServiceCreateOutput{}, err
 	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceCreateOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON202 == nil {
-		return nil, ServiceCreateOutput{}, errors.New("empty response from API")
-	}
-
-	service := *resp.JSON202
 	serviceID := service.ServiceID
 
 	// Set as default service if requested (defaults to true)

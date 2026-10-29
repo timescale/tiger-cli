@@ -153,7 +153,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "svc-12345", api.UpdatePasswordInput{Password: "newpass123"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to update password: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error on update",

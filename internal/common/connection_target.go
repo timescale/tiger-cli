@@ -179,11 +179,11 @@ func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponses
 		return NewBranchConnectionTarget(*resolved.Branch), nil
 	case resolved.ReadReplicaSet != nil:
 		replica := *resolved.ReadReplicaSet
-		parent, err := GetService(ctx, client, projectID, replica.ServiceID)
+		parent, err := JSON200(client.GetServiceWithResponse(ctx, projectID, replica.ServiceID))
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch parent service '%s' for read replica: %w", replica.ServiceID, err)
 		}
-		return NewReplicaConnectionTarget(replica, ServiceCredentials(*parent)), nil
+		return NewReplicaConnectionTarget(replica, ServiceCredentials(parent)), nil
 	default:
 		return NewServiceConnectionTarget(*resolved.Service), nil
 	}
@@ -199,15 +199,15 @@ func connectionTargetKind(allowBranches bool) string {
 }
 
 // ResolveConnectionTargetByID fetches the service named by id — which may be a
-// primary service ID or a read replica set ID, both of which GetService
-// resolves — and works out whose credentials it uses. Callers that already
-// hold the service use NewConnectionTarget instead.
+// primary service ID or a read replica set ID, both of which the API's get
+// service endpoint resolves — and works out whose credentials it uses. Callers
+// that already hold the service use NewConnectionTarget instead.
 func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*ConnectionTarget, error) {
-	service, err := GetService(ctx, client, projectID, id)
+	service, err := JSON200(client.GetServiceWithResponse(ctx, projectID, id))
 	if err != nil {
 		return nil, err
 	}
-	return NewConnectionTarget(ctx, client, projectID, *service)
+	return NewConnectionTarget(ctx, client, projectID, service)
 }
 
 // NewConnectionTarget returns the ConnectionTarget of an already-fetched
@@ -227,11 +227,11 @@ func NewConnectionTarget(ctx context.Context, client api.ClientWithResponsesInte
 		return target, nil
 	}
 
-	parent, err := GetService(ctx, client, projectID, parentID)
+	parent, err := JSON200(client.GetServiceWithResponse(ctx, projectID, parentID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch parent service '%s' for read replica: %w", parentID, err)
 	}
-	target.Credentials = ServiceCredentials(*parent)
+	target.Credentials = ServiceCredentials(parent)
 	return target, nil
 }
 

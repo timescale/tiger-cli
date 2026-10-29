@@ -199,7 +199,7 @@ func TestServiceCreateTool(t *testing.T) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to create service: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

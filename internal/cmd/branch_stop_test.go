@@ -74,7 +74,7 @@ func TestBranchStopCmd(t *testing.T) {
 				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to stop branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

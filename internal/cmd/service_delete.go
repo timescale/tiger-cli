@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/spf13/cobra"
 
@@ -96,18 +95,12 @@ Note for AI agents: Always confirm with the user before performing this destruct
 			}
 
 			// Make the delete request
-			resp, err := client.DeleteServiceWithResponse(
+			if err := common.Status202(client.DeleteServiceWithResponse(
 				cmd.Context(),
 				api.ProjectID(projectID),
 				api.ServiceID(service.ServiceID),
-			)
-			if err != nil {
-				return fmt.Errorf("failed to delete service: %w", err)
-			}
-
-			// Handle response
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			)); err != nil {
+				return err
 			}
 
 			if len(branches) == 0 {
@@ -134,7 +127,7 @@ func listBranchesToDelete(cmd *cobra.Command, client api.ClientWithResponsesInte
 	if !common.CanHaveBranches(service) {
 		return nil
 	}
-	branches, err := common.ListBranches(cmd.Context(), client, projectID, service.ServiceID)
+	branches, err := common.JSON200(client.GetBranchesWithResponse(cmd.Context(), projectID, service.ServiceID, nil))
 	if err != nil {
 		cmd.PrintErrf("Warning: failed to list branches: %v\n", err)
 		cmd.PrintErrln("Any branches of this service will also be deleted.")

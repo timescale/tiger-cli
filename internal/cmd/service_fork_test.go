@@ -176,8 +176,8 @@ is not given, the fork inherits the source service's IOPS.`),
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr:    "failed to fork service: connection refused",
-			wantStderr: "Forking service 'test-service' (svc-12345) at current state...\nError: failed to fork service: connection refused\n",
+			wantErr:    "failed to call API: connection refused",
+			wantStderr: "Forking service 'test-service' (svc-12345) at current state...\nError: failed to call API: connection refused\n",
 		},
 		{
 			name: "API error",

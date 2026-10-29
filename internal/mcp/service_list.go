@@ -2,9 +2,6 @@ package mcp
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -88,21 +85,10 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Make API call to list services
-	resp, err := client.GetServicesWithResponse(ctx, projectID, nil)
+	services, err := common.JSON200(client.GetServicesWithResponse(ctx, projectID, nil))
 	if err != nil {
-		return nil, ServiceListOutput{}, fmt.Errorf("failed to list services: %w", err)
+		return nil, ServiceListOutput{}, err
 	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceListOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, ServiceListOutput{}, errors.New("empty response from API")
-	}
-
-	services := *resp.JSON200
 	output := ServiceListOutput{
 		Services: make([]ServiceInfo, len(services)),
 	}

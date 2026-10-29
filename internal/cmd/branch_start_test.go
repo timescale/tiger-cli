@@ -74,7 +74,7 @@ func TestBranchStartCmd(t *testing.T) {
 				m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to start branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "nil response body",

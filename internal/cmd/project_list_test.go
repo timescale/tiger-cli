@@ -47,7 +47,7 @@ func TestProjectListCmd(t *testing.T) {
 				m.EXPECT().GetProjectsWithResponse(validCtx).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to list projects: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

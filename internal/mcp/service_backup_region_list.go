@@ -2,9 +2,6 @@ package mcp
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -57,24 +54,15 @@ func (s *Server) handleServiceBackupRegionList(ctx context.Context, req *mcp.Cal
 		return nil, ServiceBackupRegionListOutput{}, err
 	}
 
-	resp, err := client.GetBackupRegionsWithResponse(ctx, projectID, input.ServiceID)
+	regions, err := common.JSON200(client.GetBackupRegionsWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
-		return nil, ServiceBackupRegionListOutput{}, fmt.Errorf("failed to list backup regions: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceBackupRegionListOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, ServiceBackupRegionListOutput{}, errors.New("empty response from API")
+		return nil, ServiceBackupRegionListOutput{}, err
 	}
 
 	// Default to a non-nil slice so a JSON null marshals to `[]` rather than
 	// `null`.
-	regions := []api.BackupRegion{}
-	if *resp.JSON200 != nil {
-		regions = *resp.JSON200
+	if regions == nil {
+		regions = []api.BackupRegion{}
 	}
 
 	return nil, ServiceBackupRegionListOutput{Regions: regions}, nil

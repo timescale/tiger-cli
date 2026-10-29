@@ -88,9 +88,9 @@ func TestBranchResizeCmd(t *testing.T) {
 				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", req2000).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to resize branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
-				"Error: failed to resize branch: connection refused\n",
+				"Error: failed to call API: connection refused\n",
 		},
 		{
 			name: "nil response body",

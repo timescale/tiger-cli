@@ -111,7 +111,7 @@ func TestServiceBackupListTool(t *testing.T) {
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to list backups: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

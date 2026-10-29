@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -149,7 +148,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	// the fluid combinations.
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
-		source, err := common.GetService(ctx, client, projectID, input.ServiceID)
+		source, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, input.ServiceID))
 		if err != nil {
 			return nil, ServiceForkOutput{}, err
 		}
@@ -178,21 +177,10 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Make API call to fork service
-	resp, err := client.ForkServiceWithResponse(ctx, projectID, input.ServiceID, forkReq)
+	service, err := common.JSON202(client.ForkServiceWithResponse(ctx, projectID, input.ServiceID, forkReq))
 	if err != nil {
-		return nil, ServiceForkOutput{}, fmt.Errorf("failed to fork service: %w", err)
+		return nil, ServiceForkOutput{}, err
 	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceForkOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON202 == nil {
-		return nil, ServiceForkOutput{}, errors.New("empty response from API")
-	}
-
-	service := *resp.JSON202
 	serviceID := service.ServiceID
 
 	// Save password immediately after service fork, before any waiting

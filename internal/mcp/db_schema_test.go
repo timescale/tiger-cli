@@ -81,7 +81,7 @@ func TestDBSchemaTool(t *testing.T) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "service lookup API error",

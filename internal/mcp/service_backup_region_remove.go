@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -89,12 +88,12 @@ func (s *Server) handleServiceBackupRegionRemove(ctx context.Context, req *mcp.C
 
 	// The service's tag decides both the prod half of the read-only gate and
 	// whether the user has to confirm, so fetch it unconditionally.
-	service, err := common.GetService(ctx, client, projectID, input.ServiceID)
+	service, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
 		return nil, ServiceBackupRegionRemoveOutput{}, err
 	}
 
-	tag := common.ServiceEnvironmentTag(*service)
+	tag := common.ServiceEnvironmentTag(service)
 	if err := common.CheckReadOnly(cfg, tag); err != nil {
 		return nil, ServiceBackupRegionRemoveOutput{}, err
 	}
@@ -102,7 +101,7 @@ func (s *Server) handleServiceBackupRegionRemove(ctx context.Context, req *mcp.C
 	if tag == api.EnvironmentTagPROD {
 		answer, answered := req.Params.InputResponses[removeBackupRegionConfirmationKey]
 		if !answered {
-			result, err := promptProdBackupRegionRemove(req, *service, input.RegionCode)
+			result, err := promptProdBackupRegionRemove(req, service, input.RegionCode)
 			return result, ServiceBackupRegionRemoveOutput{}, err
 		}
 		if !serviceIDConfirmed(answer, input.ServiceID) {
@@ -113,13 +112,8 @@ func (s *Server) handleServiceBackupRegionRemove(ctx context.Context, req *mcp.C
 		}
 	}
 
-	resp, err := client.DeleteBackupRegionWithResponse(ctx, projectID, input.ServiceID, input.RegionCode)
-	if err != nil {
-		return nil, ServiceBackupRegionRemoveOutput{}, fmt.Errorf("failed to remove backup region: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusNoContent {
-		return nil, ServiceBackupRegionRemoveOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	if err := common.Status204(client.DeleteBackupRegionWithResponse(ctx, projectID, input.ServiceID, input.RegionCode)); err != nil {
+		return nil, ServiceBackupRegionRemoveOutput{}, err
 	}
 
 	return nil, ServiceBackupRegionRemoveOutput{

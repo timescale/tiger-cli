@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -133,20 +132,10 @@ other will be automatically configured).` + iopsSectionHelp,
 			cmd.PrintErrf("Resizing service %s to %s...\n", serviceLabel(*resolved), target)
 
 			// Make API call to resize service
-			resp, err := client.ResizeServiceWithResponse(cmd.Context(), projectID, resolved.ServiceID, resizeReq)
+			service, err := common.JSON202(client.ResizeServiceWithResponse(cmd.Context(), projectID, resolved.ServiceID, resizeReq))
 			if err != nil {
-				return fmt.Errorf("failed to resize service: %w", err)
+				return err
 			}
-
-			// Handle API response
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON202 == nil {
-				return errors.New("empty response from API")
-			}
-			service := *resp.JSON202
 
 			cmd.PrintErrf("Resize request accepted for service %s.\n", serviceLabel(*resolved))
 

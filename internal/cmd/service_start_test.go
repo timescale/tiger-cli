@@ -88,7 +88,7 @@ func TestServiceStartCmd(t *testing.T) {
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to start service: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

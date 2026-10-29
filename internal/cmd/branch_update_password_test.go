@@ -70,7 +70,7 @@ func TestBranchUpdatePasswordCmd(t *testing.T) {
 				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", api.UpdatePasswordInput{Password: "secret"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to update password: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

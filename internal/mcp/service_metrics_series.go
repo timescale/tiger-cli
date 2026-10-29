@@ -3,9 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -152,24 +150,15 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 		body.GroupBy = &input.GroupBy
 	}
 
-	resp, err := client.GetServiceMetricsSeriesWithResponse(ctx, projectID, input.ServiceID, body)
+	series, err := common.JSON200(client.GetServiceMetricsSeriesWithResponse(ctx, projectID, input.ServiceID, body))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch metric series: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, nil, errors.New("empty response from API")
+		return nil, nil, err
 	}
 
 	// Default to a non-nil slice so a JSON null marshals to `[]` rather than
 	// `null`.
-	series := []api.MetricSeries{}
-	if *resp.JSON200 != nil {
-		series = *resp.JSON200
+	if series == nil {
+		series = []api.MetricSeries{}
 	}
 
 	return nil, ServiceMetricsSeriesOutput{Series: series}, nil

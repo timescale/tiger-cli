@@ -170,8 +170,8 @@ Service is being created. Use 'tiger service get svc-12345' to check service sta
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr:    "failed to create service: connection refused",
-			wantStderr: "Creating service 'test-service'...\nError: failed to create service: connection refused\n",
+			wantErr:    "failed to call API: connection refused",
+			wantStderr: "Creating service 'test-service'...\nError: failed to call API: connection refused\n",
 		},
 		{
 			name: "API error",

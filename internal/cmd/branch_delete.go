@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/spf13/cobra"
 
@@ -71,12 +70,8 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				}
 			}
 
-			resp, err := client.DeleteBranchWithResponse(cmd.Context(), projectID, branch.ServiceID, branch.ID)
-			if err != nil {
-				return fmt.Errorf("failed to delete branch: %w", err)
-			}
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			if err := common.Status202(client.DeleteBranchWithResponse(cmd.Context(), projectID, branch.ServiceID, branch.ID)); err != nil {
+				return err
 			}
 
 			cmd.PrintErrf("Branch %s deleted.\n", branchLabel(*branch))

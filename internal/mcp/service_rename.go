@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -82,19 +81,10 @@ func (s *Server) handleServiceRename(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceRenameOutput{}, err
 	}
 
-	resp, err := client.RenameServiceWithResponse(ctx, projectID, input.ServiceID, api.ServiceRename{Name: name})
+	service, err := common.JSON200(client.RenameServiceWithResponse(ctx, projectID, input.ServiceID, api.ServiceRename{Name: name}))
 	if err != nil {
-		return nil, ServiceRenameOutput{}, fmt.Errorf("failed to rename service: %w", err)
+		return nil, ServiceRenameOutput{}, err
 	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceRenameOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, ServiceRenameOutput{}, errors.New("empty response from API")
-	}
-	service := *resp.JSON200
 
 	output := ServiceRenameOutput{
 		Message:   fmt.Sprintf("Service '%s' renamed to '%s'.", service.ServiceID, service.Name),

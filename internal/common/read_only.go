@@ -44,12 +44,12 @@ func CheckReadOnlyByServiceID(ctx context.Context, cfg *config.Config, client ap
 		return nil
 	}
 
-	service, err := GetService(ctx, client, projectID, serviceID)
+	service, err := JSON200(client.GetServiceWithResponse(ctx, projectID, serviceID))
 	if err != nil {
 		// %w keeps any ExitCodeError in the chain, and main.go unwraps to find it,
 		// so an unknown service still exits with its own code rather than 1.
 		return fmt.Errorf("cannot verify whether service '%s' is tagged PROD (read_only=%s): %w", serviceID, cfg.ReadOnly, err)
 	}
 
-	return CheckReadOnly(cfg, ServiceEnvironmentTag(*service))
+	return CheckReadOnly(cfg, ServiceEnvironmentTag(service))
 }

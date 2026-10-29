@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -119,17 +117,10 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 				createReq.Iops = &iops
 			}
 
-			resp, err := client.CreateBranchWithResponse(cmd.Context(), projectID, parent.ServiceID, createReq)
+			branch, err := common.JSON202(client.CreateBranchWithResponse(cmd.Context(), projectID, parent.ServiceID, createReq))
 			if err != nil {
-				return fmt.Errorf("failed to create branch: %w", err)
+				return err
 			}
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-			if resp.JSON202 == nil {
-				return errors.New("empty response from API")
-			}
-			branch := *resp.JSON202
 
 			cmd.PrintErrf("Branch ID: %s\n", branch.ID)
 

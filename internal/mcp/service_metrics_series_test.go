@@ -146,7 +146,7 @@ func TestServiceMetricsSeriesTool(t *testing.T) {
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf", baseBody).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch metric series: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name:    "API error",

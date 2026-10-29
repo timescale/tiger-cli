@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"errors"
-	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
@@ -43,19 +40,10 @@ output. Use 'tiger project use' to switch to another one.`,
 				return err
 			}
 
-			resp, err := client.GetProjectsWithResponse(cmd.Context())
+			projects, err := common.JSON200(client.GetProjectsWithResponse(cmd.Context()))
 			if err != nil {
-				return fmt.Errorf("failed to list projects: %w", err)
+				return err
 			}
-
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON200 == nil {
-				return errors.New("empty response from API")
-			}
-			projects := *resp.JSON200
 
 			return outputProjects(cmd, projects, projectID, cfg.Output)
 		},

@@ -757,17 +757,10 @@ func openBrowserAsync(url string) <-chan error {
 }
 
 func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWithResponses) (string, error) {
-	resp, err := client.GetProjectsWithResponse(ctx)
+	projects, err := common.JSON200(client.GetProjectsWithResponse(ctx))
 	if err != nil {
-		return "", fmt.Errorf("failed to get user projects: %w", err)
+		return "", err
 	}
-	if resp.StatusCode() != http.StatusOK {
-		return "", common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON200 == nil {
-		return "", errors.New("empty response from API")
-	}
-	projects := *resp.JSON200
 
 	if l.projectID != "" {
 		if err := requireProjectAccess(l.cmd, projects, l.projectID); err != nil {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -101,11 +100,11 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	if cfg.ReadOnly.BlocksAll() {
 		return nil, ServiceResizeOutput{}, common.ErrReadOnly
 	}
-	current, err := common.GetService(ctx, client, projectID, input.ServiceID)
+	current, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
-	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(*current)); err != nil {
+	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(current)); err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
 
@@ -136,21 +135,10 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Make API call to resize service
-	resp, err := client.ResizeServiceWithResponse(ctx, projectID, input.ServiceID, resizeReq)
+	service, err := common.JSON202(client.ResizeServiceWithResponse(ctx, projectID, input.ServiceID, resizeReq))
 	if err != nil {
-		return nil, ServiceResizeOutput{}, fmt.Errorf("failed to resize service: %w", err)
+		return nil, ServiceResizeOutput{}, err
 	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceResizeOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON202 == nil {
-		return nil, ServiceResizeOutput{}, errors.New("empty response from API")
-	}
-
-	service := *resp.JSON202
 
 	// If wait is requested, wait for resize to complete
 	message := "Service resize request accepted. The service may still be resizing."

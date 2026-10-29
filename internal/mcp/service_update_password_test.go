@@ -135,7 +135,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "service lookup API error",
@@ -286,7 +286,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 				m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", api.UpdatePasswordInput{Password: password}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to update service password: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "update API error",
