@@ -31,6 +31,21 @@ ERROR server run cancelled error="context canceled"
 
 	runCmdTests(t, []cmdTest{
 		{
+			name:    "start rejects positional args",
+			args:    []string{"mcp", "start", "bogus"},
+			wantErr: `unknown command "bogus" for "tiger mcp start"`,
+		},
+		{
+			name:    "start suggests close subcommands",
+			args:    []string{"mcp", "start", "stdoi"},
+			wantErr: "unknown command \"stdoi\" for \"tiger mcp start\"\n\nDid you mean this?\n\tstdio",
+		},
+		{
+			name:    "stdio rejects positional args",
+			args:    []string{"mcp", "start", "stdio", "bogus"},
+			wantErr: `unknown command "bogus" for "tiger mcp start stdio"`,
+		},
+		{
 			name:       "start defaults to stdio",
 			args:       []string{"mcp", "start"},
 			opts:       append(noDocsProxy(nil), withContext(cancelled)),
@@ -41,16 +56,6 @@ ERROR server run cancelled error="context canceled"
 			args:       []string{"mcp", "start", "stdio"},
 			opts:       append(noDocsProxy(nil), withContext(cancelled)),
 			wantStderr: matchLog(stdioLog),
-		},
-		{
-			name:    "start rejects positional args",
-			args:    []string{"mcp", "start", "bogus"},
-			wantErr: `unknown command "bogus" for "tiger mcp start"`,
-		},
-		{
-			name:    "stdio rejects positional args",
-			args:    []string{"mcp", "start", "stdio", "bogus"},
-			wantErr: `unknown command "bogus" for "tiger mcp start stdio"`,
 		},
 		{
 			// Read-only mode removes capabilities, so each skipped write tool
