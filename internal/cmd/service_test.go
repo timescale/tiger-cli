@@ -9,8 +9,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-// TestServiceCmd covers the group command itself, which shares groupRun and
-// groupArgs with every other group command.
+// TestServiceCmd covers the group command itself (see groupRun and groupArgs).
 func TestServiceCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{

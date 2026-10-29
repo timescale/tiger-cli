@@ -9,6 +9,31 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
+// TestBranchCmd covers the group command itself (see groupRun and groupArgs).
+func TestBranchCmd(t *testing.T) {
+	runCmdTests(t, []cmdTest{
+		{
+			name:       "no subcommand prints help without loading",
+			args:       []string{"branch"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("Manage branches of Fluid Services."),
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:    "unknown subcommand suggests close matches",
+			args:    []string{"branch", "lsit"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "unknown command \"lsit\" for \"tiger branch\"\n\nDid you mean this?\n\tlist",
+		},
+		{
+			name:    "unknown subcommand with no close match",
+			args:    []string{"branch", "frobnicate"},
+			opts:    []runOption{withExperimental()},
+			wantErr: `unknown command "frobnicate" for "tiger branch"`,
+		},
+	})
+}
+
 // TestBranchExperimentalGate covers the registration gate for the branch
 // commands: `tiger branch` and `tiger service branch` exist only behind the
 // experimental env var.
