@@ -492,7 +492,7 @@ func sampleReplica(overrides ...func(*api.Service)) api.Service {
 const (
 	pausedMsg     = "service is paused — start it with the service_start tool"
 	notReadyMsg   = "service is not ready — check its status with service_get and try again"
-	noEndpointMsg = "failed to build connection string: service endpoint not available"
+	noEndpointMsg = "failed to build connection string: endpoint not available"
 )
 
 // expectGetService expects one GetService call for id, returning svc. The call

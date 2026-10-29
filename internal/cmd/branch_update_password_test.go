@@ -18,7 +18,7 @@ func TestBranchUpdatePasswordCmd(t *testing.T) {
 				Return(&api.UpdateBranchPasswordResponse{HTTPResponse: httpResponse(http.StatusNoContent)}, nil)
 		}
 	}
-	successStderr := "Password saved to system keyring\nPassword updated for tsdbadmin\n"
+	successStderr := "Password saved to system keyring\nView it with: tiger branch get br-12345 --with-password\nPassword updated for tsdbadmin\n"
 
 	runCmdTests(t, []cmdTest{
 		{
