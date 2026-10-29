@@ -16,6 +16,10 @@ No additional setup is required beyond running 'tiger auth login'.
 
 Use 'tiger mcp start' to launch the MCP server.
 
+```
+tiger mcp [flags]
+```
+
 ### Options
 
 ```

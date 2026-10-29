@@ -9,6 +9,29 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
+// TestServiceCmd covers the group command itself, which shares groupRun and
+// groupArgs with every other group command.
+func TestServiceCmd(t *testing.T) {
+	runCmdTests(t, []cmdTest{
+		{
+			name:       "no subcommand prints help without loading",
+			args:       []string{"service"},
+			wantStdout: matchHelp("Manage database services within Tiger Cloud platform."),
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:    "unknown subcommand suggests close matches",
+			args:    []string{"service", "lsit"},
+			wantErr: "unknown command \"lsit\" for \"tiger service\"\n\nDid you mean this?\n\tlist",
+		},
+		{
+			name:    "unknown subcommand with no close match",
+			args:    []string{"service", "frobnicate"},
+			wantErr: `unknown command "frobnicate" for "tiger service"`,
+		},
+	})
+}
+
 func TestServiceCommandAliases(t *testing.T) {
 	emptyList := func(m *mocks.MockClientWithResponsesInterface) {
 		m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
@@ -50,13 +73,9 @@ func TestServiceCommandAliases(t *testing.T) {
 func TestServiceExperimentalGate(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{
-			// Cobra only reports "unknown command" at the root level; for a
-			// non-root group it treats the unknown name as a stray argument
-			// and prints the group's help. The gate is observable as the
-			// absence of the gated entry in that help.
-			name:       "backup unregistered by default",
-			args:       []string{"service", "backup"},
-			wantStdout: matchHelp("Available Commands:", "backup"),
+			name:    "backup unregistered by default",
+			args:    []string{"service", "backup"},
+			wantErr: `unknown command "backup" for "tiger service"`,
 		},
 		{
 			name:       "metrics registered by default",

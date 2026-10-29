@@ -8,9 +8,12 @@ import (
 
 func buildDbCreateCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create database resources",
-		Long:  `Create database resources such as roles, databases, and extensions.`,
+		Use:          "create",
+		Short:        "Create database resources",
+		Long:         `Create database resources such as roles, databases, and extensions.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	cmd.AddCommand(buildDbCreateRoleCmd(app))

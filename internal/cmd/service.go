@@ -20,10 +20,13 @@ import (
 // to the tree at all. See AGENTS.md's "Experimental Feature Gating".
 func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "service",
-		Aliases: []string{"services", "svc"},
-		Short:   "Manage database services",
-		Long:    `Manage database services within Tiger Cloud platform.`,
+		Use:          "service",
+		Aliases:      []string{"services", "svc"},
+		Short:        "Manage database services",
+		Long:         `Manage database services within Tiger Cloud platform.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	// Add all subcommands

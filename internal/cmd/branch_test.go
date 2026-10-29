@@ -22,11 +22,9 @@ func TestBranchExperimentalGate(t *testing.T) {
 				"Run 'tiger --help' for usage.\n",
 		},
 		{
-			// Cobra treats an unknown name under a group as a stray argument
-			// and prints the group's help (see TestServiceExperimentalGate).
-			name:       "service branch unregistered by default",
-			args:       []string{"service", "branch"},
-			wantStdout: matchHelp("Available Commands:", "branch"),
+			name:    "service branch unregistered by default",
+			args:    []string{"service", "branch"},
+			wantErr: `unknown command "branch" for "tiger service"`,
 		},
 		{
 			name:       "branch registered when experimental",

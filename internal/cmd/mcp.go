@@ -22,6 +22,9 @@ The server automatically uses the CLI's stored authentication and configuration.
 No additional setup is required beyond running 'tiger auth login'.
 
 Use 'tiger mcp start' to launch the MCP server.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	// Add subcommands

@@ -14,9 +14,12 @@ import (
 
 func buildDbCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "db",
-		Short: "Database operations and management",
-		Long:  `Database-specific operations including connection management, testing, and configuration.`,
+		Use:          "db",
+		Short:        "Database operations and management",
+		Long:         `Database-specific operations including connection management, testing, and configuration.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	cmd.AddCommand(buildDbURICmd(app))

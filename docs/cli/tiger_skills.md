@@ -9,6 +9,10 @@ Manage agent skills for AI coding agents.
 Skills give AI coding agents curated knowledge and best practices for working
 with PostgreSQL, TimescaleDB, and Tiger Cloud.
 
+```
+tiger skills [flags]
+```
+
 ### Options
 
 ```
