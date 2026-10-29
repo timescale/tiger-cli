@@ -257,7 +257,7 @@ func TestConnectionTargetDetails(t *testing.T) {
 			target: replicaTarget(func(r *api.ReadReplicaSet) {
 				r.Endpoint = nil
 			}),
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 	}
 

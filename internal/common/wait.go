@@ -65,10 +65,8 @@ type WaitForBranchArgs struct {
 	ServiceID string // the branch's parent
 	BranchID  string
 
-	// Branch is the branch as last returned by the API. Unlike
-	// WaitForServiceArgs.Service, the whole branch is replaced on every poll,
-	// so fields that only appear once the branch is provisioned (its endpoint)
-	// are there for the caller afterwards.
+	// Branch works as WaitForServiceArgs.Service: its status decides whether
+	// polling is needed at all, and is updated in place as polling proceeds.
 	Branch *api.Branch
 
 	// TargetStatus, Input, Output, Timeout, and TimeoutMsg work as in
@@ -100,8 +98,7 @@ func WaitForBranch(ctx context.Context, args WaitForBranchArgs) error {
 			if resp.JSON200 == nil {
 				return resp.StatusCode(), resp.Status(), nil, nil
 			}
-			*args.Branch = *resp.JSON200
-			return resp.StatusCode(), resp.Status(), &args.Branch.Status, nil
+			return resp.StatusCode(), resp.Status(), &resp.JSON200.Status, nil
 		},
 	})
 }

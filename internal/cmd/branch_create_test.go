@@ -80,6 +80,12 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			wantStderr: defaultNoWaitStderr,
 		},
 		{
+			name:    "zero wait timeout",
+			args:    []string{"branch", "create", "svc-12345", "--wait-timeout", "0s"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
 			name:    "invalid cpu/memory combination",
 			args:    []string{"branch", "create", "svc-12345", "--cpu", "1000", "--memory", "4"},
 			opts:    []runOption{withExperimental()},
@@ -177,6 +183,40 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 Branch ID: br-12345
 Password not saved (--password-storage=none). Make sure to store it securely.
 Branch is being created. Use 'tiger branch get br-12345' to check branch status.
+`,
+		},
+		{
+			// With nothing stored, the password comes from the create
+			// response, as it does for service create.
+			name:       "with password from the create response",
+			args:       []string{"branch", "create", "svc-12345", "--no-wait", "--password-storage", "none", "--with-password", "-o", "env"},
+			opts:       []runOption{withExperimental()},
+			mock:       setupCreate(baseReq, created),
+			wantStdout: sampleBranchEnv + "PGPASSWORD=branch-pw\n",
+			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
+Branch ID: br-12345
+Password not saved (--password-storage=none). Make sure to store it securely.
+Branch is being created. Use 'tiger branch get br-12345' to check branch status.
+`,
+		},
+		{
+			// The polls never carry the password, so waiting must keep the
+			// create response's.
+			name:     "with password survives the wait",
+			synctest: true,
+			args:     []string{"branch", "create", "svc-12345", "--password-storage", "none", "--with-password", "-o", "env"},
+			opts:     []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				setupCreate(baseReq, created)(m)
+				expectGetBranch(m, sampleBranch())
+			},
+			wantStdout: sampleBranchEnv + "PGPASSWORD=branch-pw\n",
+			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
+Branch ID: br-12345
+Password not saved (--password-storage=none). Make sure to store it securely.
+Waiting for branch to be ready (timeout: 10m0s)...
+⢎  Branch status: QUEUED
+Branch is ready.
 `,
 		},
 		{
