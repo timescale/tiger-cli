@@ -24,17 +24,6 @@ type FetchServiceLogsArgs struct {
 	Node *int
 }
 
-type FetchBranchLogsArgs struct {
-	Client    api.ClientWithResponsesInterface
-	ProjectID string
-	// ServiceID is the branch's parent service, which the endpoint is nested under.
-	ServiceID string
-	BranchID  string
-	Tail      int
-	Since     *time.Time
-	Until     *time.Time
-}
-
 // FetchServiceLogs fetches service logs with cursor-based pagination up to the specified
 // tail limit. Returns entries in ascending order by timestamp (oldest first, newest last).
 func FetchServiceLogs(ctx context.Context, args FetchServiceLogsArgs) ([]api.ServiceLogEntry, error) {
@@ -62,6 +51,17 @@ func FetchServiceLogs(ctx context.Context, args FetchServiceLogsArgs) ([]api.Ser
 		}
 		return entries, resp.JSON200.LastCursor, nil
 	})
+}
+
+type FetchBranchLogsArgs struct {
+	Client    api.ClientWithResponsesInterface
+	ProjectID string
+	// ServiceID is the branch's parent service, which the endpoint is nested under.
+	ServiceID string
+	BranchID  string
+	Tail      int
+	Since     *time.Time
+	Until     *time.Time
 }
 
 // FetchBranchLogs is FetchServiceLogs for a branch.
