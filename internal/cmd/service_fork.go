@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -94,6 +93,10 @@ default service from your configuration.`,
 				return fmt.Errorf("environment must be one of: %s (got '%s')", strings.Join(validEnvironmentTags, ", "), environment)
 			}
 
+			if err := validateWaitTimeout(waitTimeout); err != nil {
+				return err
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
@@ -171,20 +174,10 @@ default service from your configuration.`,
 			}
 
 			// Make API call to fork service
-			forkResp, err := client.ForkServiceWithResponse(cmd.Context(), projectID, source.ServiceID, forkReq)
+			forkedService, err := common.JSON202(client.ForkServiceWithResponse(cmd.Context(), projectID, source.ServiceID, forkReq))
 			if err != nil {
-				return fmt.Errorf("failed to fork service: %w", err)
+				return err
 			}
-
-			// Handle API response
-			if forkResp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(forkResp.StatusCode(), forkResp.JSON4XX)
-			}
-
-			if forkResp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-			forkedService := *forkResp.JSON202
 			forkedServiceID := forkedService.ServiceID
 
 			cmd.PrintErrf("Service ID: %s\n", forkedServiceID)
@@ -196,14 +189,14 @@ default service from your configuration.`,
 			if !noSetDefault {
 				if err := setDefaultService(cmd, cfg, forkedServiceID); err != nil {
 					// Log warning but don't fail the command
-					cmd.PrintErrf("Warning: Failed to set service as default: %v\n", err)
+					cmd.PrintErrf("Warning: failed to set service as default: %v\n", err)
 				}
 			}
 
 			// Handle wait behavior
 			var waitErr error
 			if noWait {
-				cmd.PrintErrf("Service is being forked. Use 'tiger service list' to check status.\n")
+				cmd.PrintErrf("Service is being forked. Use 'tiger service get %s' to check service status.\n", forkedServiceID)
 			} else {
 				// Wait for service to be ready
 				cmd.PrintErrf("Waiting for fork to be ready (timeout: %v)...\n", waitTimeout)
@@ -229,7 +222,7 @@ default service from your configuration.`,
 				Experimental: app.Experimental,
 				WithPassword: withPassword,
 			}); err != nil {
-				cmd.PrintErrf("Warning: Failed to output service details: %v\n", err)
+				cmd.PrintErrf("Warning: failed to output service details: %v\n", err)
 			}
 
 			// Return error for sake of exit code, but silence it since it was already output above
@@ -240,9 +233,9 @@ default service from your configuration.`,
 
 	// Add flags
 	cmd.Flags().StringVar(&name, "name", "", "Name for the forked service (auto-generated if not provided)")
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for fork operation to complete")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
 	cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set this service as the default service")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 
 	// Timing strategy flags. --now is the default and kept only for backwards
 	// compatibility, so it's hidden from help.

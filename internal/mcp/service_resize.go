@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -102,20 +100,13 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	if cfg.ReadOnly.BlocksAll() {
 		return nil, ServiceResizeOutput{}, common.ErrReadOnly
 	}
-	current, err := common.GetService(ctx, client, projectID, input.ServiceID)
+	current, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
-	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(*current)); err != nil {
+	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(current)); err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
-
-	s.logger.Info("MCP: Resizing service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("cpu_memory", input.CPUMemory),
-		slog.Any("iops", input.IOPS),
-	)
 
 	// The schema requires cpu_memory unless the experimental gate adds iops.
 	// An IOPS-only resize omits CPU and memory, which the API leaves unchanged.
@@ -144,24 +135,13 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Make API call to resize service
-	resp, err := client.ResizeServiceWithResponse(ctx, projectID, input.ServiceID, resizeReq)
+	service, err := common.JSON202(client.ResizeServiceWithResponse(ctx, projectID, input.ServiceID, resizeReq))
 	if err != nil {
-		return nil, ServiceResizeOutput{}, fmt.Errorf("failed to resize service: %w", err)
+		return nil, ServiceResizeOutput{}, err
 	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceResizeOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON202 == nil {
-		return nil, ServiceResizeOutput{}, fmt.Errorf("empty response from API")
-	}
-
-	service := *resp.JSON202
 
 	// If wait is requested, wait for resize to complete
-	message := "Resize request accepted. The service may still be resizing."
+	message := "Service resize request accepted. The service may still be resizing."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
 			Client:       client,

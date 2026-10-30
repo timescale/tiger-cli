@@ -50,6 +50,24 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			wantErr: "unknown flag: --no-set-default",
 		},
 		{
+			name:    "invalid cpu/memory combination",
+			args:    []string{"branch", "create", "svc-12345", "--cpu", "1000", "--memory", "4"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
+		},
+		{
+			name:    "zero wait timeout",
+			args:    []string{"branch", "create", "svc-12345", "--wait-timeout", "0s"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
+			name:    "negative wait timeout",
+			args:    []string{"branch", "create", "svc-12345", "--wait-timeout=-30m"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got -30m0s",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"branch", "create", "svc-12345"},
 			opts:    []runOption{withExperimental(), withNotLoggedIn()},
@@ -80,18 +98,6 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			wantStderr: defaultNoWaitStderr,
 		},
 		{
-			name:    "zero wait timeout",
-			args:    []string{"branch", "create", "svc-12345", "--wait-timeout", "0s"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "wait timeout must be positive, got 0s",
-		},
-		{
-			name:    "invalid cpu/memory combination",
-			args:    []string{"branch", "create", "svc-12345", "--cpu", "1000", "--memory", "4"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
-		},
-		{
 			name:    "missing service id",
 			args:    []string{"branch", "create"},
 			opts:    []runOption{withExperimental()},
@@ -116,9 +122,9 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to create branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 			wantStderr: "Creating branch from service 'test-service' (svc-12345)...\n" +
-				"Error: failed to create branch: connection refused\n",
+				"Error: failed to call API: connection refused\n",
 		},
 		{
 			name: "API error",

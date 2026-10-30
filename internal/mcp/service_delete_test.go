@@ -27,12 +27,12 @@ func TestServiceDeleteTool(t *testing.T) {
 	deleted := map[string]any{
 		"service_id": "e6ue9697jf",
 		"deleted":    true,
-		"message":    `Service "e6ue9697jf" has been deleted.`,
+		"message":    `Service 'e6ue9697jf' has been deleted.`,
 	}
 	cancelled := map[string]any{
 		"service_id": "e6ue9697jf",
 		"deleted":    false,
-		"message":    `Deletion cancelled: the user did not confirm deleting PROD service "e6ue9697jf" by typing its ID.`,
+		"message":    `Deletion cancelled: the user did not confirm deleting PROD service 'e6ue9697jf' by typing its ID.`,
 	}
 	const noElicitationMsg = "deleting service e6ue9697jf requires the user's confirmation because it is tagged PROD, " +
 		"but this MCP client does not support elicitation; ask the user to run 'tiger service delete e6ue9697jf' instead"
@@ -41,7 +41,7 @@ func TestServiceDeleteTool(t *testing.T) {
 	// the JSON round trip (which is where the SDK fills in the mode).
 	prompt := &mcp.ElicitParams{
 		Mode:    "form",
-		Message: `Delete PRODUCTION service "test-service" (e6ue9697jf)? This permanently destroys the service and all of its data, and cannot be undone.`,
+		Message: `Delete PRODUCTION service 'test-service' (e6ue9697jf)? This permanently destroys the service and all of its data, and cannot be undone.`,
 		RequestedSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

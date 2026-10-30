@@ -54,6 +54,10 @@ Return Codes:
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if timeout < 0 {
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", timeout))
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
@@ -79,11 +83,6 @@ Return Codes:
 			})
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
-			}
-
-			// Validate timeout (Cobra handles parsing automatically)
-			if timeout < 0 {
-				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", timeout))
 			}
 
 			// Test the connection

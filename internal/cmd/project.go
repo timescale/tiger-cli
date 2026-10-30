@@ -8,9 +8,12 @@ import (
 
 func buildProjectCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "project",
-		Short: "Manage Tiger Cloud projects",
-		Long:  `Manage Tiger Cloud projects.`,
+		Use:          "project",
+		Short:        "Manage Tiger Cloud projects",
+		Long:         `Manage Tiger Cloud projects.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	cmd.AddCommand(buildProjectListCmd(app))

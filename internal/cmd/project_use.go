@@ -55,14 +55,11 @@ cleared when you switch away.`,
 				return nil
 			}
 
-			resp, err := client.GetProjectsWithResponse(cmd.Context())
+			projects, err := common.JSON200(client.GetProjectsWithResponse(cmd.Context()))
 			if err != nil {
-				return fmt.Errorf("failed to list projects: %w", err)
+				return err
 			}
-			if resp.JSON200 == nil {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-			if err := requireProjectAccess(cmd, *resp.JSON200, targetID); err != nil {
+			if err := requireProjectAccess(cmd, projects, targetID); err != nil {
 				return err
 			}
 

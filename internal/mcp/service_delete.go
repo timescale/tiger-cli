@@ -3,8 +3,6 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -88,12 +86,12 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 
 	// The service's tag decides both the prod half of the read-only gate and
 	// whether the user has to confirm, so fetch it unconditionally.
-	service, err := common.GetService(ctx, client, projectID, input.ServiceID)
+	service, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
 		return nil, ServiceDeleteOutput{}, err
 	}
 
-	tag := common.ServiceEnvironmentTag(*service)
+	tag := common.ServiceEnvironmentTag(service)
 	if err := common.CheckReadOnly(cfg, tag); err != nil {
 		return nil, ServiceDeleteOutput{}, err
 	}
@@ -101,34 +99,26 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 	if tag == api.EnvironmentTagPROD {
 		answer, answered := req.Params.InputResponses[deleteConfirmationKey]
 		if !answered {
-			result, err := promptProdDelete(req, *service)
+			result, err := promptProdDelete(req, service)
 			return result, ServiceDeleteOutput{}, err
 		}
 		if !serviceIDConfirmed(answer, input.ServiceID) {
 			return nil, ServiceDeleteOutput{
 				ServiceID: input.ServiceID,
 				Deleted:   false,
-				Message:   fmt.Sprintf("Deletion cancelled: the user did not confirm deleting PROD service %q by typing its ID.", input.ServiceID),
+				Message:   fmt.Sprintf("Deletion cancelled: the user did not confirm deleting PROD service '%s' by typing its ID.", input.ServiceID),
 			}, nil
 		}
 	}
 
-	s.logger.Info("MCP: Deleting service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
-
-	resp, err := client.DeleteServiceWithResponse(ctx, projectID, input.ServiceID)
-	if err != nil {
-		return nil, ServiceDeleteOutput{}, fmt.Errorf("failed to delete service: %w", err)
-	}
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceDeleteOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	if err := common.Status202(client.DeleteServiceWithResponse(ctx, projectID, input.ServiceID)); err != nil {
+		return nil, ServiceDeleteOutput{}, err
 	}
 
 	return nil, ServiceDeleteOutput{
 		ServiceID: input.ServiceID,
 		Deleted:   true,
-		Message:   fmt.Sprintf("Service %q has been deleted.", input.ServiceID),
+		Message:   fmt.Sprintf("Service '%s' has been deleted.", input.ServiceID),
 	}, nil
 }
 
@@ -142,7 +132,7 @@ func promptProdDelete(req *mcp.CallToolRequest, service api.Service) (*mcp.CallT
 	}
 	return serviceIDConfirmationRequest(
 		deleteConfirmationKey,
-		fmt.Sprintf("Delete PRODUCTION service %q (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID),
+		fmt.Sprintf("Delete PRODUCTION service '%s' (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID),
 		service.ServiceID,
 	), nil
 }

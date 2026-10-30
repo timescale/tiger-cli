@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
@@ -31,20 +29,11 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 			}
 
 			// Make API call to list services
-			resp, err := client.GetServicesWithResponse(cmd.Context(), projectID, nil)
+			services, err := common.JSON200(client.GetServicesWithResponse(cmd.Context(), projectID, nil))
 			if err != nil {
-				return fmt.Errorf("failed to list services: %w", err)
+				return err
 			}
-
-			// Handle API response
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-			return outputServices(cmd, cfg, *resp.JSON200, serviceOutputOptions{Experimental: app.Experimental})
+			return outputServices(cmd, cfg, services, serviceOutputOptions{Experimental: app.Experimental})
 		},
 	}
 
@@ -65,8 +54,6 @@ func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Servi
 		return util.SerializeToJSON(outputWriter, outputServices)
 	case "yaml":
 		return util.SerializeToYAML(outputWriter, outputServices)
-	case "env":
-		return fmt.Errorf("environment variable output is not supported for multiple services")
 	default: // table format (default)
 		if len(outputServices) == 0 {
 			cmd.PrintErrln("No services found.")

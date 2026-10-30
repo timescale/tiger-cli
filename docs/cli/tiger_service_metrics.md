@@ -6,6 +6,10 @@ View service metrics
 
 Commands for querying time-series metrics for a Tiger Cloud service.
 
+```
+tiger service metrics [flags]
+```
+
 ### Options
 
 ```

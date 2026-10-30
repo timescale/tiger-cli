@@ -29,6 +29,16 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			wantErr: "--name is required",
 		},
 		{
+			name:    "from tsdbadmin without read-only",
+			args:    []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst", "--from", "tsdbadmin"},
+			wantErr: "roles inheriting from tsdbadmin must be read-only (use --read-only flag)",
+		},
+		{
+			name:    "from tsdbadmin with statement timeout",
+			args:    []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst", "--from", "tsdbadmin", "--read-only", "--statement-timeout", "30s"},
+			wantErr: "cannot use --statement-timeout with --from tsdbadmin (permission denied to alter special roles)",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			opts:    []runOption{withNotLoggedIn()},

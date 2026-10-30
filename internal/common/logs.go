@@ -2,8 +2,6 @@ package common
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"slices"
 	"time"
 
@@ -43,29 +41,21 @@ func FetchServiceLogs(ctx context.Context, args FetchServiceLogsArgs) ([]api.Ser
 
 	var entries []api.ServiceLogEntry
 	for {
-		resp, err := args.Client.GetServiceLogsWithResponse(ctx, args.ProjectID, args.ServiceID, params)
+		page, err := JSON200(args.Client.GetServiceLogsWithResponse(ctx, args.ProjectID, args.ServiceID, params))
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch logs: %w", err)
+			return nil, err
 		}
 
-		if resp.StatusCode() != http.StatusOK {
-			return nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-		}
-
-		if resp.JSON200 == nil {
-			return nil, fmt.Errorf("unexpected empty response")
-		}
-
-		if resp.JSON200.Entries != nil {
-			entries = append(entries, *resp.JSON200.Entries...)
+		if page.Entries != nil {
+			entries = append(entries, *page.Entries...)
 		}
 
 		// Stop when we have enough logs or the server signals no further pages.
-		if len(entries) >= args.Tail || resp.JSON200.LastCursor == nil {
+		if len(entries) >= args.Tail || page.LastCursor == nil {
 			break
 		}
 
-		params.Cursor = resp.JSON200.LastCursor
+		params.Cursor = page.LastCursor
 	}
 
 	// Trim to the requested tail count.

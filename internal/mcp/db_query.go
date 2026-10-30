@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"time"
 
@@ -151,16 +150,6 @@ func (s *Server) handleDBQuery(ctx context.Context, req *mcp.CallToolRequest, in
 
 	// Convert timeout in seconds to time.Duration
 	timeout := time.Duration(input.TimeoutSeconds) * time.Second
-
-	s.logger.Info("MCP: Executing database query",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("file", input.File),
-		slog.Duration("timeout", timeout),
-		slog.String("role", input.Role),
-		slog.Bool("pooled", input.Pooled),
-		slog.String("read_only", string(cfg.ReadOnly)),
-	)
 
 	// service_id may name a service or one of its read replicas.
 	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID)

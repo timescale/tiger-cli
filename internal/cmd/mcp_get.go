@@ -67,7 +67,7 @@ func buildMCPGetCmd(app *common.App) *cobra.Command {
 
 			// Format output
 			output := cmd.OutOrStdout()
-			switch cfg.Output {
+			switch strings.ToLower(cfg.Output) {
 			case "json":
 				return util.SerializeToJSON(output, capability)
 			case "yaml":
@@ -89,7 +89,7 @@ func buildMCPGetCmd(app *common.App) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd

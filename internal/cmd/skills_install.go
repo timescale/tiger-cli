@@ -250,7 +250,7 @@ type skillsPickerItem struct {
 // directories. It fails without a terminal to prompt on.
 func skillsDirsFromPicker(cmd *cobra.Command) ([]string, error) {
 	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-		return nil, errors.New("TTY not detected - specify install locations as arguments (e.g. 'tiger skills install universal')")
+		return nil, errors.New("TTY not detected - cannot prompt for install locations. Specify them as arguments (e.g. 'tiger skills install universal')")
 	}
 	targets := skillsTargets()
 	dirs, err := resolveSkillsTargetDirs(targets)

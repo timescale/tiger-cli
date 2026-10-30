@@ -6,6 +6,10 @@ Manage Tiger Cloud projects
 
 Manage Tiger Cloud projects.
 
+```
+tiger project [flags]
+```
+
 ### Options
 
 ```

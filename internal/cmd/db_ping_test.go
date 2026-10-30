@@ -24,6 +24,17 @@ func TestDbPingCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			name:    "invalid timeout duration",
+			args:    []string{"db", "ping", "svc-12345", "--timeout", "invalid"},
+			wantErr: "invalid argument \"invalid\" for \"-t, --timeout\" flag: time: invalid duration \"invalid\"",
+		},
+		{
+			name:    "negative timeout",
+			args:    []string{"db", "ping", "svc-12345", "--timeout=-5s"},
+			wantErr: "timeout must be positive or zero, got -5s",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"db", "ping", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
@@ -56,11 +67,7 @@ func TestDbPingCmd(t *testing.T) {
 			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
-		{
-			name:    "invalid timeout duration",
-			args:    []string{"db", "ping", "svc-12345", "--timeout", "invalid"},
-			wantErr: "invalid argument \"invalid\" for \"-t, --timeout\" flag: time: invalid duration \"invalid\"",
-		},
+
 		{
 			name: "network error",
 			args: []string{"db", "ping", "svc-12345"},
@@ -102,13 +109,6 @@ func TestDbPingCmd(t *testing.T) {
 			args:    []string{"db", "ping", "svc-12345", "--pooled"},
 			mock:    setupGet,
 			wantErr: "connection pooler not available for this service",
-			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
-		},
-		{
-			name:    "negative timeout",
-			args:    []string{"db", "ping", "svc-12345", "--timeout=-5s"},
-			mock:    setupGet,
-			wantErr: "timeout must be positive or zero, got -5s",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
@@ -233,7 +233,7 @@ func TestIsConnectionRejected(t *testing.T) {
 		},
 		{
 			name: "non-postgres error",
-			err:  fmt.Errorf("dial tcp: connection refused"),
+			err:  errors.New("dial tcp: connection refused"),
 			want: false,
 		},
 	}

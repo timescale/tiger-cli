@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 
@@ -121,14 +119,6 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 		return nil, nil, err
 	}
 
-	s.logger.Info("MCP: Fetching metric series",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("metric", input.MetricName),
-		slog.String("from", input.From),
-		slog.String("to", input.To),
-	)
-
 	fromTime, err := time.Parse(time.RFC3339, input.From)
 	if err != nil {
 		return nil, nil, fmt.Errorf("from must be RFC3339 (e.g., 2026-05-13T00:00:00Z): %w", err)
@@ -160,20 +150,15 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 		body.GroupBy = &input.GroupBy
 	}
 
-	resp, err := client.GetServiceMetricsSeriesWithResponse(ctx, projectID, input.ServiceID, body)
+	series, err := common.JSON200(client.GetServiceMetricsSeriesWithResponse(ctx, projectID, input.ServiceID, body))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch metric series: %w", err)
+		return nil, nil, err
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	// Default to a non-nil slice so a missing body or a JSON null marshals to
-	// `[]` rather than `null`.
-	series := []api.MetricSeries{}
-	if resp.JSON200 != nil && *resp.JSON200 != nil {
-		series = *resp.JSON200
+	// Default to a non-nil slice so a JSON null marshals to `[]` rather than
+	// `null`.
+	if series == nil {
+		series = []api.MetricSeries{}
 	}
 
 	return nil, ServiceMetricsSeriesOutput{Series: series}, nil

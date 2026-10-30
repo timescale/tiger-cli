@@ -48,6 +48,16 @@ INFO Gracefully shutting down HTTP server, press control-C twice to immediately 
 
 	runCmdTests(t, []cmdTest{
 		{
+			name:    "rejects positional args",
+			args:    []string{"mcp", "start", "http", "bogus"},
+			wantErr: `unknown command "bogus" for "tiger mcp start http"`,
+		},
+		{
+			name:    "rejects unknown flags",
+			args:    []string{"mcp", "start", "http", "--bogus"},
+			wantErr: "unknown flag: --bogus",
+		},
+		{
 			name: "binds the requested port and shuts down on cancel",
 			args: []string{"mcp", "start", "http", "--port", fmt.Sprint(port)},
 			opts: append(noDocsProxy(nil), withContext(cancelled)),
@@ -63,14 +73,6 @@ INFO Tiger MCP server started address=localhost:%d
 			wantStderr: matchLog(fmt.Sprintf(`INFO Docs MCP proxy is disabled
 ERROR Failed to listen error="listen tcp 127.0.0.1:%d: bind: address already in use"
 `, busyPort)),
-		},
-		{
-			name:    "rejects positional args",
-			args:    []string{"mcp", "start", "http", "bogus"},
-			wantErr: `unknown command "bogus" for "tiger mcp start http"`,
-			// SilenceErrors suppresses Cobra's "Error:" line for this command,
-			// including for an argument error it reports before RunE runs.
-			wantStderr: "",
 		},
 	})
 

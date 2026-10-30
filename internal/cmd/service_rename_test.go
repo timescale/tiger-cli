@@ -93,7 +93,7 @@ func TestServiceRenameCmd(t *testing.T) {
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ServiceRename{Name: "analytics-prod"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to rename service: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

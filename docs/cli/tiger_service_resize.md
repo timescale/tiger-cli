@@ -53,8 +53,8 @@ tiger service resize [name-or-id] [flags]
       --cpu string              CPU allocation in millicores
   -h, --help                    help for resize
       --memory string           Memory allocation in gigabytes
-      --no-wait                 Don't wait for resize operation to complete
-      --wait-timeout duration   Maximum time to wait for operation to complete (default 10m0s)
+      --no-wait                 Don't wait for the operation to complete
+      --wait-timeout duration   Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s) (default 10m0s)
 ```
 
 ### Options inherited from parent commands

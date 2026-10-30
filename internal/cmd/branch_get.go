@@ -51,7 +51,7 @@ The branch can be given by ID or name.`,
 				WithPassword:    withPassword,
 				RequirePassword: true,
 			}
-			if parent, err := common.GetService(cmd.Context(), client, projectID, branch.ServiceID); err != nil {
+			if parent, err := common.JSON200(client.GetServiceWithResponse(cmd.Context(), projectID, branch.ServiceID)); err != nil {
 				cmd.PrintErrf("Warning: failed to get parent service: %v\n", err)
 			} else {
 				opts.ServiceName = parent.Name

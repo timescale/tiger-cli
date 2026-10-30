@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -78,13 +79,13 @@ read-only while leaving DEV services writable.`,
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if timeout < 0 {
+				return fmt.Errorf("timeout must be positive or zero, got %v", timeout)
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
-			}
-
-			if timeout < 0 {
-				return fmt.Errorf("timeout must be positive or zero, got %v", timeout)
 			}
 
 			// Resolve the service before reading the query: with no --command
@@ -126,7 +127,7 @@ read-only while leaving DEV services writable.`,
 				return handleDatabaseError(err, target)
 			}
 
-			switch cfg.Output {
+			switch strings.ToLower(cfg.Output) {
 			case "json":
 				return util.SerializeToJSON(cmd.OutOrStdout(), newDbQueryOutput(result))
 			case "yaml":
@@ -143,7 +144,7 @@ read-only while leaving DEV services writable.`,
 	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
 	cmd.Flags().DurationVar(&timeout, "timeout", 0, "Query timeout duration (e.g., 30s, 5m). Use 0 for no timeout")
-	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (table, json, yaml)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "file", fileCompletion())
 	registerFlagCompletion(cmd, "output", outputCompletion())
 	cmd.MarkFlagsMutuallyExclusive("command", "file")

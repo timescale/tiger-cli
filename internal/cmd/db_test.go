@@ -80,6 +80,28 @@ func expectGetService(m *mocks.MockClientWithResponsesInterface, id string, svc 
 		}, nil)
 }
 
+// TestDbCmd covers the group command itself (see groupRun and groupArgs).
+func TestDbCmd(t *testing.T) {
+	runCmdTests(t, []cmdTest{
+		{
+			name:       "no subcommand prints help without loading",
+			args:       []string{"db"},
+			wantStdout: matchHelp("Database-specific operations including connection management, testing, and configuration."),
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:    "unknown subcommand suggests close matches",
+			args:    []string{"db", "qurey"},
+			wantErr: "unknown command \"qurey\" for \"tiger db\"\n\nDid you mean this?\n\tquery",
+		},
+		{
+			name:    "unknown subcommand with no close match",
+			args:    []string{"db", "frobnicate"},
+			wantErr: `unknown command "frobnicate" for "tiger db"`,
+		},
+	})
+}
+
 // TestIsPostgresAuthenticationError covers the auth-error classifier at the helper
 // level: exercising it through the command would need a real Postgres server.
 func TestIsPostgresAuthenticationError(t *testing.T) {

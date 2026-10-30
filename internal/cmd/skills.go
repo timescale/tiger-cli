@@ -14,6 +14,9 @@ func buildSkillsCmd(app *common.App) *cobra.Command {
 
 Skills give AI coding agents curated knowledge and best practices for working
 with PostgreSQL, TimescaleDB, and Tiger Cloud.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	cmd.AddCommand(buildSkillsInstallCmd(app))

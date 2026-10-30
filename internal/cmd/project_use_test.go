@@ -118,7 +118,7 @@ func TestProjectUseCmd(t *testing.T) {
 				m.EXPECT().GetProjectsWithResponse(validCtx).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to list projects: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error listing projects",
@@ -133,6 +133,19 @@ func TestProjectUseCmd(t *testing.T) {
 			},
 			wantErr: "internal error",
 			checks:  []checkFunc{checkExitCode(common.ExitGeneralError)},
+		},
+		{
+			name: "nil response body listing projects",
+			args: []string{"project", "use", "project-new"},
+			opts: []runOption{oauthLogin},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetProjectsWithResponse(validCtx).
+					Return(&api.GetProjectsResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+					}, nil)
+			},
+			wantErr: "empty response from API",
+			checks:  []checkFunc{checkStoredProject(testProjectID)},
 		},
 		{
 			name:    "no access to requested project",

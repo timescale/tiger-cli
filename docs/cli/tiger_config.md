@@ -6,6 +6,10 @@ Manage CLI configuration
 
 Manage CLI configuration settings stored in ~/.config/tiger/config.yaml
 
+```
+tiger config [flags]
+```
+
 ### Options
 
 ```

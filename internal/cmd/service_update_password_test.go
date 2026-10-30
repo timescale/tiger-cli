@@ -50,6 +50,12 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			wantErr: "if any flags in the group [new-password auto-generate] are set none of the others can be; [auto-generate new-password] were all set",
 		},
 		{
+			name:    "env password and auto-generate conflict",
+			args:    []string{"service", "update-password", "svc-12345", "--auto-generate"},
+			opts:    []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pass-456")},
+			wantErr: "cannot use --auto-generate and --new-password together",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
 			opts:    []runOption{withNotLoggedIn()},
@@ -87,12 +93,6 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			name:    "missing service id",
 			args:    []string{"service", "update-password", "--new-password", "newpass123"},
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
-		},
-		{
-			name:    "env password and auto-generate conflict",
-			args:    []string{"service", "update-password", "svc-12345", "--auto-generate"},
-			opts:    []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pass-456")},
-			wantErr: "cannot use --auto-generate and --new-password together",
 		},
 		{
 			name: "network error on resolve",
@@ -143,7 +143,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			name:    "non-interactive without password",
 			args:    []string{"service", "update-password", "svc-12345"},
 			mock:    setupGet,
-			wantErr: "TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable",
+			wantErr: "TTY not detected - cannot prompt for a new password. Use --new-password, --auto-generate, or TIGER_NEW_PASSWORD",
 		},
 		{
 			name: "network error on update",
@@ -153,7 +153,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "svc-12345", api.UpdatePasswordInput{Password: "newpass123"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to update password: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error on update",

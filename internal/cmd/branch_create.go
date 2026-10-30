@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -71,8 +70,13 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if waitTimeout <= 0 {
-				return fmt.Errorf("wait timeout must be positive, got %v", waitTimeout)
+			if err := validateWaitTimeout(waitTimeout); err != nil {
+				return err
+			}
+
+			cpuMemoryCfg, err := common.FluidCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
+			if err != nil {
+				return err
 			}
 
 			cfg, client, projectID, err := app.GetAll()
@@ -84,11 +88,6 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 			// mode, branching a PROD service is allowed, as forking one into
 			// a DEV fork is.
 			if err := common.CheckReadOnly(cfg, common.BranchEnvironmentTag); err != nil {
-				return err
-			}
-
-			cpuMemoryCfg, err := common.FluidCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
-			if err != nil {
 				return err
 			}
 
@@ -119,17 +118,10 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 				createReq.Iops = &iops
 			}
 
-			resp, err := client.CreateBranchWithResponse(cmd.Context(), projectID, parent.ServiceID, createReq)
+			branch, err := common.JSON202(client.CreateBranchWithResponse(cmd.Context(), projectID, parent.ServiceID, createReq))
 			if err != nil {
-				return fmt.Errorf("failed to create branch: %w", err)
+				return err
 			}
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-			branch := *resp.JSON202
 
 			cmd.PrintErrf("Branch ID: %s\n", branch.ID)
 
@@ -179,8 +171,8 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (default 250)")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes (default 2)")
 	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the branch to be ready")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 

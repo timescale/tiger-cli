@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 
@@ -58,24 +57,15 @@ service from your configuration.`,
 				return err
 			}
 
-			resp, err := client.GetBackupsWithResponse(cmd.Context(), projectID, service.ServiceID)
+			backups, err := common.JSON200(client.GetBackupsWithResponse(cmd.Context(), projectID, service.ServiceID))
 			if err != nil {
-				return fmt.Errorf("failed to list backups: %w", err)
-			}
-
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
+				return err
 			}
 
 			// Default to a non-nil slice so a JSON null marshals to `[]` rather
 			// than `null`.
-			backups := []api.Backup{}
-			if *resp.JSON200 != nil {
-				backups = *resp.JSON200
+			if backups == nil {
+				backups = []api.Backup{}
 			}
 
 			return outputBackups(cmd, backups, cfg.Output)
@@ -96,8 +86,6 @@ func outputBackups(cmd *cobra.Command, backups []api.Backup, format string) erro
 		return util.SerializeToJSON(out, backups)
 	case "yaml":
 		return util.SerializeToYAML(out, backups)
-	case "env":
-		return fmt.Errorf("environment variable output is not supported for backups")
 	default:
 		if len(backups) == 0 {
 			cmd.PrintErrln("No backups found.")

@@ -3,8 +3,6 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -72,29 +70,15 @@ func (s *Server) handleServiceBackupRegionAdd(ctx context.Context, req *mcp.Call
 		return nil, ServiceBackupRegionAddOutput{}, err
 	}
 
-	s.logger.Info("MCP: Adding service backup region",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("region_code", input.RegionCode),
-	)
-
-	resp, err := client.CreateBackupRegionWithResponse(ctx, projectID, input.ServiceID, api.BackupRegionCreate{
+	region, err := common.JSON201(client.CreateBackupRegionWithResponse(ctx, projectID, input.ServiceID, api.BackupRegionCreate{
 		RegionCode: input.RegionCode,
-	})
+	}))
 	if err != nil {
-		return nil, ServiceBackupRegionAddOutput{}, fmt.Errorf("failed to add backup region: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusCreated {
-		return nil, ServiceBackupRegionAddOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON201 == nil {
-		return nil, ServiceBackupRegionAddOutput{}, fmt.Errorf("empty response from API")
+		return nil, ServiceBackupRegionAddOutput{}, err
 	}
 
 	return nil, ServiceBackupRegionAddOutput{
-		Region:  *resp.JSON201,
+		Region:  region,
 		Message: fmt.Sprintf("Backups for service '%s' will now be copied to '%s'.", input.ServiceID, input.RegionCode),
 	}, nil
 }

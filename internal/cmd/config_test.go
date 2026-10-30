@@ -24,6 +24,22 @@ func checkConfigFile(want map[string]any) checkFunc {
 func TestConfigCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{
+			name:       "no subcommand prints help without loading",
+			args:       []string{"config"},
+			wantStdout: matchHelp("Manage CLI configuration settings stored in ~/.config/tiger/config.yaml"),
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:    "unknown subcommand suggests close matches",
+			args:    []string{"config", "lsit"},
+			wantErr: "unknown command \"lsit\" for \"tiger config\"\n\nDid you mean this?\n\tlist\n\tset",
+		},
+		{
+			name:    "unknown subcommand with no close match",
+			args:    []string{"config", "frobnicate"},
+			wantErr: `unknown command "frobnicate" for "tiger config"`,
+		},
+		{
 			name:       "cfg alias",
 			args:       []string{"cfg", "set", "service_id", "alias-service"},
 			wantStdout: "Set service_id = alias-service\n",

@@ -34,7 +34,7 @@ func TestServiceBackupRegionRemoveTool(t *testing.T) {
 	}
 	cancelled := map[string]any{
 		"removed": false,
-		"message": `Removal cancelled: the user did not confirm removing backup region "eu-central-1" from PROD service "e6ue9697jf" by typing its ID.`,
+		"message": `Removal cancelled: the user did not confirm removing backup region 'eu-central-1' from PROD service 'e6ue9697jf' by typing its ID.`,
 	}
 	const noElicitationMsg = "removing backup region eu-central-1 from service e6ue9697jf requires the user's confirmation because it is tagged PROD, " +
 		"but this MCP client does not support elicitation; ask the user to run 'tiger service backup region remove e6ue9697jf --region eu-central-1' instead"
@@ -43,7 +43,7 @@ func TestServiceBackupRegionRemoveTool(t *testing.T) {
 	// the JSON round trip (which is where the SDK fills in the mode).
 	prompt := &mcp.ElicitParams{
 		Mode:    "form",
-		Message: `Stop copying PRODUCTION service "test-service" (e6ue9697jf) backups to "eu-central-1"? Backup copies in that region will be deleted.`,
+		Message: `Stop copying PRODUCTION service 'test-service' (e6ue9697jf) backups to 'eu-central-1'? Backup copies in that region will be deleted.`,
 		RequestedSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -188,7 +188,7 @@ func TestServiceBackupRegionRemoveTool(t *testing.T) {
 				m.EXPECT().DeleteBackupRegionWithResponse(validCtx, testProjectID, "e6ue9697jf", "eu-central-1").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to remove backup region: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

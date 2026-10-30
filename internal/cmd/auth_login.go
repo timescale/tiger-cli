@@ -168,7 +168,7 @@ You can find your API credentials at: https://console.cloud.tigerdata.com/dashbo
 					return fmt.Errorf("failed to get credentials: %w", err)
 				}
 				if creds.publicKey == "" || creds.secretKey == "" {
-					return fmt.Errorf("both public key and secret key are required")
+					return errors.New("both public key and secret key are required")
 				}
 			}
 
@@ -385,7 +385,7 @@ func flagOrEnvVar(flagVal, envVarName string) string {
 
 func promptForCredentials(cmd *cobra.Command, consoleURL string, creds credentials) (credentials, error) {
 	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-		return credentials{}, fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY)")
+		return credentials{}, errors.New("TTY not detected - cannot prompt for credentials. Use --public-key and --secret-key, or TIGER_PUBLIC_KEY and TIGER_SECRET_KEY")
 	}
 
 	ctx := cmd.Context()
@@ -682,7 +682,7 @@ func (c *oauthCallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if state != c.expectedState {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "Invalid state parameter")
-		c.sendError(fmt.Errorf("invalid state parameter"))
+		c.sendError(errors.New("invalid state parameter"))
 		return
 	}
 
@@ -691,7 +691,7 @@ func (c *oauthCallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if code == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "Missing authorization code")
-		c.sendError(fmt.Errorf("missing authorization code in callback"))
+		c.sendError(errors.New("missing authorization code in callback"))
 		return
 	}
 
@@ -757,14 +757,10 @@ func openBrowserAsync(url string) <-chan error {
 }
 
 func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWithResponses) (string, error) {
-	resp, err := client.GetProjectsWithResponse(ctx)
+	projects, err := common.JSON200(client.GetProjectsWithResponse(ctx))
 	if err != nil {
-		return "", fmt.Errorf("failed to get user projects: %w", err)
+		return "", err
 	}
-	if resp.JSON200 == nil {
-		return "", common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	projects := *resp.JSON200
 
 	if l.projectID != "" {
 		if err := requireProjectAccess(l.cmd, projects, l.projectID); err != nil {
@@ -775,12 +771,12 @@ func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWith
 
 	switch len(projects) {
 	case 0:
-		return "", fmt.Errorf("user has no accessible projects")
+		return "", errors.New("user has no accessible projects")
 	case 1:
 		return projects[0].ID, nil
 	default:
 		if !util.IsTerminal(l.cmd.InOrStdin()) || !util.IsTerminal(l.cmd.ErrOrStderr()) {
-			return "", fmt.Errorf("TTY not detected - cannot select between %d projects. Log in with API keys instead (--public-key, --secret-key)", len(projects))
+			return "", fmt.Errorf("TTY not detected - cannot prompt to select between %d projects. Use --project-id, or log in with API keys (--public-key, --secret-key)", len(projects))
 		}
 		return selectProjectInteractively(l.cmd, projects)
 	}
@@ -805,7 +801,7 @@ func selectProjectInteractivelyImpl(cmd *cobra.Command, projects []api.Project) 
 
 	result := finalModel.(projectSelectModel)
 	if result.selected == "" {
-		return "", fmt.Errorf("no project selected")
+		return "", errors.New("no project selected")
 	}
 
 	return result.selected, nil

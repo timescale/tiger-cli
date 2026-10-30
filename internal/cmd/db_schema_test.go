@@ -148,7 +148,7 @@ func TestDbSchemaCmd(t *testing.T) {
 				expectGetService(m, "svc-12345", sampleService())
 			},
 			wantErr:    notReadyMsg("rep-67890"),
-			wantStderr: "Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\nError: " + notReadyMsg("rep-67890") + "\n",
+			wantStderr: "Warning: read replica 'replica-service' has no connection pooler; connecting directly instead\nError: " + notReadyMsg("rep-67890") + "\n",
 		},
 		{
 			name:       "prints the schema with the flag defaults",
@@ -184,7 +184,7 @@ func TestDbSchemaCmd(t *testing.T) {
 			},
 			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin", Pooled: true}, schema, nil)},
 			wantStdout: schemaText,
-			wantStderr: "Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\n",
+			wantStderr: "Warning: read replica 'replica-service' has no connection pooler; connecting directly instead\n",
 		},
 		{
 			// A fetch failure goes through handleDatabaseError like any other.

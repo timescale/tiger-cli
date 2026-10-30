@@ -11,9 +11,12 @@ import (
 // in buildServiceCmd.
 func buildServiceBackupCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "backup",
-		Short: "Manage a service's backups",
-		Long:  `Manage the backups taken for a database service, including cross-region copies.`,
+		Use:          "backup",
+		Short:        "Manage a service's backups",
+		Long:         `Manage the backups taken for a database service, including cross-region copies.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	cmd.AddCommand(buildServiceBackupListCmd(app))

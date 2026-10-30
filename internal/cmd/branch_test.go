@@ -9,6 +9,31 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
+// TestBranchCmd covers the group command itself (see groupRun and groupArgs).
+func TestBranchCmd(t *testing.T) {
+	runCmdTests(t, []cmdTest{
+		{
+			name:       "no subcommand prints help without loading",
+			args:       []string{"branch"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("Manage branches of Fluid Services."),
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:    "unknown subcommand suggests close matches",
+			args:    []string{"branch", "lsit"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "unknown command \"lsit\" for \"tiger branch\"\n\nDid you mean this?\n\tlist",
+		},
+		{
+			name:    "unknown subcommand with no close match",
+			args:    []string{"branch", "frobnicate"},
+			opts:    []runOption{withExperimental()},
+			wantErr: `unknown command "frobnicate" for "tiger branch"`,
+		},
+	})
+}
+
 // TestBranchExperimentalGate covers the registration gate for the branch
 // commands: `tiger branch` and `tiger service branch` exist only behind the
 // experimental env var.
@@ -22,11 +47,9 @@ func TestBranchExperimentalGate(t *testing.T) {
 				"Run 'tiger --help' for usage.\n",
 		},
 		{
-			// Cobra treats an unknown name under a group as a stray argument
-			// and prints the group's help (see TestServiceExperimentalGate).
-			name:       "service branch unregistered by default",
-			args:       []string{"service", "branch"},
-			wantStdout: matchHelp("Available Commands:", "branch"),
+			name:    "service branch unregistered by default",
+			args:    []string{"service", "branch"},
+			wantErr: `unknown command "branch" for "tiger service"`,
 		},
 		{
 			name:       "branch registered when experimental",

@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -53,13 +52,7 @@ given, the branch keeps its current CPU and memory.`,
 		ValidArgsFunction: branchRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, client, projectID, err := app.GetAll()
-			if err != nil {
-				return err
-			}
-
-			branchRef, err := getBranchRef(args)
-			if err != nil {
+			if err := validateWaitTimeout(waitTimeout); err != nil {
 				return err
 			}
 
@@ -68,6 +61,16 @@ given, the branch keeps its current CPU and memory.`,
 				return errors.New("must specify at least one of --cpu, --memory, or --iops")
 			}
 			cpuMemoryCfg, err := common.FluidCPUMemoryConfigs().ValidateAndNormalize(cpu, memory)
+			if err != nil {
+				return err
+			}
+
+			cfg, client, projectID, err := app.GetAll()
+			if err != nil {
+				return err
+			}
+
+			branchRef, err := getBranchRef(args)
 			if err != nil {
 				return err
 			}
@@ -95,22 +98,15 @@ given, the branch keeps its current CPU and memory.`,
 
 			cmd.PrintErrf("Resizing branch %s to %s...\n", branchLabel(*resolved), target)
 
-			resp, err := client.ResizeBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID, resizeReq)
+			branch, err := common.JSON202(client.ResizeBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID, resizeReq))
 			if err != nil {
-				return fmt.Errorf("failed to resize branch: %w", err)
+				return err
 			}
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-			branch := *resp.JSON202
 
 			cmd.PrintErrf("Resize request accepted for branch %s.\n", branchLabel(*resolved))
 
 			if noWait {
-				cmd.PrintErrln("Use 'tiger branch get' to check branch status.")
+				cmd.PrintErrf("Use 'tiger branch get %s' to check branch status.\n", resolved.ID)
 				return nil
 			}
 
@@ -141,8 +137,8 @@ given, the branch keeps its current CPU and memory.`,
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
 	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 
 	registerFlagCompletion(cmd, "cpu", branchCPUCompletion)
 	registerFlagCompletion(cmd, "memory", branchMemoryCompletion)

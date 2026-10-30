@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -104,12 +105,12 @@ func ValidateAPIKey(ctx context.Context, cfg *config.Config, client api.ClientWi
 	}
 
 	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("empty response from API")
+		return nil, errors.New("empty response from API")
 	}
 
 	authInfo := resp.JSON200
 	if authInfo.APIKey == nil {
-		return nil, fmt.Errorf("expected a PAT credential")
+		return nil, errors.New("expected a PAT credential")
 	}
 	apiKey := authInfo.APIKey
 

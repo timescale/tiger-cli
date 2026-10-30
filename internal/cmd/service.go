@@ -17,13 +17,16 @@ import (
 // buildServiceCmd creates the main service command with all subcommands.
 // experimental still gates `backups` and `branch`, which are backed by gateway
 // endpoints marked `x-tigerdata-preview: true`; when false, they are not added
-// to the tree at all. See CLAUDE.md's "Experimental Feature Gating".
+// to the tree at all. See AGENTS.md's "Experimental Feature Gating".
 func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "service",
-		Aliases: []string{"services", "svc"},
-		Short:   "Manage database services",
-		Long:    `Manage database services within Tiger Cloud platform.`,
+		Use:          "service",
+		Aliases:      []string{"services", "svc"},
+		Short:        "Manage database services",
+		Long:         `Manage database services within Tiger Cloud platform.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	// Add all subcommands
@@ -242,7 +245,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 
 	if connectionDetails, err := common.GetConnectionDetails(cfg, common.NewServiceConnectionTarget(service), detailsOpts); err != nil {
 		if cmd != nil {
-			cmd.PrintErrf("Warning: Failed to get connection details: %v\n", err)
+			cmd.PrintErrf("Warning: failed to get connection details: %v\n", err)
 		}
 	} else {
 		outputSvc.ConnectionDetails = *connectionDetails

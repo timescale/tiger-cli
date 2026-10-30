@@ -15,7 +15,7 @@ tiger config list [flags]
 ```
   -h, --help            help for list
       --no-defaults     do not show default values for unset fields
-  -o, --output string   output format (json, yaml, table)
+  -o, --output string   Output format (json, yaml, table)
       --with-env        apply environment variable overrides
 ```
 

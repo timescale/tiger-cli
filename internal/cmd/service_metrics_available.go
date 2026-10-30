@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -39,20 +37,16 @@ service from your configuration.`,
 				return err
 			}
 
-			resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(cmd.Context(), projectID, service.ServiceID)
+			series, err := common.JSON200(client.GetServiceMetricsAvailableSeriesWithResponse(cmd.Context(), projectID, service.ServiceID))
 			if err != nil {
-				return fmt.Errorf("failed to list metric series: %w", err)
+				return err
 			}
 
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			// Default to a non-nil slice so a JSON null marshals to `[]` rather
+			// than `null`.
+			if series == nil {
+				series = []string{}
 			}
-
-			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-
-			series := *resp.JSON200
 
 			out := cmd.OutOrStdout()
 			switch strings.ToLower(cfg.Output) {

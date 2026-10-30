@@ -2,9 +2,7 @@ package mcp
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
-	"net/http"
+	"errors"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -61,32 +59,19 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 		return nil, ServiceGetOutput{}, err
 	}
 
-	s.logger.Info("MCP: Getting service details",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
-
 	// Make API call to get service details
-	resp, err := client.GetServiceWithResponse(ctx, projectID, input.ServiceID)
+	service, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
-		return nil, ServiceGetOutput{}, fmt.Errorf("failed to get service details: %w", err)
-	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceGetOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, ServiceGetOutput{}, fmt.Errorf("empty response from API")
+		return nil, ServiceGetOutput{}, err
 	}
 
 	output := ServiceGetOutput{
-		Service: s.convertToServiceDetail(cfg, *resp.JSON200, input.WithPassword),
+		Service: s.convertToServiceDetail(cfg, service, input.WithPassword),
 	}
 
 	// Check if password was requested but not available
 	if input.WithPassword && output.Service.Password == "" {
-		return nil, ServiceGetOutput{}, fmt.Errorf("requested password but password not available")
+		return nil, ServiceGetOutput{}, errors.New("requested password but password not available")
 	}
 
 	return nil, output, nil

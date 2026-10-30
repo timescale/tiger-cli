@@ -24,7 +24,7 @@ import (
 // internally via a sync.RWMutex.
 type App struct {
 	// Experimental gates preview-stage commands and MCP tools. Read once from
-	// TIGER_EXPERIMENTAL at startup; see CLAUDE.md's "Experimental Feature
+	// TIGER_EXPERIMENTAL at startup; see AGENTS.md's "Experimental Feature
 	// Gating".
 	Experimental bool
 

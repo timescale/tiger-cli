@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -106,7 +105,7 @@ skipping the prompt. Read replicas share the primary's credentials.` + branchRef
 			// Check if psql is available
 			psqlPath, err := exec.LookPath("psql")
 			if err != nil {
-				return fmt.Errorf("psql not found. Install the PostgreSQL client tools")
+				return errors.New("psql not found. Install the PostgreSQL client tools")
 			}
 
 			opts := common.ConnectionDetailsOptions{
@@ -181,7 +180,7 @@ func selectConnection(
 	// Offer the replica menu only for a primary on an interactive terminal.
 	// Branches have no read replicas.
 	if target.Kind == common.TargetService && !noReplicaPrompt && util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr()) {
-		replicas, err := fetchReplicaSets(ctx, client, projectID, target.ID)
+		replicas, err := common.JSON200(client.GetReplicaSetsWithResponse(ctx, projectID, target.ID))
 		if err != nil {
 			// Don't block the connection if we can't list replicas.
 			cmd.PrintErrf("Warning: could not list read replicas: %v\n", err)
@@ -225,24 +224,6 @@ func connectableReplicas(replicas []api.ReadReplicaSet) []api.ReadReplicaSet {
 		}
 	}
 	return out
-}
-
-// fetchReplicaSets retrieves the read replica sets for a service.
-func fetchReplicaSets(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) ([]api.ReadReplicaSet, error) {
-	resp, err := client.GetReplicaSetsWithResponse(ctx, projectID, serviceID)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, nil
-	}
-
-	return *resp.JSON200, nil
 }
 
 // connectTargetKind enumerates the choices in the connect target menu.
@@ -405,7 +386,7 @@ func connectWithPasswordMenu(
 
 	// Check if we're in a TTY for interactive menu
 	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-		return fmt.Errorf("authentication failed and no TTY available for interactive password entry")
+		return errors.New("TTY not detected - cannot prompt for a password. Save the correct one with 'tiger db save-password'")
 	}
 
 	// Password reset is admin-only, and rotating the master password is a

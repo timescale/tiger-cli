@@ -50,6 +50,33 @@ CPU/memory allocation. See the Tiger Data documentation for details. If only
 --iops is given, the service keeps its current CPU and memory.`),
 		},
 		{
+			name:    "missing cpu and memory",
+			args:    []string{"service", "resize", "svc-12345"},
+			wantErr: "must specify at least one of --cpu or --memory",
+		},
+		{
+			// --iops is a preview flag, so without the gate it doesn't exist.
+			name:    "iops flag rejected without experimental",
+			args:    []string{"service", "resize", "svc-12345", "--iops", "12000"},
+			wantErr: "unknown flag: --iops",
+		},
+		{
+			name:    "experimental missing cpu, memory, and iops",
+			args:    []string{"service", "resize", "svc-12345"},
+			opts:    []runOption{experimental},
+			wantErr: "must specify at least one of --cpu, --memory, or --iops",
+		},
+		{
+			name:    "zero wait timeout",
+			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--wait-timeout", "0s"},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
+			name:    "negative wait timeout",
+			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--wait-timeout=-30m"},
+			wantErr: "wait timeout must be positive, got -30m0s",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			opts:    []runOption{withNotLoggedIn()},
@@ -86,30 +113,13 @@ CPU/memory allocation. See the Tiger Data documentation for details. If only
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
 			name:    "missing service id",
 			args:    []string{"service", "resize", "--cpu", "2000", "--memory", "8"},
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
-		},
-		{
-			name:    "missing cpu and memory",
-			args:    []string{"service", "resize", "svc-12345"},
-			wantErr: "must specify at least one of --cpu or --memory",
-		},
-		{
-			// --iops is a preview flag, so without the gate it doesn't exist.
-			name:    "iops flag rejected without experimental",
-			args:    []string{"service", "resize", "svc-12345", "--iops", "12000"},
-			wantErr: "unknown flag: --iops",
-		},
-		{
-			name:    "experimental missing cpu, memory, and iops",
-			args:    []string{"service", "resize", "svc-12345"},
-			opts:    []runOption{experimental},
-			wantErr: "must specify at least one of --cpu, --memory, or --iops",
 		},
 		{
 			name: "ambiguous name refused",
@@ -155,8 +165,8 @@ Use 'tiger service get' to check service status.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr:    "failed to resize service: connection refused",
-			wantStderr: "Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...\nError: failed to resize service: connection refused\n",
+			wantErr:    "failed to call API: connection refused",
+			wantStderr: "Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...\nError: failed to call API: connection refused\n",
 		},
 		{
 			name: "API error",
@@ -216,7 +226,7 @@ Service resized to 2 CPU/8 GB.
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -233,7 +243,7 @@ Use 'tiger service get' to check service status.
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -249,7 +259,7 @@ Use 'tiger service get' to check service status.
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 4 CPU/16 GB...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -265,7 +275,7 @@ Use 'tiger service get' to check service status.
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{
@@ -284,7 +294,7 @@ Use 'tiger service get' to check service status.
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 12000 IOPS...
 Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+Use 'tiger service get svc-12345' to check service status.
 `,
 		},
 		{

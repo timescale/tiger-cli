@@ -82,7 +82,7 @@ func TestDBExtensionsListTool(t *testing.T) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "service lookup API error",
@@ -119,7 +119,7 @@ func TestDBExtensionsListTool(t *testing.T) {
 						JSON4XX:      &api.ClientError{Message: new("service not found")},
 					}, nil)
 			},
-			wantErr: `failed to fetch parent service "e6ue9697jf" for read replica: service not found`,
+			wantErr: `failed to fetch parent service 'e6ue9697jf' for read replica: service not found`,
 		},
 		{
 			name:    "service paused",

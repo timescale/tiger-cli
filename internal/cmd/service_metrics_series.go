@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -148,20 +147,18 @@ into 1-hour (3600s) intervals unless --bucket-seconds is also given.`,
 				body.GroupBy = &groupBy
 			}
 
-			resp, err := client.GetServiceMetricsSeriesWithResponse(cmd.Context(), projectID, service.ServiceID, body)
+			series, err := common.JSON200(client.GetServiceMetricsSeriesWithResponse(cmd.Context(), projectID, service.ServiceID, body))
 			if err != nil {
-				return fmt.Errorf("failed to fetch metric series: %w", err)
+				return err
 			}
 
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			// Default to a non-nil slice so a JSON null marshals to `[]` rather
+			// than `null`.
+			if series == nil {
+				series = []api.MetricSeries{}
 			}
 
-			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-
-			return renderMetricSeries(cmd, cfg.Output, *resp.JSON200)
+			return renderMetricSeries(cmd, cfg.Output, series)
 		},
 	}
 

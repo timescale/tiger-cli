@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -75,14 +74,7 @@ other will be automatically configured).` + iopsSectionHelp,
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, client, projectID, err := app.GetAll()
-			if err != nil {
-				return err
-			}
-
-			// Determine the service ref
-			serviceRef, err := getServiceRef(cmd, cfg, args)
-			if err != nil {
+			if err := validateWaitTimeout(waitTimeout); err != nil {
 				return err
 			}
 
@@ -94,6 +86,17 @@ other will be automatically configured).` + iopsSectionHelp,
 					return errors.New("must specify at least one of --cpu, --memory, or --iops")
 				}
 				return errors.New("must specify at least one of --cpu or --memory")
+			}
+
+			cfg, client, projectID, err := app.GetAll()
+			if err != nil {
+				return err
+			}
+
+			// Determine the service ref
+			serviceRef, err := getServiceRef(cmd, cfg, args)
+			if err != nil {
+				return err
 			}
 
 			resolved, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
@@ -129,26 +132,16 @@ other will be automatically configured).` + iopsSectionHelp,
 			cmd.PrintErrf("Resizing service %s to %s...\n", serviceLabel(*resolved), target)
 
 			// Make API call to resize service
-			resp, err := client.ResizeServiceWithResponse(cmd.Context(), projectID, resolved.ServiceID, resizeReq)
+			service, err := common.JSON202(client.ResizeServiceWithResponse(cmd.Context(), projectID, resolved.ServiceID, resizeReq))
 			if err != nil {
-				return fmt.Errorf("failed to resize service: %w", err)
+				return err
 			}
-
-			// Handle API response
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-			service := *resp.JSON202
 
 			cmd.PrintErrf("Resize request accepted for service %s.\n", serviceLabel(*resolved))
 
 			// If not waiting, return early
 			if noWait {
-				cmd.PrintErrln("Use 'tiger service get' to check service status.")
+				cmd.PrintErrf("Use 'tiger service get %s' to check service status.\n", resolved.ServiceID)
 				return nil
 			}
 
@@ -183,8 +176,8 @@ other will be automatically configured).` + iopsSectionHelp,
 		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 		registerFlagCompletion(cmd, "iops", iopsCompletion)
 	}
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 
 	registerFlagCompletion(cmd, "cpu", cpuCompletion(false, app.Experimental))
 	registerFlagCompletion(cmd, "memory", memoryCompletion(false, app.Experimental))

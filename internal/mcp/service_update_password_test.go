@@ -68,7 +68,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 	}
 	cancelled := map[string]any{
 		"updated": false,
-		"message": `Password update cancelled: the user did not confirm updating the password of PROD service "e6ue9697jf" by typing its ID.`,
+		"message": `Password update cancelled: the user did not confirm updating the password of PROD service 'e6ue9697jf' by typing its ID.`,
 	}
 	const noElicitationMsg = "updating the password of service e6ue9697jf requires the user's confirmation because it is tagged PROD, " +
 		"but this MCP client does not support elicitation; ask the user to run 'tiger service update-password e6ue9697jf' instead"
@@ -77,7 +77,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 	// the JSON round trip (which is where the SDK fills in the mode).
 	prompt := &mcp.ElicitParams{
 		Mode:    "form",
-		Message: `Update the password of PRODUCTION service "test-service" (e6ue9697jf)? The tsdbadmin password is replaced with a newly generated one: existing connections may be terminated, and applications using the old password will fail to authenticate.`,
+		Message: `Update the password of PRODUCTION service 'test-service' (e6ue9697jf)? The tsdbadmin password is replaced with a newly generated one: existing connections may be terminated, and applications using the old password will fail to authenticate.`,
 		RequestedSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -135,7 +135,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "service lookup API error",
@@ -286,7 +286,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 				m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", api.UpdatePasswordInput{Password: password}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to update service password: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "update API error",

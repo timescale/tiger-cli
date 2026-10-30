@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -52,7 +51,7 @@ type ServiceLogsOutput struct {
 
 func (ServiceLogsOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceLogsOutput](nil))
-	schema.Properties["logs"].Description = "Log lines ordered from oldest to newest. Each line is prefixed with an RFC3339 timestamp followed by the log message."
+	schema.Properties["logs"].Description = "Log lines ordered from oldest to newest. Each line is the log message, prefixed with its UTC timestamp (e.g. 2024-01-15 09:00:00 UTC) when the entry has one."
 	return schema
 }
 
@@ -81,15 +80,6 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 	if err != nil {
 		return nil, ServiceLogsOutput{}, err
 	}
-
-	s.logger.Info("MCP: Fetching service logs",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.Any("node", input.Node),
-		slog.Int("tail", input.Tail),
-		slog.Any("since", input.Since),
-		slog.Any("until", input.Until),
-	)
 
 	// Fetch logs with pagination support
 	entries, err := common.FetchServiceLogs(ctx, common.FetchServiceLogsArgs{

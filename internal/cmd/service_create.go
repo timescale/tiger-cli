@@ -1,8 +1,8 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -104,7 +104,7 @@ other will be automatically configured).` + iopsSectionHelp,
 				return err
 			}
 			if replicas < 0 {
-				return fmt.Errorf("replica count must be non-negative (--replicas)")
+				return errors.New("replica count must be non-negative (--replicas)")
 			}
 
 			// Validate and normalize environment tag (case-insensitive)
@@ -130,9 +130,8 @@ other will be automatically configured).` + iopsSectionHelp,
 				return err
 			}
 
-			// Validate wait timeout (Cobra handles parsing automatically)
-			if waitTimeout <= 0 {
-				return fmt.Errorf("wait timeout must be positive, got %v", waitTimeout)
+			if err := validateWaitTimeout(waitTimeout); err != nil {
+				return err
 			}
 
 			cfg, client, projectID, err := app.GetAll()
@@ -171,20 +170,10 @@ other will be automatically configured).` + iopsSectionHelp,
 			// Make API call to create service
 			// All status messages go to stderr
 			cmd.PrintErrf("Creating service '%s'...\n", name)
-			resp, err := client.CreateServiceWithResponse(cmd.Context(), projectID, serviceCreateReq)
+			service, err := common.JSON202(client.CreateServiceWithResponse(cmd.Context(), projectID, serviceCreateReq))
 			if err != nil {
-				return fmt.Errorf("failed to create service: %w", err)
+				return err
 			}
-
-			// Handle API response
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-			service := *resp.JSON202
 			serviceID := service.ServiceID
 
 			cmd.PrintErrf("Service ID: %s\n", serviceID)
@@ -197,14 +186,14 @@ other will be automatically configured).` + iopsSectionHelp,
 			if !noSetDefault {
 				if err := setDefaultService(cmd, cfg, serviceID); err != nil {
 					// Log warning but don't fail the command
-					cmd.PrintErrf("Warning: Failed to set service as default: %v\n", err)
+					cmd.PrintErrf("Warning: failed to set service as default: %v\n", err)
 				}
 			}
 
 			// Handle wait behavior
 			var waitErr error
 			if noWait {
-				cmd.PrintErrf("Service is being created. Use 'tiger service list' to check status.\n")
+				cmd.PrintErrf("Service is being created. Use 'tiger service get %s' to check service status.\n", serviceID)
 			} else {
 				// Wait for service to be ready
 				cmd.PrintErrf("Waiting for service to be ready (timeout: %v)...\n", waitTimeout)
@@ -230,7 +219,7 @@ other will be automatically configured).` + iopsSectionHelp,
 				Experimental: app.Experimental,
 				WithPassword: withPassword,
 			}); err != nil {
-				cmd.PrintErrf("Warning: Failed to output service details: %v\n", err)
+				cmd.PrintErrf("Warning: failed to output service details: %v\n", err)
 			}
 
 			// Return error for sake of exit code, but silence it since it was already output above
@@ -253,8 +242,8 @@ other will be automatically configured).` + iopsSectionHelp,
 		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 		registerFlagCompletion(cmd, "iops", iopsCompletion)
 	}
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for operation to complete")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")

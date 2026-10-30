@@ -132,7 +132,7 @@ status: READY
 			wantStdout: strings.Replace(sampleBranchTable,
 				"│ Parent Service    │ test-service (svc-12345)  ",
 				"│ Parent Service    │ svc-12345                 ", 1),
-			wantStderr: "Warning: failed to get parent service: failed to fetch service details: connection refused\n",
+			wantStderr: "Warning: failed to get parent service: failed to call API: connection refused\n",
 		},
 		{
 			name:       "env",

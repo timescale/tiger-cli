@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -52,24 +50,15 @@ its current name.`,
 				return err
 			}
 
-			resp, err := client.RenameServiceWithResponse(
+			renamed, err := common.JSON200(client.RenameServiceWithResponse(
 				cmd.Context(),
 				api.ProjectID(projectID),
 				api.ServiceID(service.ServiceID),
 				api.ServiceRename{Name: newName},
-			)
+			))
 			if err != nil {
-				return fmt.Errorf("failed to rename service: %w", err)
+				return err
 			}
-
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON200 == nil {
-				return errors.New("empty response from API")
-			}
-			renamed := *resp.JSON200
 
 			cmd.Printf("Renamed service %s to '%s'.\n", serviceLabel(*service), renamed.Name)
 
