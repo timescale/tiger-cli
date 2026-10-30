@@ -39,7 +39,7 @@ func (ServiceResizeInput) Schema(experimental bool) *jsonschema.Schema {
 	setCPUMemorySchemaProperties(schema, false, experimental, cpuMemoryDescription,
 		"The valid combinations depend on the service's platform (the platform field from service_get).")
 
-	setIOPSSchemaProperties(schema, experimental, "")
+	setIOPSSchemaProperties(schema, experimental, "If not specified while changing CPU/memory on the fluid platform, the IOPS is reset to the baseline for the new size.")
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be done resizing before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
