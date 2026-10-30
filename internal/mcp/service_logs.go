@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"time"
 
@@ -31,16 +30,7 @@ func (ServiceLogsInput) Schema() *jsonschema.Schema {
 	schema.Properties["node"].Minimum = new(0.0)
 	schema.Properties["node"].Examples = []any{0, 1, 2}
 
-	schema.Properties["tail"].Description = "Number of log lines to return. Defaults to 100."
-	schema.Properties["tail"].Default = util.Must(json.Marshal(100))
-	schema.Properties["tail"].Minimum = new(1.0)
-	schema.Properties["tail"].Examples = []any{50, 100, 1000}
-
-	schema.Properties["since"].Description = "Fetch logs after this timestamp (RFC3339 format). If not provided, only the tail parameter limits how far back logs are fetched."
-	schema.Properties["since"].Examples = []any{"2024-01-15T09:00:00Z", "2025-01-16T08:00:00Z"}
-
-	schema.Properties["until"].Description = "Fetch logs before this timestamp (RFC3339 format). If not provided, fetches logs up to the current time."
-	schema.Properties["until"].Examples = []any{"2024-01-15T10:00:00Z", "2025-01-16T08:30:00Z"}
+	setLogsInputSchemaProperties(schema)
 
 	return schema
 }
@@ -52,7 +42,7 @@ type ServiceLogsOutput struct {
 
 func (ServiceLogsOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceLogsOutput](nil))
-	schema.Properties["logs"].Description = "Log lines ordered from oldest to newest. Each line is prefixed with an RFC3339 timestamp followed by the log message."
+	setLogsOutputSchemaProperties(schema)
 	return schema
 }
 
@@ -105,14 +95,5 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceLogsOutput{}, err
 	}
 
-	logs := make([]string, len(entries))
-	for i, e := range entries {
-		if !e.Timestamp.IsZero() {
-			logs[i] = e.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC") + " " + e.Message
-		} else {
-			logs[i] = e.Message
-		}
-	}
-
-	return nil, ServiceLogsOutput{Logs: logs}, nil
+	return nil, ServiceLogsOutput{Logs: formatLogLines(entries)}, nil
 }

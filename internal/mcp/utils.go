@@ -69,6 +69,41 @@ func updatePasswordMessage(withPassword bool, storage common.PasswordStorageResu
 	return "Password updated for tsdbadmin."
 }
 
+// setLogsInputSchemaProperties sets the tail, since, and until properties
+// shared by the logs tools.
+func setLogsInputSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["tail"].Description = "Number of log lines to return. Defaults to 100."
+	schema.Properties["tail"].Default = util.Must(json.Marshal(100))
+	schema.Properties["tail"].Minimum = new(1.0)
+	schema.Properties["tail"].Examples = []any{50, 100, 1000}
+
+	schema.Properties["since"].Description = "Fetch logs after this timestamp (RFC3339 format). If not provided, only the tail parameter limits how far back logs are fetched."
+	schema.Properties["since"].Examples = []any{"2024-01-15T09:00:00Z", "2025-01-16T08:00:00Z"}
+
+	schema.Properties["until"].Description = "Fetch logs before this timestamp (RFC3339 format). If not provided, fetches logs up to the current time."
+	schema.Properties["until"].Examples = []any{"2024-01-15T10:00:00Z", "2025-01-16T08:30:00Z"}
+}
+
+// setLogsOutputSchemaProperties sets the logs property shared by the logs
+// tools' outputs.
+func setLogsOutputSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["logs"].Description = "Log lines ordered from oldest to newest. Each line is prefixed with an RFC3339 timestamp followed by the log message."
+}
+
+// formatLogLines renders log entries as the logs tools return them: each
+// message prefixed with its timestamp in UTC, if it has one.
+func formatLogLines(entries []api.ServiceLogEntry) []string {
+	logs := make([]string, len(entries))
+	for i, e := range entries {
+		if !e.Timestamp.IsZero() {
+			logs[i] = e.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC") + " " + e.Message
+		} else {
+			logs[i] = e.Message
+		}
+	}
+	return logs
+}
+
 // setCPUMemorySchemaProperties sets a tool's cpu_memory property. shared
 // includes shared/shared, which a service can't be resized onto. Without the
 // experimental gate, only the standard platform's combinations are offered.
