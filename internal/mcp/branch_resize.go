@@ -30,7 +30,7 @@ func (BranchResizeInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[BranchResizeInput](nil))
 
 	setBranchIDSchemaProperties(schema)
-	setBranchCPUMemorySchemaProperties(schema, "CPU and memory allocation combination. If not specified, the branch keeps its current CPU and memory, and at least one of cpu_memory or iops is required.")
+	setBranchCPUMemorySchemaProperties(schema, "CPU and memory allocation combination. If not specified, the branch keeps its current CPU and memory.")
 	setBranchIOPSSchemaProperties(schema, "If not specified while changing CPU/memory, the IOPS is reset to the baseline for the new size.")
 
 	schema.Properties["wait"].Description = "Whether to wait for the branch to be done resizing before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying the branch. When true, waits up to 10 minutes."
@@ -61,7 +61,7 @@ func newBranchResizeTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolBranchResize,
 		Title: "Resize Branch",
-		Description: `Resize a branch by changing its CPU and memory allocation or its provisioned IOPS.
+		Description: `Resize a branch by changing its CPU and memory allocation or its provisioned IOPS. At least one of cpu_memory or iops is required.
 
 The branch may be temporarily unavailable during the resize operation.
 

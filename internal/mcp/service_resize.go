@@ -32,7 +32,7 @@ func (ServiceResizeInput) Schema(experimental bool) *jsonschema.Schema {
 
 	cpuMemoryDescription := "CPU and memory allocation combination."
 	if experimental {
-		cpuMemoryDescription = "CPU and memory allocation combination. If not specified, the service keeps its current CPU and memory, and at least one of cpu_memory or iops is required."
+		cpuMemoryDescription = "CPU and memory allocation combination. If not specified, the service keeps its current CPU and memory."
 	} else {
 		schema.Required = append(schema.Required, "cpu_memory")
 	}
@@ -64,15 +64,16 @@ func (ServiceResizeOutput) Schema(experimental bool) *jsonschema.Schema {
 
 func newServiceResizeTool(experimental bool) *mcp.Tool {
 	// IOPS are a preview, described only behind the gate.
-	resources := "CPU and memory allocation"
+	resources, required := "CPU and memory allocation", ""
 	if experimental {
 		resources = "CPU and memory allocation or its provisioned IOPS"
+		required = " At least one of cpu_memory or iops is required."
 	}
 
 	return &mcp.Tool{
 		Name:  toolServiceResize,
 		Title: "Resize Database Service",
-		Description: `Resize a database service by changing its ` + resources + `.
+		Description: `Resize a database service by changing its ` + resources + `.` + required + `
 
 This tool changes the compute resources allocated to your database service. The service
 may be temporarily unavailable during the resize operation.
