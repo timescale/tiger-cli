@@ -54,24 +54,14 @@ The branch can be given by ID or name.`,
 				return err
 			}
 
-			var sincePtr *time.Time
-			if !since.IsZero() {
-				sincePtr = &since
-			}
-
-			var untilPtr *time.Time
-			if !until.IsZero() {
-				untilPtr = &until
-			}
-
 			logs, err := common.FetchBranchLogs(cmd.Context(), common.FetchBranchLogsArgs{
 				Client:    client,
 				ProjectID: projectID,
 				ServiceID: branch.ServiceID,
 				BranchID:  branch.ID,
 				Tail:      tail,
-				Since:     sincePtr,
-				Until:     untilPtr,
+				Since:     since,
+				Until:     until,
 			})
 			if err != nil {
 				return err

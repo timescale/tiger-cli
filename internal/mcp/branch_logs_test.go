@@ -77,6 +77,14 @@ func TestBranchLogsTool(t *testing.T) {
 			wantErr: `validating "arguments": validating root: validating /properties/tail: minimum: 0/1 is less than 1.000000`,
 		},
 		{
+			// The time parameters are optional strings, not nullable ones.
+			name:    "null since",
+			tool:    toolBranchLogs,
+			args:    map[string]any{"branch_id": "br4nch1d9x", "since": nil},
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: validating /properties/since: type: <invalid reflect.Value> has type "null", want "string"`,
+		},
+		{
 			name: "branch not found",
 			tool: toolBranchLogs,
 			args: args,
@@ -163,6 +171,18 @@ func TestBranchLogsTool(t *testing.T) {
 			}},
 		},
 		{
+			// A non-UTC timestamp is converted before formatting.
+			name:     "non-UTC timestamp is rendered in UTC",
+			synctest: true,
+			tool:     toolBranchLogs,
+			args:     args,
+			opts:     []runOption{experimental},
+			mock: expectLogs(api.BranchLogs{Entries: []api.ServiceLogEntry{
+				{Message: "LOG: ready", Severity: "LOG", Timestamp: time.Date(2025, 1, 15, 10, 31, 0, 0, time.FixedZone("UTC+2", 2*60*60))},
+			}}),
+			wantOutput: map[string]any{"logs": []any{"2025-01-15 08:31:00 UTC LOG: ready"}},
+		},
+		{
 			// Two pages: the first returns a cursor, the second must be
 			// requested with it. Entries beyond tail are trimmed.
 			name:     "pagination trimmed to tail",
@@ -209,6 +229,40 @@ func TestBranchLogsTool(t *testing.T) {
 				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 				m.EXPECT().GetBranchLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", &api.GetBranchLogsParams{
 					Since: &since,
+					Until: &until,
+				}).
+					Return(logsResponse(&api.BranchLogs{Entries: entries}), nil)
+			},
+			wantOutput: entriesOutput,
+		},
+		{
+			// Without until, the upper bound is pinned to the current time.
+			name:     "since alone reaches the request",
+			synctest: true,
+			tool:     toolBranchLogs,
+			args:     map[string]any{"branch_id": "br4nch1d9x", "since": "2024-01-15T09:00:00Z"},
+			opts:     []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, sampleBranch())
+				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
+				m.EXPECT().GetBranchLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", &api.GetBranchLogsParams{
+					Since: &since,
+					Until: &now,
+				}).
+					Return(logsResponse(&api.BranchLogs{Entries: entries}), nil)
+			},
+			wantOutput: entriesOutput,
+		},
+		{
+			// Without since, no lower bound is sent.
+			name: "until alone reaches the request",
+			tool: toolBranchLogs,
+			args: map[string]any{"branch_id": "br4nch1d9x", "until": "2024-01-15T10:00:00Z"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, sampleBranch())
+				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+				m.EXPECT().GetBranchLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", &api.GetBranchLogsParams{
 					Until: &until,
 				}).
 					Return(logsResponse(&api.BranchLogs{Entries: entries}), nil)

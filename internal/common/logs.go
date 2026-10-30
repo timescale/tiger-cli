@@ -16,8 +16,11 @@ type FetchServiceLogsArgs struct {
 	ProjectID string
 	ServiceID string
 	Tail      int
-	Since     *time.Time
-	Until     *time.Time
+
+	// Since and Until bound the logs fetched. A zero Since fetches as far back
+	// as Tail allows, and a zero Until fetches up to the current time.
+	Since time.Time
+	Until time.Time
 
 	// Node selects a specific service node to fetch logs from, for services
 	// with HA replicas. If nil, the backend returns logs for the primary.
@@ -29,7 +32,7 @@ type FetchServiceLogsArgs struct {
 func FetchServiceLogs(ctx context.Context, args FetchServiceLogsArgs) ([]api.ServiceLogEntry, error) {
 	params := &api.GetServiceLogsParams{
 		Node:  args.Node,
-		Since: args.Since,
+		Since: optionalTime(args.Since),
 		Until: fixedUntil(args.Until),
 	}
 
@@ -60,14 +63,17 @@ type FetchBranchLogsArgs struct {
 	ServiceID string
 	BranchID  string
 	Tail      int
-	Since     *time.Time
-	Until     *time.Time
+
+	// Since and Until bound the logs fetched. A zero Since fetches as far back
+	// as Tail allows, and a zero Until fetches up to the current time.
+	Since time.Time
+	Until time.Time
 }
 
 // FetchBranchLogs is FetchServiceLogs for a branch.
 func FetchBranchLogs(ctx context.Context, args FetchBranchLogsArgs) ([]api.ServiceLogEntry, error) {
 	params := &api.GetBranchLogsParams{
-		Since: args.Since,
+		Since: optionalTime(args.Since),
 		Until: fixedUntil(args.Until),
 	}
 
@@ -87,16 +93,24 @@ func FetchBranchLogs(ctx context.Context, args FetchBranchLogsArgs) ([]api.Servi
 	})
 }
 
-// fixedUntil returns until, or the current time if it's nil. Fixing the upper
-// time bound makes every paginated request share the same window — without
-// it, a clock tick between requests could cause the second page to return
-// logs already included on the first page. UTC is the canonical form for the
-// query parameter it becomes.
-func fixedUntil(until *time.Time) *time.Time {
-	if until != nil {
-		return until
+// optionalTime returns a pointer to t, or nil if t is zero.
+func optionalTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
 	}
-	return new(time.Now().UTC())
+	return &t
+}
+
+// fixedUntil returns a pointer to until, or to the current time if until is
+// zero. Fixing the upper time bound makes every paginated request share the
+// same window — without it, a clock tick between requests could cause the
+// second page to return logs already included on the first page. UTC is the
+// canonical form for the query parameter it becomes.
+func fixedUntil(until time.Time) *time.Time {
+	if until.IsZero() {
+		return new(time.Now().UTC())
+	}
+	return &until
 }
 
 // fetchLogs pages through logs with fetchPage, which takes the cursor for the

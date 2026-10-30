@@ -14,10 +14,10 @@ import (
 
 // BranchLogsInput represents input for branch_logs
 type BranchLogsInput struct {
-	BranchID string     `json:"branch_id"`
-	Tail     int        `json:"tail,omitempty"`
-	Since    *time.Time `json:"since,omitempty"`
-	Until    *time.Time `json:"until,omitempty"`
+	BranchID string    `json:"branch_id"`
+	Tail     int       `json:"tail,omitempty"`
+	Since    time.Time `json:"since,omitzero"`
+	Until    time.Time `json:"until,omitzero"`
 }
 
 func (BranchLogsInput) Schema() *jsonschema.Schema {
