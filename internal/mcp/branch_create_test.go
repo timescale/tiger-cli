@@ -215,6 +215,35 @@ func TestBranchCreateTool(t *testing.T) {
 			},
 		},
 		{
+			// The password is returned even when the connection string can't
+			// be built, since it may be the only copy.
+			name: "with password and no endpoint",
+			tool: toolBranchCreate,
+			args: map[string]any{"service_id": "e6ue9697jf", "with_password": true},
+			opts: []runOption{experimental, withConfig(map[string]any{"password_storage": "none"})},
+			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED), func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+				b.Endpoint = nil
+			})),
+			wantOutput: map[string]any{
+				"branch": map[string]any{
+					"id":         "br4nch1d9x",
+					"name":       "test-branch",
+					"service_id": "e6ue9697jf",
+					"status":     "QUEUED",
+					"created":    "2025-01-16T09:00:00Z",
+					"resources":  map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
+					"password":   "branch-pw",
+				},
+				"message": acceptedMsg,
+				"password_storage": map[string]any{
+					"success": false,
+					"method":  "none",
+					"message": "Password not saved (--password-storage=none). Make sure to store it securely.",
+				},
+			},
+		},
+		{
 			name:     "wait polls until ready",
 			synctest: true,
 			tool:     toolBranchCreate,

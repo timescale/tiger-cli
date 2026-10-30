@@ -387,6 +387,13 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, wi
 	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
 		detail.DirectEndpoint = fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port)
 	}
+
+	// Setting the password here ensures it's set even if
+	// GetConnectionDetails returns an error.
+	if withPassword {
+		detail.Password = util.Deref(branch.InitialPassword)
+	}
+
 	if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
@@ -395,6 +402,9 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, wi
 	}); err != nil {
 		s.logger.Error("MCP: Failed to build connection string", slog.Any("error", err))
 	} else {
+		if withPassword && details.Password == "" {
+			s.logger.Error("MCP: Requested password but password not available")
+		}
 		detail.ConnectionString = details.String()
 		detail.Password = details.Password
 	}
