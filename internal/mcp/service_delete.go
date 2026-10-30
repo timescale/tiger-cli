@@ -50,19 +50,19 @@ func (ServiceDeleteOutput) Schema() *jsonschema.Schema {
 }
 
 func newServiceDeleteTool(experimental bool) *mcp.Tool {
-	description := "Delete a database service permanently.\n\n" +
-		"This operation is irreversible: the service and all of its data are destroyed. "
 	// Branches are a preview, so only the experimental description mentions
 	// them. The PROD prompt lists them regardless: they're deleted either way.
+	var branches string
 	if experimental {
-		description += "Deleting a service also deletes all of its branches. "
+		branches = "Deleting a service also deletes all of its branches. "
 	}
-	description += `Deleting a service tagged PROD automatically prompts the user, via an elicitation request through the MCP client, to confirm the deletion before it proceeds, so agents don't need to ask the user for confirmation themselves; if the client cannot prompt, the deletion is refused and the user must run 'tiger service delete' from the CLI instead.`
 
 	return &mcp.Tool{
-		Name:         toolServiceDelete,
-		Title:        "Delete Database Service",
-		Description:  description,
+		Name:  toolServiceDelete,
+		Title: "Delete Database Service",
+		Description: `Delete a database service permanently.
+
+This operation is irreversible: the service and all of its data are destroyed. ` + branches + `Deleting a service tagged PROD automatically prompts the user, via an elicitation request through the MCP client, to confirm the deletion before it proceeds, so agents don't need to ask the user for confirmation themselves; if the client cannot prompt, the deletion is refused and the user must run 'tiger service delete' from the CLI instead.`,
 		InputSchema:  ServiceDeleteInput{}.Schema(),
 		OutputSchema: ServiceDeleteOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
