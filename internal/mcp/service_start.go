@@ -51,7 +51,7 @@ func newServiceStartTool() *mcp.Tool {
 		Title: "Start Database Service",
 		Description: `Start a stopped database service.
 
-This operation starts a service that is currently in a stopped/paused state. The service will transition to a ready state and become available for connections, and charging for its compute resumes.`,
+This operation starts a service that is currently in a stopped/paused state. The service will transition to a ready state and become available for connections. Charging for its compute resumes.`,
 		InputSchema:  ServiceStartInput{}.Schema(),
 		OutputSchema: ServiceStartOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
