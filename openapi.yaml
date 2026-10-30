@@ -1760,6 +1760,88 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/logs:
+    get:
+      operationId: getBranchLogs
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Get branch logs
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Fetch logs for a branch. Returns up to 500 log entries in reverse
+        chronological order. Supports cursor-based pagination via the `cursor`
+        parameter and the `last_cursor` field in the response.
+
+        Use the returned `last_cursor` value as the `cursor` parameter on
+        subsequent requests to page through all available logs.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Opaque pagination cursor returned as `last_cursor` in a previous response.
+            When provided, returns the next page of logs older than the cursor position.
+        - name: until
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Upper bound timestamp — fetch logs before this time (RFC3339 format, e.g., 2024-01-15T10:00:00Z).
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: |
+            Lower bound timestamp — fetch logs after this time (RFC3339 format).
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              minLength: 1
+              pattern: "\\S"
+          style: form
+          explode: true
+          description: |
+            Full-text search terms to filter log lines. Repeat the parameter for multiple values
+            (e.g. `?search=slow+query&search=ERROR`).
+        - name: severities
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              minLength: 1
+              pattern: "\\S"
+          style: form
+          explode: true
+          description: |
+            Severity levels to filter results. Repeat the parameter for multiple values
+            (e.g. `?severities=ERROR&severities=WARNING`).
+      responses:
+        '200':
+          description: Branch logs retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchLogs'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/resolve:
     get:
       operationId: resolveRef
@@ -2944,12 +3026,12 @@ components:
         cpu_millis:
           type: integer
           minimum: 1
-          description: The initial CPU allocation in milli-cores. Defaults to 250 if not provided.
+          description: The initial CPU allocation in milli-cores.
           example: 250
         memory_gbs:
           type: integer
           minimum: 1
-          description: The initial memory allocation in gigabytes. Defaults to 2 if not provided.
+          description: The initial memory allocation in gigabytes.
           example: 2
         iops:
           x-tigerdata-preview: true
@@ -2990,6 +3072,25 @@ components:
       description: >-
         At least one of cpu_millis, memory_gbs, or iops must be provided.
         cpu_millis and memory_gbs must be provided together.
+    BranchLogs:
+      type: object
+      description: The logs for a branch.
+      required:
+        - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceLogEntry'
+          description: Structured log entries, in reverse chronological order.
+        last_cursor:
+          type: string
+          description: |
+            Opaque cursor for the next page of results. Present when more log entries
+            exist older than the last entry in this response. Pass this value as the
+            `cursor` query parameter to retrieve the next page. Absent when there are
+            no further results.
+          example: "eyJ0cyI6IjIwMjUtMDEtMTVUMDk6MzA6MDBaIn0="
     ServiceCreate:
       type: object
       description: Parameters for creating a service.

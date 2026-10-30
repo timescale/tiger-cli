@@ -1352,7 +1352,7 @@ type Branch struct {
 
 // BranchCreate Parameters for creating a branch of the service identified by `service_id` in the path.
 type BranchCreate struct {
-	// CPUMillis The initial CPU allocation in milli-cores. Defaults to 250 if not provided.
+	// CPUMillis The initial CPU allocation in milli-cores.
 	//
 	// Example: 250
 	CPUMillis *int `json:"cpu_millis,omitempty"`
@@ -1362,7 +1362,7 @@ type BranchCreate struct {
 	// Example: 4000
 	Iops *int `json:"iops,omitempty"`
 
-	// MemoryGbs The initial memory allocation in gigabytes. Defaults to 2 if not provided.
+	// MemoryGbs The initial memory allocation in gigabytes.
 	//
 	// Example: 2
 	MemoryGbs *int `json:"memory_gbs,omitempty"`
@@ -1371,6 +1371,21 @@ type BranchCreate struct {
 	//
 	// Example: my-production-db-pr-412
 	Name *string `json:"name,omitempty"`
+}
+
+// BranchLogs The logs for a branch.
+type BranchLogs struct {
+	// Entries Structured log entries, in reverse chronological order.
+	Entries []ServiceLogEntry `json:"entries"`
+
+	// LastCursor Opaque cursor for the next page of results. Present when more log entries
+	// exist older than the last entry in this response. Pass this value as the
+	// `cursor` query parameter to retrieve the next page. Absent when there are
+	// no further results.
+	//
+	//
+	// Example: eyJ0cyI6IjIwMjUtMDEtMTVUMDk6MzA6MDBaIn0=
+	LastCursor *string `json:"last_cursor,omitempty"`
 }
 
 // BranchRename Parameters for renaming a branch.
@@ -3435,6 +3450,27 @@ type GetBranchesParams struct {
 	// with no precedence between the two. A reference matching nothing
 	// returns an empty list.
 	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
+}
+
+// GetBranchLogsParams defines parameters for GetBranchLogs.
+type GetBranchLogsParams struct {
+	// Cursor Opaque pagination cursor returned as `last_cursor` in a previous response.
+	// When provided, returns the next page of logs older than the cursor position.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Until Upper bound timestamp — fetch logs before this time (RFC3339 format, e.g., 2024-01-15T10:00:00Z).
+	Until *time.Time `form:"until,omitempty" json:"until,omitempty"`
+
+	// Since Lower bound timestamp — fetch logs after this time (RFC3339 format).
+	Since *time.Time `form:"since,omitempty" json:"since,omitempty"`
+
+	// Search Full-text search terms to filter log lines. Repeat the parameter for multiple values
+	// (e.g. `?search=slow+query&search=ERROR`).
+	Search *[]string `form:"search,omitempty" json:"search,omitempty"`
+
+	// Severities Severity levels to filter results. Repeat the parameter for multiple values
+	// (e.g. `?severities=ERROR&severities=WARNING`).
+	Severities *[]string `form:"severities,omitempty" json:"severities,omitempty"`
 }
 
 // GetServiceLogsParams defines parameters for GetServiceLogs.

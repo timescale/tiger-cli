@@ -123,6 +123,20 @@ func TestServiceLogsCmd(t *testing.T) {
 			mock:     setupLogs(api.ServiceLogs{}),
 		},
 		{
+			name:       "empty logs json output",
+			args:       []string{"service", "logs", "svc-12345", "-o", "json"},
+			synctest:   true,
+			mock:       setupLogs(api.ServiceLogs{}),
+			wantStdout: "[]\n",
+		},
+		{
+			name:       "empty logs yaml output",
+			args:       []string{"service", "logs", "svc-12345", "-o", "yaml"},
+			synctest:   true,
+			mock:       setupLogs(api.ServiceLogs{}),
+			wantStdout: "[]\n",
+		},
+		{
 			name:     "text output",
 			args:     []string{"service", "logs", "svc-12345"},
 			synctest: true,
@@ -209,6 +223,38 @@ func TestServiceLogsCmd(t *testing.T) {
 				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
 					Since: &since,
+					Until: &until,
+				}).
+					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)
+			},
+			wantStdout: "LOG: database system is ready to accept connections\n" +
+				"ERROR: relation \"missing\" does not exist\n",
+		},
+		{
+			// Without --until, the upper bound is pinned to the current time.
+			name:     "since param alone",
+			args:     []string{"service", "logs", "svc-12345", "--since", "2024-01-15T09:00:00Z"},
+			synctest: true,
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
+				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
+				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
+					Since: &since,
+					Until: &logsNow,
+				}).
+					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)
+			},
+			wantStdout: "LOG: database system is ready to accept connections\n" +
+				"ERROR: relation \"missing\" does not exist\n",
+		},
+		{
+			// Without --since, no lower bound is sent.
+			name: "until param alone",
+			args: []string{"service", "logs", "svc-12345", "--until", "2024-01-15T10:00:00Z"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
+				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
 					Until: &until,
 				}).
 					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)

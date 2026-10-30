@@ -73,6 +73,13 @@ func TestServiceLogsTool(t *testing.T) {
 			wantErr: `validating "arguments": validating root: validating /properties/tail: minimum: 0/1 is less than 1.000000`,
 		},
 		{
+			// The time parameters are optional strings, not nullable ones.
+			name:    "null since",
+			tool:    toolServiceLogs,
+			args:    map[string]any{"service_id": "e6ue9697jf", "since": nil},
+			wantErr: `validating "arguments": validating root: validating /properties/since: type: <invalid reflect.Value> has type "null", want "string"`,
+		},
+		{
 			name:     "network error",
 			synctest: true,
 			tool:     toolServiceLogs,
@@ -193,6 +200,36 @@ func TestServiceLogsTool(t *testing.T) {
 				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", &api.GetServiceLogsParams{
 					Since: &since,
+					Until: &until,
+				}).
+					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)
+			},
+			wantOutput: entriesOutput,
+		},
+		{
+			// Without until, the upper bound is pinned to the current time.
+			name:     "since alone reaches the request",
+			synctest: true,
+			tool:     toolServiceLogs,
+			args:     map[string]any{"service_id": "e6ue9697jf", "since": "2024-01-15T09:00:00Z"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
+				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", &api.GetServiceLogsParams{
+					Since: &since,
+					Until: &now,
+				}).
+					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)
+			},
+			wantOutput: entriesOutput,
+		},
+		{
+			// Without since, no lower bound is sent.
+			name: "until alone reaches the request",
+			tool: toolServiceLogs,
+			args: map[string]any{"service_id": "e6ue9697jf", "until": "2024-01-15T10:00:00Z"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", &api.GetServiceLogsParams{
 					Until: &until,
 				}).
 					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)

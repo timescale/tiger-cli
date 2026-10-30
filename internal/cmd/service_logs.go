@@ -1,14 +1,11 @@
 package cmd
 
 import (
-	"strings"
 	"time"
 
-	lipgloss "charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // buildServiceLogsCmd creates the logs command for viewing service logs
@@ -66,17 +63,6 @@ service from your configuration.`,
 				return err
 			}
 
-			// Prepare parameters
-			var sincePtr *time.Time
-			if !since.IsZero() {
-				sincePtr = &since
-			}
-
-			var untilPtr *time.Time
-			if !until.IsZero() {
-				untilPtr = &until
-			}
-
 			// Check if node flag was explicitly set (0 is a valid node)
 			// If not set, omit the parameter and let the backend fetch primaryOrdinal
 			var nodePtr *int
@@ -90,33 +76,15 @@ service from your configuration.`,
 				ProjectID: projectID,
 				ServiceID: service.ServiceID,
 				Tail:      tail,
-				Since:     sincePtr,
-				Until:     untilPtr,
+				Since:     since,
+				Until:     until,
 				Node:      nodePtr,
 			})
 			if err != nil {
 				return err
 			}
 
-			// Display logs based on output format
-			outputWriter := cmd.OutOrStdout()
-			switch strings.ToLower(cfg.Output) {
-			case "json":
-				return util.SerializeToJSON(outputWriter, logs)
-			case "yaml":
-				return util.SerializeToYAML(outputWriter, logs)
-			default: // text format (default)
-				for _, entry := range logs {
-					line := entry.Message
-					if !entry.Timestamp.IsZero() {
-						// Local timezone for terminal output; MCP and public API use UTC.
-						line = entry.Timestamp.Local().Format("2006-01-02 15:04:05 MST") + " " + line
-					}
-					cmd.Println(colorizeLogEntry(line, entry.Severity))
-				}
-			}
-
-			return nil
+			return outputLogs(cmd, cfg, logs)
 		},
 	}
 
@@ -129,37 +97,4 @@ service from your configuration.`,
 	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd
-}
-
-// Log severity styles
-var (
-	logErrorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Red)
-	logWarningStyle = lipgloss.NewStyle().Foreground(lipgloss.Yellow)
-	logInfoStyle    = lipgloss.NewStyle().Foreground(lipgloss.Blue)
-	logDebugStyle   = lipgloss.NewStyle().Foreground(lipgloss.Magenta)
-)
-
-// colorizeLogEntry colorizes the severity token (e.g. "ERROR:") within the log
-// line using the API-provided severity field. Using the structured field avoids
-// false positives where a severity word appears in the message body rather than
-// as an actual log level.
-//
-// PostgreSQL severity levels: https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-SEVERITY-LEVELS
-func colorizeLogEntry(line, severity string) string {
-	var style lipgloss.Style
-	switch strings.ToUpper(severity) {
-	case "ERROR", "FATAL", "PANIC":
-		style = logErrorStyle
-	case "WARNING":
-		style = logWarningStyle
-	case "LOG", "INFO", "NOTICE":
-		style = logInfoStyle
-	case "DEBUG":
-		style = logDebugStyle
-	default:
-		return line
-	}
-
-	token := strings.ToUpper(severity) + ":"
-	return strings.Replace(line, token, style.Render(token), 1)
 }
