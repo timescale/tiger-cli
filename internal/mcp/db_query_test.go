@@ -100,8 +100,7 @@ func TestDBQueryTool(t *testing.T) {
 		}
 	})
 	replica := sampleReplica(func(r *api.ReadReplicaSet) { r.Status = api.ReadReplicaSetStatusActive })
-	// A replica connects to its own endpoint with its primary's credentials,
-	// and a branch with its own.
+	// A replica connects to its own endpoint with its primary's credentials.
 	replicaTarget := common.NewReplicaConnectionTarget(replica, common.ServiceCredentials(sampleService()))
 	branch := sampleBranch()
 

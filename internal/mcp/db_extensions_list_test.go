@@ -213,7 +213,6 @@ func TestDBExtensionsListTool(t *testing.T) {
 			wantOutput: map[string]any{"extensions": extensionsOutput},
 		},
 		{
-			// A branch connects with its own credentials, not its parent's.
 			name: "returns the extensions of a branch",
 			tool: toolDBExtensionsList,
 			args: map[string]any{"service_id": "br4nch1d9x"},
