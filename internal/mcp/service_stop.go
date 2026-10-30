@@ -51,7 +51,7 @@ func newServiceStopTool() *mcp.Tool {
 		Title: "Stop Database Service",
 		Description: `Stop a running database service.
 
-This operation stops a service that is currently running. The service will transition to a stopped/paused state and will no longer accept connections.`,
+This operation stops a service that is currently running. The service will transition to a stopped/paused state and will no longer accept connections. It stops charging for compute, but keeps its data, whose storage is still billed.`,
 		InputSchema:  ServiceStopInput{}.Schema(),
 		OutputSchema: ServiceStopOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
