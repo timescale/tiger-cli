@@ -374,7 +374,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 				"password_storage": map[string]any{
 					"success": false,
 					"method":  "pgpass",
-					"message": "Failed to save password to ~/.pgpass: service endpoint not available",
+					"message": "Failed to save password to ~/.pgpass: endpoint not available",
 				},
 			},
 		},

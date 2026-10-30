@@ -137,7 +137,7 @@ type PgpassStorage struct{}
 
 func (p *PgpassStorage) Save(target PasswordTarget, password string, role string) error {
 	if target.Endpoint == nil || target.Endpoint.Host == nil || target.Endpoint.Port == nil {
-		return errors.New("service endpoint not available")
+		return errors.New("endpoint not available")
 	}
 	if role == "" {
 		return errors.New("role is required")
@@ -178,7 +178,7 @@ func (p *PgpassStorage) Save(target PasswordTarget, password string, role string
 
 func (p *PgpassStorage) Get(target PasswordTarget, role string) (string, error) {
 	if target.Endpoint == nil || target.Endpoint.Host == nil || target.Endpoint.Port == nil {
-		return "", errors.New("service endpoint not available")
+		return "", errors.New("endpoint not available")
 	}
 	if role == "" {
 		return "", errors.New("role is required")
@@ -229,7 +229,7 @@ func (p *PgpassStorage) Get(target PasswordTarget, role string) (string, error) 
 
 func (p *PgpassStorage) Remove(target PasswordTarget, role string) error {
 	if target.Endpoint == nil || target.Endpoint.Host == nil || target.Endpoint.Port == nil {
-		return errors.New("service endpoint not available")
+		return errors.New("endpoint not available")
 	}
 	if role == "" {
 		return errors.New("role is required")

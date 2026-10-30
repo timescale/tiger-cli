@@ -28,6 +28,7 @@ func newBranchCreateCmd(app *common.App, use, commandPath string) *cobra.Command
 	var iops int
 	var noWait bool
 	var waitTimeout time.Duration
+	var withPassword bool
 
 	cmd := &cobra.Command{
 		Use:   use,
@@ -153,7 +154,10 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 				}
 			}
 
-			if err := outputBranch(cmd, cfg, branch, branchOutputOptions{ServiceName: parent.Name}); err != nil {
+			if err := outputBranch(cmd, cfg, branch, branchOutputOptions{
+				ServiceName:  parent.Name,
+				WithPassword: withPassword,
+			}); err != nil {
 				cmd.PrintErrf("Warning: failed to output branch details: %v\n", err)
 			}
 
@@ -169,6 +173,7 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))

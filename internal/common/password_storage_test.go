@@ -212,7 +212,7 @@ func TestPgpassStorage_Remove_NoEndpoint(t *testing.T) {
 	if err == nil {
 		t.Error("PgpassStorage.Remove() should return error when endpoint is nil")
 	}
-	if !strings.Contains(err.Error(), "service endpoint not available") {
+	if !strings.Contains(err.Error(), "endpoint not available") {
 		t.Errorf("PgpassStorage.Remove() should mention endpoint not available, got: %v", err)
 	}
 }
@@ -224,14 +224,14 @@ func TestPgpassStorage_NoPort(t *testing.T) {
 	service := createTestService("test-service-123")
 	service.Endpoint.Port = nil
 
-	if err := storage.Save(ServicePasswordTarget(service), "secret", "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
-		t.Errorf("PgpassStorage.Save() error = %v, want service endpoint not available", err)
+	if err := storage.Save(ServicePasswordTarget(service), "secret", "tsdbadmin"); err == nil || err.Error() != "endpoint not available" {
+		t.Errorf("PgpassStorage.Save() error = %v, want endpoint not available", err)
 	}
-	if _, err := storage.Get(ServicePasswordTarget(service), "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
-		t.Errorf("PgpassStorage.Get() error = %v, want service endpoint not available", err)
+	if _, err := storage.Get(ServicePasswordTarget(service), "tsdbadmin"); err == nil || err.Error() != "endpoint not available" {
+		t.Errorf("PgpassStorage.Get() error = %v, want endpoint not available", err)
 	}
-	if err := storage.Remove(ServicePasswordTarget(service), "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
-		t.Errorf("PgpassStorage.Remove() error = %v, want service endpoint not available", err)
+	if err := storage.Remove(ServicePasswordTarget(service), "tsdbadmin"); err == nil || err.Error() != "endpoint not available" {
+		t.Errorf("PgpassStorage.Remove() error = %v, want endpoint not available", err)
 	}
 }
 
@@ -262,7 +262,7 @@ func TestPgpassStorage_Get_NoEndpoint(t *testing.T) {
 	if password != "" {
 		t.Errorf("PgpassStorage.Get() should return empty password on error, got: %s", password)
 	}
-	if !strings.Contains(err.Error(), "service endpoint not available") {
+	if !strings.Contains(err.Error(), "endpoint not available") {
 		t.Errorf("PgpassStorage.Get() should mention endpoint not available, got: %v", err)
 	}
 }

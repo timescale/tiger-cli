@@ -64,11 +64,18 @@ type branchOutputOptions struct {
 	// ServiceName is the parent service's name, if it's known. A branch
 	// carries only its parent's ID.
 	ServiceName string
+	// WithPassword includes the tsdbadmin password, if one is available.
+	WithPassword bool
+	// RequirePassword fails the output when WithPassword finds no password.
+	RequirePassword bool
 }
 
 // outputBranch outputs a single branch in the configured output format.
 func outputBranch(cmd *cobra.Command, cfg *config.Config, branch api.Branch, opts branchOutputOptions) error {
 	outputBr := prepareBranchForOutput(cmd, cfg, branch, opts)
+	if opts.RequirePassword && opts.WithPassword && outputBr.Password == "" {
+		return fmt.Errorf("password requested but not available for branch %s", outputBr.ID)
+	}
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(cfg.Output) {
@@ -84,12 +91,15 @@ func outputBranch(cmd *cobra.Command, cfg *config.Config, branch api.Branch, opt
 }
 
 // outputBranchEnv outputs branch connection details in environment variable
-// format. Branch commands never output a password, so PGPASSWORD is never set.
+// format. PGPASSWORD is set only when the password was requested and found.
 func outputBranchEnv(cmd *cobra.Command, branch OutputBranch) error {
 	cmd.Printf("PGHOST=%s\n", branch.Host)
 	cmd.Printf("PGPORT=%d\n", branch.Port)
 	cmd.Printf("PGDATABASE=%s\n", branch.Database)
 	cmd.Printf("PGUSER=%s\n", branch.Role)
+	if branch.Password != "" {
+		cmd.Printf("PGPASSWORD=%s\n", branch.Password)
+	}
 	return nil
 }
 
@@ -115,6 +125,9 @@ func outputBranchTable(output io.Writer, branch OutputBranch) error {
 		table.Append("Direct Endpoint", fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port))
 	}
 	table.Append("Created", branch.Created.Format("2006-01-02 15:04:05 MST"))
+	if branch.Password != "" {
+		table.Append("Password", branch.Password)
+	}
 	if branch.ConnectionString != "" {
 		table.Append("Connection String", branch.ConnectionString)
 	}
@@ -131,21 +144,19 @@ func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.B
 	}
 	outputBr.Branch.InitialPassword = nil
 
-	// A branch that's still provisioning may have no endpoint yet, which
-	// isn't worth a warning.
-	if branch.Endpoint != nil {
-		opts := common.ConnectionDetailsOptions{
-			Role:     "tsdbadmin",
-			ReadOnly: common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
+	detailsOpts := common.ConnectionDetailsOptions{
+		Role:            "tsdbadmin",
+		WithPassword:    opts.WithPassword,
+		InitialPassword: util.Deref(branch.InitialPassword),
+		ReadOnly:        common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
+	}
+	if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), detailsOpts); err != nil {
+		if cmd != nil {
+			cmd.PrintErrf("Warning: failed to get connection details: %v\n", err)
 		}
-		if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), opts); err != nil {
-			if cmd != nil {
-				cmd.PrintErrf("Warning: failed to get connection details: %v\n", err)
-			}
-		} else {
-			outputBr.ConnectionDetails = *details
-			outputBr.ConnectionString = details.String()
-		}
+	} else {
+		outputBr.ConnectionDetails = *details
+		outputBr.ConnectionString = details.String()
 	}
 
 	// TODO: add a Console URL once the Console supports branches.

@@ -32,10 +32,11 @@ func updateAndSavePassword(
 		cmd.PrintErrf("Warning: could not save password: %v\n", err)
 	} else if result.Success {
 		cmd.PrintErrf("%s\n", result.Message)
-		// Only service get can show a stored password.
-		if credentials.BranchServiceID == "" {
-			cmd.PrintErrf("View it with: tiger service get %s --with-password\n", credentials.ID)
+		group := "service"
+		if credentials.BranchServiceID != "" {
+			group = "branch"
 		}
+		cmd.PrintErrf("View it with: tiger %s get %s --with-password\n", group, credentials.ID)
 	}
 
 	return nil

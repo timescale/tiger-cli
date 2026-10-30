@@ -473,7 +473,7 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	}
 
 	// Verify we get an endpoint error
-	expectedError := "service endpoint not available"
+	expectedError := "endpoint not available"
 	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
 	}

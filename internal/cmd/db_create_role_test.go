@@ -77,7 +77,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 					s.Endpoint = nil
 				}))
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			// The missing endpoint stops the command before any connection
@@ -90,7 +90,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 					s.Endpoint = nil
 				}))
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "network error",
@@ -154,7 +154,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 					s.Endpoint = nil
 				}))
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			// Branches are a preview, so the help mentions them only behind

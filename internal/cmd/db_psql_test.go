@@ -125,7 +125,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "--no-replica-prompt skips replica prompt on a TTY",
@@ -134,7 +134,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "replica target skips replica prompt",
@@ -144,7 +144,7 @@ func TestDbPsqlCmd(t *testing.T) {
 				expectResolveTarget(m, "rep-67890", sampleReplica(func(r *api.ReadReplicaSet) { r.Endpoint = nil }))
 				expectGetService(m, "svc-12345", sampleService())
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "replica listing failure warns and continues",
@@ -155,8 +155,8 @@ func TestDbPsqlCmd(t *testing.T) {
 				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr:    "failed to build connection string: service endpoint not available",
-			wantStderr: "Warning: could not list read replicas: failed to call API: connection refused\nError: failed to build connection string: service endpoint not available\n",
+			wantErr:    "failed to build connection string: endpoint not available",
+			wantStderr: "Warning: could not list read replicas: failed to call API: connection refused\nError: failed to build connection string: endpoint not available\n",
 		},
 		{
 			name: "replica listing nil response body warns and continues",
@@ -169,8 +169,8 @@ func TestDbPsqlCmd(t *testing.T) {
 						HTTPResponse: httpResponse(http.StatusOK),
 					}, nil)
 			},
-			wantErr:    "failed to build connection string: service endpoint not available",
-			wantStderr: "Warning: could not list read replicas: empty response from API\nError: failed to build connection string: service endpoint not available\n",
+			wantErr:    "failed to build connection string: endpoint not available",
+			wantStderr: "Warning: could not list read replicas: empty response from API\nError: failed to build connection string: endpoint not available\n",
 		},
 		{
 			name: "no replicas skips prompt on a TTY",
@@ -184,7 +184,7 @@ func TestDbPsqlCmd(t *testing.T) {
 						JSON200:      &[]api.ReadReplicaSet{},
 					}, nil)
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "no connectable replicas skips prompt",
@@ -210,7 +210,7 @@ func TestDbPsqlCmd(t *testing.T) {
 						JSON200:      &replicas,
 					}, nil)
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "--pooled without pooler",
