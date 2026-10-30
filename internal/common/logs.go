@@ -102,9 +102,10 @@ func fixedUntil(until *time.Time) *time.Time {
 // fetchLogs pages through logs with fetchPage, which takes the cursor for the
 // page (nil for the first) and returns its entries newest-first along with
 // the next page's cursor (nil when there are none). It stops once it has tail
-// entries, and returns them oldest-first.
+// entries, and returns them oldest-first. With no entries, the result is an
+// empty slice rather than nil, so it serializes as [] rather than null.
 func fetchLogs(tail int, fetchPage func(cursor *string) ([]api.ServiceLogEntry, *string, error)) ([]api.ServiceLogEntry, error) {
-	var entries []api.ServiceLogEntry
+	entries := []api.ServiceLogEntry{}
 	var cursor *string
 	for {
 		page, next, err := fetchPage(cursor)

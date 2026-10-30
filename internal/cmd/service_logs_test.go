@@ -123,6 +123,20 @@ func TestServiceLogsCmd(t *testing.T) {
 			mock:     setupLogs(api.ServiceLogs{}),
 		},
 		{
+			name:       "empty logs json output",
+			args:       []string{"service", "logs", "svc-12345", "-o", "json"},
+			synctest:   true,
+			mock:       setupLogs(api.ServiceLogs{}),
+			wantStdout: "[]\n",
+		},
+		{
+			name:       "empty logs yaml output",
+			args:       []string{"service", "logs", "svc-12345", "-o", "yaml"},
+			synctest:   true,
+			mock:       setupLogs(api.ServiceLogs{}),
+			wantStdout: "[]\n",
+		},
+		{
 			name:     "text output",
 			args:     []string{"service", "logs", "svc-12345"},
 			synctest: true,
