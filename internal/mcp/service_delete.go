@@ -148,19 +148,6 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 	}, nil
 }
 
-// promptProdDelete returns the input-required result that asks the user to
-// confirm deleting a PROD service, with branchesNote (from
-// branchesToDeleteMessage) appended to the question. It refuses outright when
-// the client can't show the prompt: silently deleting a production service
-// without a human in the loop is the one outcome this tool must never produce.
-func promptProdDelete(req *mcp.CallToolRequest, service api.Service, branchesNote string) (*mcp.CallToolResult, error) {
-	if !clientSupportsFormElicitation(req) {
-		return nil, fmt.Errorf("deleting service %s requires the user's confirmation because it is tagged PROD, but this MCP client does not support elicitation; ask the user to run 'tiger service delete %s' instead", service.ServiceID, service.ServiceID)
-	}
-	message := fmt.Sprintf("Delete PRODUCTION service %q (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID)
-	return serviceIDConfirmationRequest(deleteConfirmationKey, message+branchesNote, service.ServiceID), nil
-}
-
 // listBranchesToDelete returns the branches that deleting service takes with
 // it. The API deletes them without asking, so this isn't gated on the
 // experimental env var: whoever has branches gets told. A failed listing is
@@ -197,4 +184,17 @@ func branchLabels(branches []api.Branch) string {
 		labels[i] = fmt.Sprintf("%q (%s)", branch.Name, branch.ID)
 	}
 	return strings.Join(labels, ", ")
+}
+
+// promptProdDelete returns the input-required result that asks the user to
+// confirm deleting a PROD service, with branchesNote (from
+// branchesToDeleteMessage) appended to the question. It refuses outright when
+// the client can't show the prompt: silently deleting a production service
+// without a human in the loop is the one outcome this tool must never produce.
+func promptProdDelete(req *mcp.CallToolRequest, service api.Service, branchesNote string) (*mcp.CallToolResult, error) {
+	if !clientSupportsFormElicitation(req) {
+		return nil, fmt.Errorf("deleting service %s requires the user's confirmation because it is tagged PROD, but this MCP client does not support elicitation; ask the user to run 'tiger service delete %s' instead", service.ServiceID, service.ServiceID)
+	}
+	message := fmt.Sprintf("Delete PRODUCTION service %q (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID)
+	return serviceIDConfirmationRequest(deleteConfirmationKey, message+branchesNote, service.ServiceID), nil
 }
