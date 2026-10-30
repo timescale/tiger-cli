@@ -138,6 +138,22 @@ func TestBranchLogsCmd(t *testing.T) {
 			mock:     setupLogs(api.BranchLogs{Entries: []api.ServiceLogEntry{}}),
 		},
 		{
+			name:       "empty logs json output",
+			args:       []string{"branch", "logs", "br-12345", "-o", "json"},
+			opts:       []runOption{withExperimental()},
+			synctest:   true,
+			mock:       setupLogs(api.BranchLogs{}),
+			wantStdout: "[]\n",
+		},
+		{
+			name:       "empty logs yaml output",
+			args:       []string{"branch", "logs", "br-12345", "-o", "yaml"},
+			opts:       []runOption{withExperimental()},
+			synctest:   true,
+			mock:       setupLogs(api.BranchLogs{}),
+			wantStdout: "[]\n",
+		},
+		{
 			name:     "text output",
 			args:     []string{"branch", "logs", "br-12345"},
 			opts:     []runOption{withExperimental()},
