@@ -130,6 +130,17 @@ func TestDBExtensionsListTool(t *testing.T) {
 			wantErr: notReadyMsg,
 		},
 		{
+			// The resolve endpoint also matches names, but the tools take IDs
+			// only, so a service whose name looks like an ID isn't found by it.
+			name: "a name match is not found",
+			tool: toolDBExtensionsList,
+			args: map[string]any{"service_id": "mydatabase"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "mydatabase", nil, sampleService())
+			},
+			wantErr: "service or read replica set 'mydatabase' not found",
+		},
+		{
 			// Branches are a preview, so without the gate a branch ID is
 			// reported as not found, without mentioning branches.
 			name: "branch not found without the experimental gate",

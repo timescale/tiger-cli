@@ -18,15 +18,19 @@ import (
 )
 
 // withExecuteQuery stubs common.ExecuteQuery — otherwise the point where the
-// tool would open a real database connection — asserting the arguments the
-// handler passed down and returning result and err in their place. Expectation
+// tool would open a real database connection — asserting the target and
+// arguments the handler passed down and returning result and err in their
+// place. Expectation
 // and return value are configured together, the way an API client mock's are,
 // so nothing about a case leaks into the next one.
-func withExecuteQuery(want common.ExecuteQueryArgs, result *common.QueryResult, err error) runOption {
+func withExecuteQuery(wantTarget *common.ConnectionTarget, want common.ExecuteQueryArgs, result *common.QueryResult, err error) runOption {
 	return withSetup(func(t *testing.T) {
 		original := common.ExecuteQuery
-		common.ExecuteQuery = func(_ context.Context, _ *config.Config, _ *common.ConnectionTarget, got common.ExecuteQueryArgs) (*common.QueryResult, error) {
+		common.ExecuteQuery = func(_ context.Context, _ *config.Config, gotTarget *common.ConnectionTarget, got common.ExecuteQueryArgs) (*common.QueryResult, error) {
 			t.Helper()
+			if diff := cmp.Diff(wantTarget, gotTarget); diff != "" {
+				t.Errorf("ExecuteQuery target mismatch (-want +got):\n%s", diff)
+			}
 			if diff := cmp.Diff(want, got); diff != "" {
 				t.Errorf("ExecuteQuery args mismatch (-want +got):\n%s", diff)
 			}
@@ -85,6 +89,21 @@ func TestDBQueryTool(t *testing.T) {
 		MaxRows:  config.DefaultMCPMaxRows,
 		MaxBytes: mcpMaxResponseBytes,
 	}
+
+	primaryTarget := common.NewServiceConnectionTarget(sampleService())
+	pooledService := sampleService(func(s *api.Service) {
+		s.ConnectionPooler = &api.ConnectionPooler{
+			Endpoint: &api.Endpoint{
+				Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
+				Port: new(6432),
+			},
+		}
+	})
+	replica := sampleReplica(func(r *api.ReadReplicaSet) { r.Status = api.ReadReplicaSetStatusActive })
+	// A replica connects to its own endpoint with its primary's credentials,
+	// and a branch with its own.
+	replicaTarget := common.NewReplicaConnectionTarget(replica, common.ServiceCredentials(sampleService()))
+	branch := sampleBranch()
 
 	runToolTests(t, []toolTest{
 		{
@@ -182,6 +201,17 @@ func TestDBQueryTool(t *testing.T) {
 			wantErr: notReadyMsg,
 		},
 		{
+			// The resolve endpoint also matches names, but the tools take IDs
+			// only, so a service whose name looks like an ID isn't found by it.
+			name: "a name match is not found",
+			tool: toolDBQuery,
+			args: map[string]any{"service_id": "mydatabase", "query": "SELECT 1"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "mydatabase", nil, sampleService())
+			},
+			wantErr: "service or read replica set 'mydatabase' not found",
+		},
+		{
 			// Branches are a preview, so without the gate a branch ID is
 			// reported as not found, without mentioning branches.
 			name: "branch not found without the experimental gate",
@@ -267,7 +297,7 @@ func TestDBQueryTool(t *testing.T) {
 			name:    "query fails",
 			tool:    toolDBQuery,
 			args:    args,
-			opts:    []runOption{withExecuteQuery(baseArgs, nil, errors.New("failed to connect to database: no route to host"))},
+			opts:    []runOption{withExecuteQuery(primaryTarget, baseArgs, nil, errors.New("failed to connect to database: no route to host"))},
 			mock:    setupGetWithStatus(api.DeployStatusREADY),
 			wantErr: "failed to connect to database: no route to host",
 		},
@@ -275,7 +305,7 @@ func TestDBQueryTool(t *testing.T) {
 			name:       "returns the result sets",
 			tool:       toolDBQuery,
 			args:       args,
-			opts:       []runOption{withExecuteQuery(baseArgs, result, nil)},
+			opts:       []runOption{withExecuteQuery(primaryTarget, baseArgs, result, nil)},
 			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: wantResult,
 		},
@@ -290,7 +320,7 @@ func TestDBQueryTool(t *testing.T) {
 				"role":            "readonly",
 				"pooled":          true,
 			},
-			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
+			opts: []runOption{withExecuteQuery(common.NewServiceConnectionTarget(pooledService), common.ExecuteQueryArgs{
 				Query:      "SELECT $1::int",
 				Parameters: []string{"1"},
 				Role:       "readonly",
@@ -299,14 +329,7 @@ func TestDBQueryTool(t *testing.T) {
 				MaxBytes:   mcpMaxResponseBytes,
 			}, result, nil)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolve(m, "e6ue9697jf", nil, sampleService(func(s *api.Service) {
-					s.ConnectionPooler = &api.ConnectionPooler{
-						Endpoint: &api.Endpoint{
-							Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
-							Port: new(6432),
-						},
-					}
-				}))
+				expectResolve(m, "e6ue9697jf", nil, pooledService)
 			},
 			wantOutput: wantResult,
 		},
@@ -315,7 +338,7 @@ func TestDBQueryTool(t *testing.T) {
 			name: "runs the query read from a file",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
-			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
+			opts: []runOption{withExecuteQuery(primaryTarget, common.ExecuteQueryArgs{
 				Query:    "SELECT * FROM users;\n",
 				Role:     "tsdbadmin",
 				MaxRows:  config.DefaultMCPMaxRows,
@@ -332,7 +355,7 @@ func TestDBQueryTool(t *testing.T) {
 			args: args,
 			opts: []runOption{
 				withConfig(map[string]any{"read_only": "all"}),
-				withExecuteQuery(common.ExecuteQueryArgs{
+				withExecuteQuery(primaryTarget, common.ExecuteQueryArgs{
 					Query:    "SELECT 1",
 					Role:     "tsdbadmin",
 					ReadOnly: true,
@@ -349,7 +372,7 @@ func TestDBQueryTool(t *testing.T) {
 			args: args,
 			opts: []runOption{
 				withConfig(map[string]any{"mcp_max_rows": 250}),
-				withExecuteQuery(common.ExecuteQueryArgs{
+				withExecuteQuery(primaryTarget, common.ExecuteQueryArgs{
 					Query:    "SELECT 1",
 					Role:     "tsdbadmin",
 					MaxRows:  250,
@@ -368,7 +391,7 @@ func TestDBQueryTool(t *testing.T) {
 			args: args,
 			opts: []runOption{
 				withConfig(map[string]any{"mcp_max_rows": 0}),
-				withExecuteQuery(baseArgs, result, nil),
+				withExecuteQuery(primaryTarget, baseArgs, result, nil),
 			},
 			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: wantResult,
@@ -378,7 +401,7 @@ func TestDBQueryTool(t *testing.T) {
 			name: "truncated results carry an actionable notice",
 			tool: toolDBQuery,
 			args: args,
-			opts: []runOption{withExecuteQuery(baseArgs, &common.QueryResult{
+			opts: []runOption{withExecuteQuery(primaryTarget, baseArgs, &common.QueryResult{
 				ResultSets: []common.ResultSet{{
 					CommandTag:   "SELECT 100",
 					Columns:      []common.Column{{Name: "id", Type: "int4"}},
@@ -411,7 +434,7 @@ func TestDBQueryTool(t *testing.T) {
 			name: "read replica without a pooler warns alongside the results",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "u8me885b93", "query": "SELECT 1", "pooled": true},
-			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
+			opts: []runOption{withExecuteQuery(replicaTarget, common.ExecuteQueryArgs{
 				Query:    "SELECT 1",
 				Role:     "tsdbadmin",
 				Pooled:   true,
@@ -419,7 +442,7 @@ func TestDBQueryTool(t *testing.T) {
 				MaxBytes: mcpMaxResponseBytes,
 			}, result, nil)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolve(m, "u8me885b93", nil, sampleReplica(func(r *api.ReadReplicaSet) { r.Status = api.ReadReplicaSetStatusActive }))
+				expectResolve(m, "u8me885b93", nil, replica)
 				expectGetService(m, "e6ue9697jf", sampleService())
 			},
 			wantOutput: map[string]any{
@@ -427,6 +450,16 @@ func TestDBQueryTool(t *testing.T) {
 				"execution_time": "12ms",
 				"warning":        `read replica "replica-service" has no connection pooler; connecting directly instead`,
 			},
+		},
+		{
+			name: "runs the query on a branch",
+			tool: toolDBQuery,
+			args: map[string]any{"service_id": "br4nch1d9x", "query": "SELECT 1"},
+			opts: []runOption{withExperimental(), withExecuteQuery(common.NewBranchConnectionTarget(branch), baseArgs, result, nil)},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "br4nch1d9x", nil, branch)
+			},
+			wantOutput: wantResult,
 		},
 	})
 }
