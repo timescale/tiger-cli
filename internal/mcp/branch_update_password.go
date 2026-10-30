@@ -109,12 +109,8 @@ func (s *Server) handleBranchUpdatePassword(ctx context.Context, req *mcp.CallTo
 		s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
 	}
 
-	message := "Password updated for tsdbadmin."
-	if !storage.Success && !input.WithPassword {
-		message += " Warning: the new password was not saved, and was not returned because with_password was false."
-	}
 	output := BranchUpdatePasswordOutput{
-		Message:         message,
+		Message:         updatePasswordMessage(input.WithPassword, storage),
 		PasswordStorage: &storage,
 	}
 	if input.WithPassword {

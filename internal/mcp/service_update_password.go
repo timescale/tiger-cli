@@ -160,7 +160,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 
 	output := ServiceUpdatePasswordOutput{
 		Updated:         true,
-		Message:         updatePasswordMessage(input, storage),
+		Message:         updatePasswordMessage(input.WithPassword, storage),
 		PasswordStorage: &storage,
 	}
 	if input.WithPassword {
@@ -181,15 +181,4 @@ func promptProdUpdatePassword(req *mcp.CallToolRequest, service api.Service) (*m
 		fmt.Sprintf("Update the password of PRODUCTION service %q (%s)? The tsdbadmin password is replaced with a newly generated one: existing connections may be terminated, and applications using the old password will fail to authenticate.", service.Name, service.ServiceID),
 		service.ServiceID,
 	), nil
-}
-
-// updatePasswordMessage returns the result message for an update that went
-// through, given the outcome of saving the new password. It warns when the
-// password was neither saved (because saving failed or password storage is
-// disabled) nor returned, since then nobody knows it.
-func updatePasswordMessage(input ServiceUpdatePasswordInput, storage common.PasswordStorageResult) string {
-	if !storage.Success && !input.WithPassword {
-		return "Password updated for tsdbadmin. Warning: the new password was not saved, and was not returned because with_password was false."
-	}
-	return "Password updated for tsdbadmin."
 }

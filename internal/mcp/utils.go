@@ -58,6 +58,17 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["with_password"].Examples = []any{false, true}
 }
 
+// updatePasswordMessage returns the result message for an update that went
+// through, given the outcome of saving the new password. It warns when the
+// password was neither saved (because saving failed or password storage is
+// disabled) nor returned, since then nobody knows it.
+func updatePasswordMessage(withPassword bool, storage common.PasswordStorageResult) string {
+	if !storage.Success && !withPassword {
+		return "Password updated for tsdbadmin. Warning: the new password was not saved, and was not returned because with_password was false."
+	}
+	return "Password updated for tsdbadmin."
+}
+
 // setCPUMemorySchemaProperties sets a tool's cpu_memory property. shared
 // includes shared/shared, which a service can't be resized onto. Without the
 // experimental gate, only the standard platform's combinations are offered.
