@@ -43,7 +43,7 @@ func newBranchDeleteTool() *mcp.Tool {
 		Title: "Delete Branch",
 		Description: `Delete a branch permanently, along with any changes made on it. The parent service is not affected.
 
-This operation is irreversible. Branches are always treated as DEV, so the tool does not prompt the user for confirmation the way deleting a PROD service does.`,
+This operation is irreversible.`,
 		InputSchema:  BranchDeleteInput{}.Schema(),
 		OutputSchema: BranchDeleteOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
