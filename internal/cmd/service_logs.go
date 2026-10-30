@@ -63,17 +63,6 @@ service from your configuration.`,
 				return err
 			}
 
-			// Prepare parameters
-			var sincePtr *time.Time
-			if !since.IsZero() {
-				sincePtr = &since
-			}
-
-			var untilPtr *time.Time
-			if !until.IsZero() {
-				untilPtr = &until
-			}
-
 			// Check if node flag was explicitly set (0 is a valid node)
 			// If not set, omit the parameter and let the backend fetch primaryOrdinal
 			var nodePtr *int
@@ -87,8 +76,8 @@ service from your configuration.`,
 				ProjectID: projectID,
 				ServiceID: service.ServiceID,
 				Tail:      tail,
-				Since:     sincePtr,
-				Until:     untilPtr,
+				Since:     since,
+				Until:     until,
 				Node:      nodePtr,
 			})
 			if err != nil {

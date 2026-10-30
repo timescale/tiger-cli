@@ -254,6 +254,40 @@ func TestBranchLogsCmd(t *testing.T) {
 				"ERROR: relation \"missing\" does not exist\n",
 		},
 		{
+			// Without --until, the upper bound is pinned to the current time.
+			name:     "since param alone",
+			args:     []string{"branch", "logs", "br-12345", "--since", "2024-01-15T09:00:00Z"},
+			opts:     []runOption{withExperimental()},
+			synctest: true,
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
+				m.EXPECT().GetBranchLogsWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", &api.GetBranchLogsParams{
+					Since: &since,
+					Until: &logsNow,
+				}).
+					Return(branchLogsResponse(&api.BranchLogs{Entries: entries}), nil)
+			},
+			wantStdout: "LOG: database system is ready to accept connections\n" +
+				"ERROR: relation \"missing\" does not exist\n",
+		},
+		{
+			// Without --since, no lower bound is sent.
+			name: "until param alone",
+			args: []string{"branch", "logs", "br-12345", "--until", "2024-01-15T10:00:00Z"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+				m.EXPECT().GetBranchLogsWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", &api.GetBranchLogsParams{
+					Until: &until,
+				}).
+					Return(branchLogsResponse(&api.BranchLogs{Entries: entries}), nil)
+			},
+			wantStdout: "LOG: database system is ready to accept connections\n" +
+				"ERROR: relation \"missing\" does not exist\n",
+		},
+		{
 			name:     "log alias",
 			args:     []string{"branch", "log", "br-12345"},
 			opts:     []runOption{withExperimental()},

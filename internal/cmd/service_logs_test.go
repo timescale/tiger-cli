@@ -231,6 +231,38 @@ func TestServiceLogsCmd(t *testing.T) {
 				"ERROR: relation \"missing\" does not exist\n",
 		},
 		{
+			// Without --until, the upper bound is pinned to the current time.
+			name:     "since param alone",
+			args:     []string{"service", "logs", "svc-12345", "--since", "2024-01-15T09:00:00Z"},
+			synctest: true,
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
+				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
+				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
+					Since: &since,
+					Until: &logsNow,
+				}).
+					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)
+			},
+			wantStdout: "LOG: database system is ready to accept connections\n" +
+				"ERROR: relation \"missing\" does not exist\n",
+		},
+		{
+			// Without --since, no lower bound is sent.
+			name: "until param alone",
+			args: []string{"service", "logs", "svc-12345", "--until", "2024-01-15T10:00:00Z"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
+				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
+					Until: &until,
+				}).
+					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)
+			},
+			wantStdout: "LOG: database system is ready to accept connections\n" +
+				"ERROR: relation \"missing\" does not exist\n",
+		},
+		{
 			// --node 0 is valid and must be sent explicitly (the parameter is
 			// only omitted when the flag isn't set).
 			name:     "node param",

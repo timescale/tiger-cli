@@ -14,11 +14,11 @@ import (
 
 // ServiceLogsInput represents input for service_logs
 type ServiceLogsInput struct {
-	ServiceID string     `json:"service_id"`
-	Node      *int       `json:"node,omitempty"`
-	Tail      int        `json:"tail,omitempty"`
-	Since     *time.Time `json:"since,omitempty"`
-	Until     *time.Time `json:"until,omitempty"`
+	ServiceID string    `json:"service_id"`
+	Node      *int      `json:"node,omitempty"`
+	Tail      int       `json:"tail,omitempty"`
+	Since     time.Time `json:"since,omitzero"`
+	Until     time.Time `json:"until,omitzero"`
 }
 
 func (ServiceLogsInput) Schema() *jsonschema.Schema {
