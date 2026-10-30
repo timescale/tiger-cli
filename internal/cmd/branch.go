@@ -42,6 +42,7 @@ moment it was created and gets its own compute.`,
 	cmd.AddCommand(buildBranchResizeCmd(app))
 	cmd.AddCommand(buildBranchRenameCmd(app))
 	cmd.AddCommand(buildBranchUpdatePasswordCmd(app))
+	cmd.AddCommand(buildBranchLogsCmd(app))
 
 	return cmd
 }
