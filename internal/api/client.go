@@ -688,6 +688,20 @@ type ClientInterface interface {
 	// Corresponds with GET /projects/{project_id}/services/{service_id}/branches/{branch_id} (the `GetBranch` operationId).
 	GetBranch(ctx context.Context, projectID ProjectID, serviceID ServiceID, branchID BranchID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetBranchLogs Get branch logs
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Fetch logs for a branch. Returns up to 500 log entries in reverse
+	// chronological order. Supports cursor-based pagination via the `cursor`
+	// parameter and the `last_cursor` field in the response.
+	//
+	// Use the returned `last_cursor` value as the `cursor` parameter on
+	// subsequent requests to page through all available logs.
+	//
+	// Corresponds with GET /projects/{project_id}/services/{service_id}/branches/{branch_id}/logs (the `GetBranchLogs` operationId).
+	GetBranchLogs(ctx context.Context, projectID ProjectID, serviceID ServiceID, branchID BranchID, params *GetBranchLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// RenameBranchWithBody Rename a Branch
 	//
 	// **Preview - this endpoint is experimental and may change without notice.**
@@ -2322,6 +2336,30 @@ func (c *Client) DeleteBranch(ctx context.Context, projectID ProjectID, serviceI
 // Corresponds with GET /projects/{project_id}/services/{service_id}/branches/{branch_id} (the `GetBranch` operationId).
 func (c *Client) GetBranch(ctx context.Context, projectID ProjectID, serviceID ServiceID, branchID BranchID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetBranchRequest(c.Server, projectID, serviceID, branchID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBranchLogs Get branch logs
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Fetch logs for a branch. Returns up to 500 log entries in reverse
+// chronological order. Supports cursor-based pagination via the `cursor`
+// parameter and the `last_cursor` field in the response.
+//
+// Use the returned `last_cursor` value as the `cursor` parameter on
+// subsequent requests to page through all available logs.
+//
+// Corresponds with GET /projects/{project_id}/services/{service_id}/branches/{branch_id}/logs (the `GetBranchLogs` operationId).
+func (c *Client) GetBranchLogs(ctx context.Context, projectID ProjectID, serviceID ServiceID, branchID BranchID, params *GetBranchLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBranchLogsRequest(c.Server, projectID, serviceID, branchID, params)
 	if err != nil {
 		return nil, err
 	}
@@ -5057,6 +5095,129 @@ func NewGetBranchRequest(server string, projectID ProjectID, serviceID ServiceID
 	return req, nil
 }
 
+// NewGetBranchLogsRequest constructs an http.Request for the GetBranchLogs method
+func NewGetBranchLogsRequest(server string, projectID ProjectID, serviceID ServiceID, branchID BranchID, params *GetBranchLogsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "branch_id", branchID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/branches/%s/logs", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Until != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "until", *params.Until, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Search != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "search", *params.Search, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Severities != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "severities", *params.Severities, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewRenameBranchRequest calls the generic RenameBranch builder with application/json body
 func NewRenameBranchRequest(server string, projectID ProjectID, serviceID ServiceID, branchID BranchID, body RenameBranchJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -7749,6 +7910,22 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /projects/{project_id}/services/{service_id}/branches/{branch_id} (the `GetBranch` operationId).
 	GetBranchWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, branchID BranchID, reqEditors ...RequestEditorFn) (*GetBranchResponse, error)
 
+	// GetBranchLogsWithResponse Get branch logs
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Fetch logs for a branch. Returns up to 500 log entries in reverse
+	// chronological order. Supports cursor-based pagination via the `cursor`
+	// parameter and the `last_cursor` field in the response.
+	//
+	// Use the returned `last_cursor` value as the `cursor` parameter on
+	// subsequent requests to page through all available logs.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project_id}/services/{service_id}/branches/{branch_id}/logs (the `GetBranchLogs` operationId).
+	GetBranchLogsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, branchID BranchID, params *GetBranchLogsParams, reqEditors ...RequestEditorFn) (*GetBranchLogsResponse, error)
+
 	// RenameBranchWithBodyWithResponse Rename a Branch
 	//
 	// **Preview - this endpoint is experimental and may change without notice.**
@@ -9960,6 +10137,54 @@ func (r GetBranchResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetBranchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBranchLogsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *BranchLogs
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBranchLogsResponse) GetJSON200() *BranchLogs {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetBranchLogsResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBranchLogsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBranchLogsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBranchLogsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBranchLogsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -12741,6 +12966,28 @@ func (c *ClientWithResponses) GetBranchWithResponse(ctx context.Context, project
 	return ParseGetBranchResponse(rsp)
 }
 
+// GetBranchLogsWithResponse Get branch logs
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Fetch logs for a branch. Returns up to 500 log entries in reverse
+// chronological order. Supports cursor-based pagination via the `cursor`
+// parameter and the `last_cursor` field in the response.
+//
+// Use the returned `last_cursor` value as the `cursor` parameter on
+// subsequent requests to page through all available logs.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project_id}/services/{service_id}/branches/{branch_id}/logs (the `GetBranchLogs` operationId).
+func (c *ClientWithResponses) GetBranchLogsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, branchID BranchID, params *GetBranchLogsParams, reqEditors ...RequestEditorFn) (*GetBranchLogsResponse, error) {
+	rsp, err := c.GetBranchLogs(ctx, projectID, serviceID, branchID, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBranchLogsResponse(rsp)
+}
+
 // RenameBranchWithBodyWithResponse Rename a Branch
 //
 // **Preview - this endpoint is experimental and may change without notice.**
@@ -14784,6 +15031,39 @@ func ParseGetBranchResponse(rsp *http.Response) (*GetBranchResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Branch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBranchLogsResponse parses an HTTP response from a GetBranchLogsWithResponse call
+func ParseGetBranchLogsResponse(rsp *http.Response) (*GetBranchLogsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBranchLogsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BranchLogs
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
