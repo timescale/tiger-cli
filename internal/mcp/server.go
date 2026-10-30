@@ -53,6 +53,7 @@ const (
 	toolBranchResize              = "branch_resize"
 	toolBranchRename              = "branch_rename"
 	toolBranchUpdatePassword      = "branch_update_password"
+	toolBranchLogs                = "branch_logs"
 	toolDBQuery                   = "db_query"
 	toolDBSchema                  = "db_schema"
 	toolDBExtensionsList          = "db_extensions_list"
@@ -265,6 +266,7 @@ func (s *Server) registerBranchTools(mode config.ReadOnlyMode, experimental bool
 	addTool(s, mode, newBranchResizeTool(), s.handleBranchResize)
 	addTool(s, mode, newBranchRenameTool(), s.handleBranchRename)
 	addTool(s, mode, newBranchUpdatePasswordTool(), s.handleBranchUpdatePassword)
+	addTool(s, mode, newBranchLogsTool(), s.handleBranchLogs)
 }
 
 // registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions
