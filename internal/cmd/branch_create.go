@@ -36,9 +36,9 @@ func newBranchCreateCmd(app *common.App, use, commandPath string) *cobra.Command
 		Short: "Create a branch of a database service",
 		Long: `Create a branch of a Fluid Service.
 
-A branch is a lightweight, ephemeral copy of a service, sharing the service's
-storage as of the moment it is created and getting its own compute. The
-tsdbadmin user gets a new password, which is saved the same way as a new
+A branch is a lightweight, ephemeral copy of a service. It starts with a copy
+of the service's data as of the moment it is created, and gets its own compute.
+The tsdbadmin user gets a new password, which is saved the same way as a new
 service's. Unless --cpu or --memory is given, the branch gets the same CPU and
 memory as the service, up to a limit.
 

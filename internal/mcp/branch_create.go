@@ -66,7 +66,7 @@ func newBranchCreateTool() *mcp.Tool {
 		Title: "Create Branch",
 		Description: `Create a branch of a Fluid Service.
 
-A branch is a lightweight, ephemeral copy of a service for development, testing, CI/CD, and agent workflows. It shares the parent's storage as of the moment it is created and gets its own compute. The tsdbadmin user gets a new password, which is saved to the configured password storage. Branches are always treated as DEV, so under read-only mode for production services a PROD service can still be branched.
+A branch is a lightweight, ephemeral copy of a service for development, testing, CI/CD, and agent workflows. It starts with a copy of the parent's data as of the moment it is created, and gets its own compute. The tsdbadmin user gets a new password, which is saved to the configured password storage. Branches are always treated as DEV, so under read-only mode for production services a PROD service can still be branched.
 
 By default, the branch gets the same CPU and memory as the parent service, up to a limit, and its name is auto-generated. Branching from a branch isn't supported.
 
