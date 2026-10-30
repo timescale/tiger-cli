@@ -23,7 +23,7 @@ func buildBranchStopCmd(app *common.App) *cobra.Command {
 		Long: `Stop a running branch.
 
 A stopped branch no longer accepts connections and stops charging for compute,
-but keeps the changes made on it, whose storage is still billed.
+but keeps the data changes made on it, whose storage is still billed.
 
 The branch can be given by ID or name.`,
 		Example: `  # Stop a branch (waits for completion by default)

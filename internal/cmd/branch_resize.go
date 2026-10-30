@@ -25,7 +25,6 @@ func buildBranchResizeCmd(app *common.App) *cobra.Command {
 		Use:   "resize <name-or-id>",
 		Short: "Resize a branch",
 		Long: `Resize a branch by changing its CPU, memory, and provisioned IOPS allocation.
-A branch's storage is shared with its parent service and isn't resized.
 
 The branch can be given by ID or name. It may be temporarily unavailable
 during the resize.
@@ -37,7 +36,8 @@ other will be automatically configured).
 
 The allowed --iops values depend on your plan and the branch's CPU/memory
 allocation. See the Tiger Data documentation for details. If only --iops is
-given, the branch keeps its current CPU and memory.`,
+given, the branch keeps its current CPU and memory. If --cpu or --memory is
+given without --iops, the IOPS is reset to the baseline for the new size.`,
 		Example: `  # Resize a branch to 2 CPU cores and 16GB memory
   tiger branch resize br-12345 --cpu 2000 --memory 16
 

@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/timescale/tiger-cli/internal/util"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -362,6 +365,16 @@ func withElicitation(answer *mcp.ElicitResult) runOption {
 // withKeyringError makes every keyring operation fail with err for the
 // duration of the test, for exercising a tool's password storage failure
 // path. The keyring is restored to an empty in-memory one afterwards.
+// withStoredPassword seeds a tsdbadmin password for target in the mock keyring
+// before the server starts.
+func withStoredPassword(target common.PasswordTarget, password string) runOption {
+	return withSetup(func(t *testing.T) {
+		if err := (&common.KeyringStorage{}).Save(target, password, "tsdbadmin"); err != nil {
+			t.Fatalf("failed to seed password: %v", err)
+		}
+	})
+}
+
 func withKeyringError(err error) runOption {
 	return withSetup(func(t *testing.T) {
 		keyring.MockInitWithError(err)
@@ -512,6 +525,134 @@ func expectTaggedService(tag string, calls int) func(*mocks.MockClientWithRespon
 		expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
 			s.Metadata = &api.ServiceMetadata{Environment: &tag}
 		})).Times(calls)
+	}
+}
+
+// sampleBranch returns a branch of sampleService with reasonable defaults.
+// Use overrides to customize specific fields.
+func sampleBranch(overrides ...func(*api.Branch)) api.Branch {
+	branch := api.Branch{
+		ID:        "br4nch1d9x",
+		ProjectID: testProjectID,
+		ServiceID: "e6ue9697jf",
+		Name:      "test-branch",
+		Status:    api.DeployStatusREADY,
+		CPUMillis: 250,
+		MemoryGbs: 2,
+		Created:   time.Date(2025, 1, 16, 9, 0, 0, 0, time.UTC),
+		Endpoint: &api.Endpoint{
+			Host: new("br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com"),
+			Port: new(36956),
+		},
+	}
+	for _, o := range overrides {
+		o(&branch)
+	}
+	return branch
+}
+
+// sampleBranchDetail is the BranchDetail output of sampleBranch, with the
+// given status.
+func sampleBranchDetail(status api.DeployStatus) map[string]any {
+	return map[string]any{
+		"id":                "br4nch1d9x",
+		"name":              "test-branch",
+		"service_id":        "e6ue9697jf",
+		"status":            string(status),
+		"created":           "2025-01-16T09:00:00Z",
+		"resources":         map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
+		"direct_endpoint":   "br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956",
+		"connection_string": "postgresql://tsdbadmin@br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
+	}
+}
+
+// branchStatus returns a sampleBranch override setting the branch's status.
+func branchStatus(status api.DeployStatus) func(*api.Branch) {
+	return func(b *api.Branch) { b.Status = status }
+}
+
+// expectResolve expects resolving ref through the resolve endpoint,
+// restricted to resolveType (nil for none), answered with v: an api.Service,
+// api.Branch, or api.ReadReplicaSet, whose Go type picks the discriminator.
+// The call is returned so a caller can adjust its cardinality.
+func expectResolve(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, v any) *gomock.Call {
+	return m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(&api.ResolveRefResponse{
+			HTTPResponse: httpResponse(http.StatusOK),
+			JSON200:      resolveResult(v),
+		}, nil)
+}
+
+// expectResolveStatus expects a resolve answered with status. A nil apiErr
+// stands in for a response with no body.
+func expectResolveStatus(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, status int, apiErr *api.ClientError) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(&api.ResolveRefResponse{
+			HTTPResponse: httpResponse(status),
+			JSON4XX:      apiErr,
+		}, nil)
+}
+
+// resolveResult encodes v as the resolve endpoint's union, discriminated by
+// v's Go type. Each member is its plain type plus the discriminator.
+func resolveResult(v any) *api.ResolveResult {
+	var resolveType api.ResolveType
+	switch v.(type) {
+	case api.Service:
+		resolveType = api.ResolveTypeSERVICE
+	case api.Branch:
+		resolveType = api.ResolveTypeBRANCH
+	case api.ReadReplicaSet:
+		resolveType = api.ResolveTypeREADREPLICASET
+	default:
+		panic(fmt.Sprintf("resolveResult: unsupported type %T", v))
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(util.Must(json.Marshal(v)), &body); err != nil {
+		panic(err)
+	}
+	body["type"] = resolveType
+
+	var result api.ResolveResult
+	if err := result.UnmarshalJSON(util.Must(json.Marshal(body))); err != nil {
+		panic(err)
+	}
+	return &result
+}
+
+// branchType is the resolve type every branch tool restricts its lookup to.
+var branchType = new(api.ResolveTypeBRANCH)
+
+// expectResolveBranch expects resolving branch's ID as a branch, which every
+// branch tool but branch_create and branch_list does first.
+func expectResolveBranch(m *mocks.MockClientWithResponsesInterface, branch api.Branch) {
+	expectResolve(m, branch.ID, branchType, branch)
+}
+
+// expectGetBranch expects one GetBranch call for branch, through its parent,
+// returning branch. The call is returned so a caller can adjust its
+// cardinality (a wait loop's poll).
+func expectGetBranch(m *mocks.MockClientWithResponsesInterface, branch api.Branch) *gomock.Call {
+	return m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, branch.ServiceID, branch.ID).
+		Return(&api.GetBranchResponse{
+			HTTPResponse: httpResponse(http.StatusOK),
+			JSON200:      &branch,
+		}, nil)
+}
+
+// checkStoredPassword returns a check asserting the password stored in the
+// mock keyring for the given service or branch ID.
+func checkStoredPassword(id, want string) checkFunc {
+	return func(t *testing.T, result toolResult) {
+		t.Helper()
+		got, err := (&common.KeyringStorage{}).Get(common.PasswordTarget{ID: id, ProjectID: testProjectID}, "tsdbadmin")
+		if err != nil {
+			t.Fatalf("failed to read stored password: %v", err)
+		}
+		if got != want {
+			t.Errorf("stored password = %q, want %q", got, want)
+		}
 	}
 }
 
