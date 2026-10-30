@@ -1,7 +1,9 @@
 package mcp
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -54,6 +56,45 @@ func TestServiceDeleteTool(t *testing.T) {
 			"required": []any{"service_id"},
 		},
 	}
+	// promptWith is prompt with extra appended to its message, for a fluid
+	// service whose branches the prompt names.
+	promptWith := func(extra string) *mcp.ElicitParams {
+		p := *prompt
+		p.Message += extra
+		return &p
+	}
+	// expectFluidService registers fetching a fluid service tagged tag, the
+	// kind that can have branches, on each of calls handler runs.
+	expectFluidService := func(tag string, calls int) func(*mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
+				s.Metadata = &api.ServiceMetadata{Environment: &tag}
+				s.Platform = new(api.ServicePlatformFLUID)
+			})).Times(calls)
+		}
+	}
+	// expectBranches registers listing the service's branches on each of
+	// calls handler runs.
+	expectBranches := func(m *mocks.MockClientWithResponsesInterface, calls int, branches ...api.Branch) {
+		m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
+			Return(&api.GetBranchesResponse{
+				HTTPResponse: httpResponse(http.StatusOK),
+				JSON200:      &branches,
+			}, nil).Times(calls)
+	}
+	otherBranch := sampleBranch(func(b *api.Branch) {
+		b.ID = "x7k2m9p4qa"
+		b.Name = "other-branch"
+	})
+	// deletedWith is a successful deletion's result, with the given message.
+	deletedWith := func(message string) map[string]any {
+		return map[string]any{
+			"service_id": "e6ue9697jf",
+			"deleted":    true,
+			"message":    message,
+		}
+	}
+
 	// confirm answers the prompt by typing id back.
 	confirm := func(id string) runOption {
 		return withElicitation(&mcp.ElicitResult{Action: "accept", Content: map[string]any{"service_id": id}})
@@ -130,6 +171,77 @@ func TestServiceDeleteTool(t *testing.T) {
 			wantOutput: deleted,
 		},
 		{
+			// The API deletes a service's branches along with it, so the
+			// prompt and the result name them even without the experimental
+			// gate. Both handler runs list them.
+			name: "PROD prompt and result name the branches deleted with the service",
+			tool: toolServiceDelete,
+			args: args,
+			opts: []runOption{confirm("e6ue9697jf")},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectFluidService("PROD", 2)(m)
+				expectBranches(m, 2, sampleBranch(), otherBranch)
+				expectDelete(m)
+			},
+			wantPrompt: promptWith(` Its 2 branches will also be deleted: "test-branch" (br4nch1d9x), "other-branch" (x7k2m9p4qa).`),
+			wantOutput: deletedWith(`Service "e6ue9697jf" has been deleted, along with its 2 branches: "test-branch" (br4nch1d9x), "other-branch" (x7k2m9p4qa).`),
+		},
+		{
+			name: "PROD prompt names a single branch",
+			tool: toolServiceDelete,
+			args: args,
+			opts: []runOption{confirm("e6ue9697jf")},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectFluidService("PROD", 2)(m)
+				expectBranches(m, 2, sampleBranch())
+				expectDelete(m)
+			},
+			wantPrompt: promptWith(` Its 1 branch will also be deleted: "test-branch" (br4nch1d9x).`),
+			wantOutput: deletedWith(`Service "e6ue9697jf" has been deleted, along with its 1 branch: "test-branch" (br4nch1d9x).`),
+		},
+		{
+			name: "PROD prompt for a fluid service without branches names none",
+			tool: toolServiceDelete,
+			args: args,
+			opts: []runOption{confirm("e6ue9697jf")},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectFluidService("PROD", 2)(m)
+				expectBranches(m, 2)
+				expectDelete(m)
+			},
+			wantPrompt: prompt,
+			wantOutput: deleted,
+		},
+		{
+			// The listing only informs the decision, so a failure still
+			// prompts, with a warning in place of the names.
+			name: "PROD prompt when the branch listing fails",
+			tool: toolServiceDelete,
+			args: args,
+			opts: []runOption{confirm("e6ue9697jf")},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectFluidService("PROD", 2)(m)
+				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
+					Return(nil, errors.New("connection refused")).Times(2)
+				expectDelete(m)
+			},
+			wantPrompt: promptWith(" Any branches of the service will also be deleted."),
+			wantOutput: deleted,
+		},
+		{
+			// DEV deletions don't prompt, but the result still names the
+			// branches deleted along with the service.
+			name: "deletes fluid DEV service and names its branches",
+			tool: toolServiceDelete,
+			args: args,
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectFluidService("DEV", 1)(m)
+				expectBranches(m, 1, sampleBranch(), otherBranch)
+				expectDelete(m)
+			},
+			wantOutput: deletedWith(`Service "e6ue9697jf" has been deleted, along with its 2 branches: "test-branch" (br4nch1d9x), "other-branch" (x7k2m9p4qa).`),
+		},
+		{
 			name:       "PROD deletion cancelled when the typed ID does not match",
 			tool:       toolServiceDelete,
 			args:       args,
@@ -198,4 +310,17 @@ func TestServiceDeleteTool(t *testing.T) {
 			wantErr: "unknown error",
 		},
 	})
+}
+
+// TestServiceDeleteToolDescription covers the description's experimental
+// gate at the helper level: the harness calls tools but never lists them, so
+// a description isn't reachable through runTool.
+func TestServiceDeleteToolDescription(t *testing.T) {
+	const branchNote = "Deleting a service also deletes all of its branches."
+	if got := newServiceDeleteTool(false).Description; strings.Contains(got, "branch") {
+		t.Errorf("description must not mention branches without the gate, got:\n%s", got)
+	}
+	if got := newServiceDeleteTool(true).Description; !strings.Contains(got, branchNote) {
+		t.Errorf("description must contain %q behind the gate, got:\n%s", branchNote, got)
+	}
 }

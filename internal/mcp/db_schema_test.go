@@ -16,14 +16,17 @@ import (
 
 // withFetchServiceSchema stubs common.FetchServiceSchema — otherwise the point
 // where the tool would open a real database connection — asserting the
-// arguments the handler passed down and returning schema and err in their
-// place. Expectation and return value are configured together, the way an API
+// target and arguments the handler passed down and returning schema and err in
+// their place. Expectation and return value are configured together, the way an API
 // client mock's are, so nothing about a case leaks into the next one.
-func withFetchServiceSchema(want common.FetchServiceSchemaArgs, schema *common.DatabaseSchema, err error) runOption {
+func withFetchServiceSchema(wantTarget *common.ConnectionTarget, want common.FetchServiceSchemaArgs, schema *common.DatabaseSchema, err error) runOption {
 	return withSetup(func(t *testing.T) {
 		original := common.FetchServiceSchema
-		common.FetchServiceSchema = func(_ context.Context, _ *config.Config, _ *common.ConnectionTarget, got common.FetchServiceSchemaArgs) (*common.DatabaseSchema, error) {
+		common.FetchServiceSchema = func(_ context.Context, _ *config.Config, gotTarget *common.ConnectionTarget, got common.FetchServiceSchemaArgs) (*common.DatabaseSchema, error) {
 			t.Helper()
+			if diff := cmp.Diff(wantTarget, gotTarget); diff != "" {
+				t.Errorf("FetchServiceSchema target mismatch (-want +got):\n%s", diff)
+			}
 			if diff := cmp.Diff(want, got); diff != "" {
 				t.Errorf("FetchServiceSchema args mismatch (-want +got):\n%s", diff)
 			}
@@ -38,7 +41,7 @@ func TestDBSchemaTool(t *testing.T) {
 
 	setupGetWithStatus := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) { s.Status = status }))
+			expectResolve(m, "e6ue9697jf", nil, sampleService(func(s *api.Service) { s.Status = status }))
 		}
 	}
 
@@ -56,6 +59,12 @@ func TestDBSchemaTool(t *testing.T) {
 		}},
 	}
 	const schemaText = "DATABASE: tsdb (e6ue9697jf)\n\nSCHEMA: public\n\nTABLE: metrics\n  time  TIMESTAMPTZ NOT NULL\n"
+
+	primaryTarget := common.NewServiceConnectionTarget(sampleService())
+	replica := sampleReplica(func(r *api.ReadReplicaSet) { r.Status = api.ReadReplicaSetStatusActive })
+	// A replica connects to its own endpoint with its primary's credentials.
+	replicaTarget := common.NewReplicaConnectionTarget(replica, common.ServiceCredentials(sampleService()))
+	branch := sampleBranch()
 
 	runToolTests(t, []toolTest{
 		{
@@ -78,31 +87,26 @@ func TestDBSchemaTool(t *testing.T) {
 			tool: toolDBSchema,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
+				m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: "e6ue9697jf"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: "failed to resolve service or read replica set 'e6ue9697jf': connection refused",
 		},
 		{
 			name: "service lookup API error",
 			tool: toolDBSchema,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.ClientError{Message: new("service not found")},
-					}, nil)
+				expectResolveStatus(m, "e6ue9697jf", nil, http.StatusNotFound, &api.ClientError{Message: new("resource not found")})
 			},
-			wantErr: "service not found",
+			wantErr: "service or read replica set 'e6ue9697jf' not found",
 		},
 		{
 			name: "nil response body",
 			tool: toolDBSchema,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
+				expectResolveStatus(m, "e6ue9697jf", nil, http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -128,23 +132,23 @@ func TestDBSchemaTool(t *testing.T) {
 			wantErr: notReadyMsg,
 		},
 		{
-			// Both services are fetched: the replica for its endpoint, the
-			// parent for its credentials. The replica's own status then stops it.
+			// The parent is fetched for its credentials, then the replica's own
+			// status stops it: a replica set that isn't active isn't ready.
 			name: "read replica resolves its parent",
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "u8me885b93"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "u8me885b93", sampleReplica())
+				expectResolve(m, "u8me885b93", nil, sampleReplica())
 				expectGetService(m, "e6ue9697jf", sampleService())
 			},
-			wantErr: pausedMsg,
+			wantErr: notReadyMsg,
 		},
 		{
 			name: "read replica parent lookup fails",
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "u8me885b93"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "u8me885b93", sampleReplica())
+				expectResolve(m, "u8me885b93", nil, sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -152,6 +156,39 @@ func TestDBSchemaTool(t *testing.T) {
 					}, nil)
 			},
 			wantErr: `failed to fetch parent service "e6ue9697jf" for read replica: service not found`,
+		},
+		{
+			// The resolve endpoint also matches names, but the tools take IDs
+			// only, so a service whose name looks like an ID isn't found by it.
+			name: "a name match is not found",
+			tool: toolDBSchema,
+			args: map[string]any{"service_id": "mydatabase"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "mydatabase", nil, sampleService())
+			},
+			wantErr: "service or read replica set 'mydatabase' not found",
+		},
+		{
+			// Branches are a preview, so without the gate a branch ID is
+			// reported as not found, without mentioning branches.
+			name: "branch not found without the experimental gate",
+			tool: toolDBSchema,
+			args: map[string]any{"service_id": "br4nch1d9x"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "br4nch1d9x", nil, branch)
+			},
+			wantErr: "service or read replica set 'br4nch1d9x' not found",
+		},
+		{
+			// A branch is started with branch_start, not service_start.
+			name: "paused branch points at branch_start",
+			tool: toolDBSchema,
+			args: map[string]any{"service_id": "br4nch1d9x"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "br4nch1d9x", nil, sampleBranch(branchStatus(api.DeployStatusPAUSED)))
+			},
+			wantErr: "branch is paused — start it with the branch_start tool",
 		},
 		{
 			name:    "ready service without an endpoint",
@@ -165,7 +202,7 @@ func TestDBSchemaTool(t *testing.T) {
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "e6ue9697jf", "pooled": true},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
+				expectResolve(m, "e6ue9697jf", nil, sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{
 						Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
 						Port: new(5432),
@@ -179,7 +216,7 @@ func TestDBSchemaTool(t *testing.T) {
 			name:    "fetch fails",
 			tool:    toolDBSchema,
 			args:    args,
-			opts:    []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, nil, errors.New("failed to connect to database: no route to host"))},
+			opts:    []runOption{withFetchServiceSchema(primaryTarget, common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, nil, errors.New("failed to connect to database: no route to host"))},
 			mock:    setupGetWithStatus(api.DeployStatusREADY),
 			wantErr: "failed to connect to database: no route to host",
 		},
@@ -187,7 +224,7 @@ func TestDBSchemaTool(t *testing.T) {
 			name:       "returns the schema with the parameter defaults",
 			tool:       toolDBSchema,
 			args:       args,
-			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, schema, nil)},
+			opts:       []runOption{withFetchServiceSchema(primaryTarget, common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, schema, nil)},
 			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: map[string]any{"schema": schemaText},
 		},
@@ -202,7 +239,7 @@ func TestDBSchemaTool(t *testing.T) {
 				"comments":    true,
 				"role":        "readonly",
 			},
-			opts: []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{
+			opts: []runOption{withFetchServiceSchema(primaryTarget, common.FetchServiceSchemaArgs{
 				Role:               "readonly",
 				Schema:             "public",
 				IncludeInternal:    true,
@@ -219,15 +256,25 @@ func TestDBSchemaTool(t *testing.T) {
 			name: "read replica without a pooler warns alongside the schema",
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "u8me885b93", "pooled": true},
-			opts: []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin", Pooled: true}, schema, nil)},
+			opts: []runOption{withFetchServiceSchema(replicaTarget, common.FetchServiceSchemaArgs{Role: "tsdbadmin", Pooled: true}, schema, nil)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "u8me885b93", sampleReplica(func(s *api.Service) { s.Status = api.DeployStatusREADY }))
+				expectResolve(m, "u8me885b93", nil, replica)
 				expectGetService(m, "e6ue9697jf", sampleService())
 			},
 			wantOutput: map[string]any{
 				"schema":  schemaText,
 				"warning": `read replica "replica-service" has no connection pooler; connecting directly instead`,
 			},
+		},
+		{
+			name: "returns the schema of a branch",
+			tool: toolDBSchema,
+			args: map[string]any{"service_id": "br4nch1d9x"},
+			opts: []runOption{withExperimental(), withFetchServiceSchema(common.NewBranchConnectionTarget(branch), common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, schema, nil)},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolve(m, "br4nch1d9x", nil, branch)
+			},
+			wantOutput: map[string]any{"schema": schemaText},
 		},
 	})
 }

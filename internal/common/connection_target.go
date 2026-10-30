@@ -188,6 +188,19 @@ func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponses
 	}
 }
 
+// ResolveConnectionTargetByID is ResolveConnectionTarget for a caller that
+// takes only IDs: a ref that matched by name is reported as not found.
+func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string, allowBranches bool) (*ConnectionTarget, error) {
+	target, err := ResolveConnectionTarget(ctx, client, projectID, id, allowBranches)
+	if err != nil {
+		return nil, err
+	}
+	if target.ID != id {
+		return nil, ExitWithCode(ExitServiceNotFound, fmt.Errorf("%s '%s' not found", connectionTargetKind(allowBranches), id))
+	}
+	return target, nil
+}
+
 // connectionTargetKind names what ResolveConnectionTarget looks for, in its
 // errors. Branches are left out unless they are allowed.
 func connectionTargetKind(allowBranches bool) string {
@@ -195,43 +208,6 @@ func connectionTargetKind(allowBranches bool) string {
 		return "service, branch, or read replica set"
 	}
 	return "service or read replica set"
-}
-
-// ResolveConnectionTargetByID fetches the service named by id — which may be a
-// primary service ID or a read replica set ID, both of which GetService
-// resolves — and works out whose credentials it uses. Callers that already
-// hold the service use NewConnectionTarget instead.
-func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*ConnectionTarget, error) {
-	service, err := GetService(ctx, client, projectID, id)
-	if err != nil {
-		return nil, err
-	}
-	return NewConnectionTarget(ctx, client, projectID, *service)
-}
-
-// NewConnectionTarget returns the ConnectionTarget of an already-fetched
-// service. A standby read replica connects to its own endpoint but shares the
-// parent primary's credentials, so the parent is fetched here.
-func NewConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, service api.Service) (*ConnectionTarget, error) {
-	target := NewServiceConnectionTarget(service)
-	if !IsReadReplica(service) {
-		return target, nil
-	}
-	target.Kind = TargetReadReplica
-
-	// A replica with no parent recorded has nowhere else to look, so it stands
-	// in as its own credential owner.
-	parentID := util.DerefStr(service.ForkedFrom.ServiceID)
-	if parentID == "" {
-		return target, nil
-	}
-
-	parent, err := GetService(ctx, client, projectID, parentID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", parentID, err)
-	}
-	target.Credentials = ServiceCredentials(*parent)
-	return target, nil
 }
 
 // environmentTag reads an optional environment tag. Anything but PROD reads

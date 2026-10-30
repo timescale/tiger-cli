@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -48,13 +49,20 @@ func (ServiceDeleteOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newServiceDeleteTool() *mcp.Tool {
+func newServiceDeleteTool(experimental bool) *mcp.Tool {
+	// Branches are a preview, so only the experimental description mentions
+	// them. The PROD prompt lists them regardless: they're deleted either way.
+	var branches string
+	if experimental {
+		branches = "Deleting a service also deletes all of its branches. "
+	}
+
 	return &mcp.Tool{
 		Name:  toolServiceDelete,
 		Title: "Delete Database Service",
 		Description: `Delete a database service permanently.
 
-This operation is irreversible: the service and all of its data are destroyed. Deleting a service tagged PROD automatically prompts the user, via an elicitation request through the MCP client, to confirm the deletion before it proceeds, so agents don't need to ask the user for confirmation themselves; if the client cannot prompt, the deletion is refused and the user must run 'tiger service delete' from the CLI instead.`,
+This operation is irreversible: the service and all of its data are destroyed. ` + branches + `Deleting a service tagged PROD automatically prompts the user, via an elicitation request through the MCP client, to confirm the deletion before it proceeds, so agents don't need to ask the user for confirmation themselves; if the client cannot prompt, the deletion is refused and the user must run 'tiger service delete' from the CLI instead.`,
 		InputSchema:  ServiceDeleteInput{}.Schema(),
 		OutputSchema: ServiceDeleteOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -98,10 +106,14 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceDeleteOutput{}, err
 	}
 
+	// Listed on every run, PROD's prompting run included, so both the prompt
+	// and the result can name them.
+	branches, branchesErr := s.listBranchesToDelete(ctx, client, projectID, *service)
+
 	if tag == api.EnvironmentTagPROD {
 		answer, answered := req.Params.InputResponses[deleteConfirmationKey]
 		if !answered {
-			result, err := promptProdDelete(req, *service)
+			result, err := promptProdDelete(req, *service, branchesToDeleteMessage(branches, branchesErr))
 			return result, ServiceDeleteOutput{}, err
 		}
 		if !serviceIDConfirmed(answer, input.ServiceID) {
@@ -125,24 +137,64 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceDeleteOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
+	message := fmt.Sprintf("Service %q has been deleted.", input.ServiceID)
+	if len(branches) > 0 {
+		message = fmt.Sprintf("Service %q has been deleted, along with its %s: %s.", input.ServiceID, common.FormatBranchCount(len(branches)), branchLabels(branches))
+	}
 	return nil, ServiceDeleteOutput{
 		ServiceID: input.ServiceID,
 		Deleted:   true,
-		Message:   fmt.Sprintf("Service %q has been deleted.", input.ServiceID),
+		Message:   message,
 	}, nil
 }
 
+// listBranchesToDelete returns the branches that deleting service takes with
+// it. The API deletes them without asking, so this isn't gated on the
+// experimental env var: whoever has branches gets told. A failed listing is
+// logged and returned rather than failing the call, so the delete can still go
+// ahead.
+func (s *Server) listBranchesToDelete(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, service api.Service) ([]api.Branch, error) {
+	if !common.CanHaveBranches(service) {
+		return nil, nil
+	}
+	branches, err := common.ListBranches(ctx, client, projectID, service.ServiceID)
+	if err != nil {
+		s.logger.Error("MCP: Failed to list branches", slog.Any("error", err))
+	}
+	return branches, err
+}
+
+// branchesToDeleteMessage is the sentence the PROD prompt appends about the
+// branches deleted with the service: their names, a warning in their place if
+// listing them failed, or "" if there are none.
+func branchesToDeleteMessage(branches []api.Branch, err error) string {
+	if err != nil {
+		return " Any branches of the service will also be deleted."
+	}
+	if len(branches) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" Its %s will also be deleted: %s.", common.FormatBranchCount(len(branches)), branchLabels(branches))
+}
+
+// branchLabels lists branches by name and ID, e.g. `"a" (id1), "b" (id2)`.
+func branchLabels(branches []api.Branch) string {
+	labels := make([]string, len(branches))
+	for i, branch := range branches {
+		labels[i] = fmt.Sprintf("%q (%s)", branch.Name, branch.ID)
+	}
+	return strings.Join(labels, ", ")
+}
+
 // promptProdDelete returns the input-required result that asks the user to
-// confirm deleting a PROD service. It refuses outright when the client can't
-// show the prompt: silently deleting a production service without a human in
-// the loop is the one outcome this tool must never produce.
-func promptProdDelete(req *mcp.CallToolRequest, service api.Service) (*mcp.CallToolResult, error) {
+// confirm deleting a PROD service, with branchesNote (from
+// branchesToDeleteMessage) appended to the question. It refuses outright when
+// the client can't show the prompt: silently deleting a production service
+// without a human in the loop is the one outcome this tool must never produce.
+func promptProdDelete(req *mcp.CallToolRequest, service api.Service, branchesNote string) (*mcp.CallToolResult, error) {
 	if !clientSupportsFormElicitation(req) {
 		return nil, fmt.Errorf("deleting service %s requires the user's confirmation because it is tagged PROD, but this MCP client does not support elicitation; ask the user to run 'tiger service delete %s' instead", service.ServiceID, service.ServiceID)
 	}
-	return serviceIDConfirmationRequest(
-		deleteConfirmationKey,
-		fmt.Sprintf("Delete PRODUCTION service %q (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID),
-		service.ServiceID,
-	), nil
+	message := fmt.Sprintf("Delete PRODUCTION service %q (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID)
+	return serviceIDConfirmationRequest(deleteConfirmationKey, message+branchesNote, service.ServiceID), nil
 }
