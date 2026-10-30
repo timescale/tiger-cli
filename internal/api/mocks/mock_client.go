@@ -1082,6 +1082,26 @@ func (mr *MockClientInterfaceMockRecorder) GetBranch(ctx, projectID, serviceID, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBranch", reflect.TypeOf((*MockClientInterface)(nil).GetBranch), varargs...)
 }
 
+// GetBranchLogs mocks base method.
+func (m *MockClientInterface) GetBranchLogs(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, params *api.GetBranchLogsParams, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, branchID, params}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetBranchLogs", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBranchLogs indicates an expected call of GetBranchLogs.
+func (mr *MockClientInterfaceMockRecorder) GetBranchLogs(ctx, projectID, serviceID, branchID, params any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, branchID, params}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBranchLogs", reflect.TypeOf((*MockClientInterface)(nil).GetBranchLogs), varargs...)
+}
+
 // GetBranches mocks base method.
 func (m *MockClientInterface) GetBranches(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, params *api.GetBranchesParams, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -3244,6 +3264,26 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetBackupsWithResponse(c
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectID, serviceID}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBackupsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetBackupsWithResponse), varargs...)
+}
+
+// GetBranchLogsWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetBranchLogsWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, branchID api.BranchID, params *api.GetBranchLogsParams, reqEditors ...api.RequestEditorFn) (*api.GetBranchLogsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, branchID, params}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetBranchLogsWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetBranchLogsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBranchLogsWithResponse indicates an expected call of GetBranchLogsWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetBranchLogsWithResponse(ctx, projectID, serviceID, branchID, params any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, branchID, params}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBranchLogsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetBranchLogsWithResponse), varargs...)
 }
 
 // GetBranchWithResponse mocks base method.
