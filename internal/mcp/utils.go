@@ -87,7 +87,11 @@ func setLogsInputSchemaProperties(schema *jsonschema.Schema) {
 // setLogsOutputSchemaProperties sets the logs property shared by the logs
 // tools' outputs.
 func setLogsOutputSchemaProperties(schema *jsonschema.Schema) {
-	schema.Properties["logs"].Description = "Log lines ordered from oldest to newest. Each line is prefixed with an RFC3339 timestamp followed by the log message."
+	schema.Properties["logs"].Description = "Log lines ordered from oldest to newest. Each line is the log message, prefixed with its timestamp in UTC if it has one."
+	schema.Properties["logs"].Examples = []any{[]any{
+		"2025-01-15 10:30:00 UTC LOG: database system is ready to accept connections",
+		`2025-01-15 10:30:30 UTC ERROR: relation "missing" does not exist`,
+	}}
 }
 
 // formatLogLines renders log entries as the logs tools return them: each
