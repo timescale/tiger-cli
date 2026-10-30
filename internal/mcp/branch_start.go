@@ -52,7 +52,7 @@ func newBranchStartTool() *mcp.Tool {
 		Title: "Start Branch",
 		Description: `Start a stopped branch.
 
-Starting a branch resumes charging for its compute.`,
+This operation starts a branch that is currently in a stopped/paused state. The branch will transition to a ready state and become available for connections, and charging for its compute resumes.`,
 		InputSchema:  BranchStartInput{}.Schema(),
 		OutputSchema: BranchStartOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{

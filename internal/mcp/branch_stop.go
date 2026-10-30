@@ -52,7 +52,7 @@ func newBranchStopTool() *mcp.Tool {
 		Title: "Stop Branch",
 		Description: `Stop a running branch.
 
-A stopped branch no longer accepts connections and stops charging for compute, but keeps the changes made on it, whose storage is still billed.`,
+This operation stops a branch that is currently running. The branch will transition to a stopped/paused state and will no longer accept connections. It stops charging for compute, but keeps the changes made on it, whose storage is still billed.`,
 		InputSchema:  BranchStopInput{}.Schema(),
 		OutputSchema: BranchStopOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
