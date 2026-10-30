@@ -366,7 +366,7 @@ Connect with: tiger db psql
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-67890                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-67890/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 			wantStderr: noWaitStderr("Forking service 'test-service' (svc-12345) at current state..."),
@@ -389,6 +389,6 @@ const sampleForkedServiceTable = `┌──────────────�
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-67890                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-67890/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `

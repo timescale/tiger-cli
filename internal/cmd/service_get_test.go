@@ -176,7 +176,7 @@ func TestServiceGetCmd(t *testing.T) {
 │ Pooler Endpoint   │ svc-12345.project.pooler.tsdb.cloud.timescale.com:6432                                      │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 		},
@@ -197,7 +197,7 @@ func TestServiceGetCmd(t *testing.T) {
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 		},
@@ -222,7 +222,7 @@ func TestServiceGetCmd(t *testing.T) {
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 		},
@@ -244,7 +244,7 @@ func TestServiceGetCmd(t *testing.T) {
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 		},
@@ -280,7 +280,7 @@ func TestServiceGetCmd(t *testing.T) {
   "port": 5432,
   "database": "tsdb",
   "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
-  "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview"
 }
 `,
 		},
@@ -289,7 +289,7 @@ func TestServiceGetCmd(t *testing.T) {
 			args: []string{"service", "get", "svc-12345", "-o", "yaml"},
 			mock: setupGet(sampleService()),
 			wantStdout: `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
-console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
+console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview
 created: "2025-01-15T10:30:00Z"
 database: tsdb
 endpoint:
@@ -335,7 +335,7 @@ status: READY
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 		},
@@ -373,7 +373,7 @@ status: READY
   "port": 5432,
   "database": "tsdb",
   "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
-  "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview"
 }
 `,
 		},
@@ -384,7 +384,7 @@ status: READY
 			opts: []runOption{experimental},
 			wantStdout: `branch_count: 2
 connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
-console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
+console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview
 created: "2025-01-15T10:30:00Z"
 database: tsdb
 endpoint:
@@ -467,7 +467,7 @@ status: READY
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                                     │
 │ Password          │ super-secret-pw                                                                                             │
 │ Connection String │ postgresql://tsdbadmin:super-secret-pw@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview                   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 		},
@@ -483,19 +483,19 @@ status: READY
 			mock: setupGet(sampleService(func(s *api.Service) {
 				s.Endpoint = nil
 			})),
-			wantStdout: `┌─────────────┬──────────────────────────────────────────────────────────────────┐
-│  PROPERTY   │                              VALUE                               │
-├─────────────┼──────────────────────────────────────────────────────────────────┤
-│ Service ID  │ svc-12345                                                        │
-│ Name        │ test-service                                                     │
-│ Status      │ READY                                                            │
-│ Type        │ TIMESCALEDB                                                      │
-│ Region      │ us-east-1                                                        │
-│ CPU         │ 1 cores (1000m)                                                  │
-│ Memory      │ 4 GB                                                             │
-│ Created     │ 2025-01-15 10:30:00 UTC                                          │
-│ Console URL │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345 │
-└─────────────┴──────────────────────────────────────────────────────────────────┘
+			wantStdout: `┌─────────────┬───────────────────────────────────────────────────────────────────────────────────────────┐
+│  PROPERTY   │                                           VALUE                                           │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID  │ svc-12345                                                                                 │
+│ Name        │ test-service                                                                              │
+│ Status      │ READY                                                                                     │
+│ Type        │ TIMESCALEDB                                                                               │
+│ Region      │ us-east-1                                                                                 │
+│ CPU         │ 1 cores (1000m)                                                                           │
+│ Memory      │ 4 GB                                                                                      │
+│ Created     │ 2025-01-15 10:30:00 UTC                                                                   │
+│ Console URL │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview │
+└─────────────┴───────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 			wantStderr: "Warning: Failed to get connection details: endpoint not available\n",
 		},
@@ -510,19 +510,19 @@ status: READY
 					Endpoint: &api.Endpoint{Host: new("svc-12345.project.pooler.tsdb.cloud.timescale.com")},
 				}
 			})),
-			wantStdout: `┌─────────────┬──────────────────────────────────────────────────────────────────┐
-│  PROPERTY   │                              VALUE                               │
-├─────────────┼──────────────────────────────────────────────────────────────────┤
-│ Service ID  │ svc-12345                                                        │
-│ Name        │ test-service                                                     │
-│ Status      │ READY                                                            │
-│ Type        │ TIMESCALEDB                                                      │
-│ Region      │ us-east-1                                                        │
-│ CPU         │ 1 cores (1000m)                                                  │
-│ Memory      │ 4 GB                                                             │
-│ Created     │ 2025-01-15 10:30:00 UTC                                          │
-│ Console URL │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345 │
-└─────────────┴──────────────────────────────────────────────────────────────────┘
+			wantStdout: `┌─────────────┬───────────────────────────────────────────────────────────────────────────────────────────┐
+│  PROPERTY   │                                           VALUE                                           │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID  │ svc-12345                                                                                 │
+│ Name        │ test-service                                                                              │
+│ Status      │ READY                                                                                     │
+│ Type        │ TIMESCALEDB                                                                               │
+│ Region      │ us-east-1                                                                                 │
+│ CPU         │ 1 cores (1000m)                                                                           │
+│ Memory      │ 4 GB                                                                                      │
+│ Created     │ 2025-01-15 10:30:00 UTC                                                                   │
+│ Console URL │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview │
+└─────────────┴───────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 			wantStderr: "Warning: Failed to get connection details: endpoint port not available\n",
 		},
