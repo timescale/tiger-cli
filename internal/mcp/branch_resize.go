@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -108,13 +107,6 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 		resizeReq.CPUMillis = cpuMemoryCfg.CPUMillisString()
 		resizeReq.MemoryGbs = cpuMemoryCfg.MemoryGBsString()
 	}
-
-	s.logger.Info("MCP: Resizing branch",
-		slog.String("project_id", projectID),
-		slog.String("branch_id", input.BranchID),
-		slog.String("cpu_memory", input.CPUMemory),
-		slog.Any("iops", input.IOPS),
-	)
 
 	branch, err := common.JSON202(client.ResizeBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID, resizeReq))
 	if err != nil {

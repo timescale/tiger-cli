@@ -109,14 +109,6 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 	}
 	createReq.Iops = input.IOPS
 
-	s.logger.Info("MCP: Creating branch",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("name", input.Name),
-		slog.String("cpu_memory", input.CPUMemory),
-		slog.Any("iops", input.IOPS),
-	)
-
 	branch, err := common.JSON202(client.CreateBranchWithResponse(ctx, projectID, input.ServiceID, createReq))
 	if err != nil {
 		return nil, BranchCreateOutput{}, err

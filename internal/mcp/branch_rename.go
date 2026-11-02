@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -85,10 +84,6 @@ func (s *Server) handleBranchRename(ctx context.Context, req *mcp.CallToolReques
 	if err != nil {
 		return nil, BranchRenameOutput{}, err
 	}
-
-	s.logger.Info("MCP: Renaming branch",
-		slog.String("project_id", projectID),
-		slog.String("branch_id", input.BranchID))
 
 	renamed, err := common.JSON200(client.RenameBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID, api.BranchRename{Name: name}))
 	if err != nil {

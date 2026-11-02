@@ -59,10 +59,6 @@ func (s *Server) handleBranchGet(ctx context.Context, req *mcp.CallToolRequest, 
 		return nil, BranchGetOutput{}, err
 	}
 
-	s.logger.Info("MCP: Getting branch details",
-		slog.String("project_id", projectID),
-		slog.String("branch_id", input.BranchID))
-
 	branch, err := resolveBranchByID(ctx, client, projectID, input.BranchID)
 	if err != nil {
 		return nil, BranchGetOutput{}, err

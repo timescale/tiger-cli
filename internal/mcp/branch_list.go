@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -56,10 +55,6 @@ func (s *Server) handleBranchList(ctx context.Context, req *mcp.CallToolRequest,
 	if err != nil {
 		return nil, BranchListOutput{}, err
 	}
-
-	s.logger.Info("MCP: Listing branches",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
 
 	listed, err := common.JSON200(client.GetBranchesWithResponse(ctx, projectID, input.ServiceID, nil))
 	if err != nil {

@@ -90,10 +90,6 @@ func (s *Server) handleBranchUpdatePassword(ctx context.Context, req *mcp.CallTo
 		return nil, BranchUpdatePasswordOutput{}, err
 	}
 
-	s.logger.Info("MCP: Updating branch password",
-		slog.String("project_id", projectID),
-		slog.String("branch_id", input.BranchID))
-
 	if err := common.Status204(client.UpdateBranchPasswordWithResponse(ctx, projectID, branch.ServiceID, branch.ID, api.UpdatePasswordInput{Password: password})); err != nil {
 		return nil, BranchUpdatePasswordOutput{}, err
 	}
