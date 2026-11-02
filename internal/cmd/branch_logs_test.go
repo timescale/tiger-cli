@@ -51,6 +51,24 @@ func TestBranchLogsCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			name:    "invalid since flag",
+			args:    []string{"branch", "logs", "br-12345", "--since", "bogus"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "invalid argument \"bogus\" for \"--since\" flag: invalid time format `bogus` must be one of: `2006-01-02T15:04:05Z07:00`",
+		},
+		{
+			name:    "zero tail",
+			args:    []string{"branch", "logs", "br-12345", "--tail", "0"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "tail must be positive, got 0",
+		},
+		{
+			name:    "negative tail",
+			args:    []string{"branch", "logs", "br-12345", "--tail=-1"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "tail must be positive, got -1",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"branch", "logs", "br-12345"},
 			opts:    []runOption{withExperimental(), withNotLoggedIn()},
@@ -63,12 +81,6 @@ func TestBranchLogsCmd(t *testing.T) {
 			args:    []string{"branch", "logs"},
 			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
 			wantErr: "branch name or ID is required",
-		},
-		{
-			name:    "invalid since flag",
-			args:    []string{"branch", "logs", "br-12345", "--since", "bogus"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "invalid argument \"bogus\" for \"--since\" flag: invalid time format `bogus` must be one of: `2006-01-02T15:04:05Z07:00`",
 		},
 		{
 			name: "branch not found",
