@@ -362,9 +362,6 @@ func withElicitation(answer *mcp.ElicitResult) runOption {
 	}
 }
 
-// withKeyringError makes every keyring operation fail with err for the
-// duration of the test, for exercising a tool's password storage failure
-// path. The keyring is restored to an empty in-memory one afterwards.
 // withStoredPassword seeds a tsdbadmin password for target in the mock keyring
 // before the server starts.
 func withStoredPassword(target common.PasswordTarget, password string) runOption {
@@ -375,6 +372,9 @@ func withStoredPassword(target common.PasswordTarget, password string) runOption
 	})
 }
 
+// withKeyringError makes every keyring operation fail with err for the
+// duration of the test, for exercising a tool's password storage failure
+// path. The keyring is restored to an empty in-memory one afterwards.
 func withKeyringError(err error) runOption {
 	return withSetup(func(t *testing.T) {
 		keyring.MockInitWithError(err)
