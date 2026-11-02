@@ -515,7 +515,7 @@ Service is being created. Use 'tiger service list' to check status.
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 			wantStderr: `Creating service 'test-service'...
@@ -642,7 +642,7 @@ const sampleServiceCreateTable = `┌──────────────�
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `
 
@@ -660,7 +660,7 @@ const sampleServiceCreateQueuedTable = `┌────────────�
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `
 
@@ -690,12 +690,12 @@ const sampleServiceCreateJSON = `{
   "port": 5432,
   "database": "tsdb",
   "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
-  "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview"
 }
 `
 
 const sampleServiceCreateYAML = `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
-console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
+console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview
 created: "2025-01-15T10:30:00Z"
 database: tsdb
 endpoint:

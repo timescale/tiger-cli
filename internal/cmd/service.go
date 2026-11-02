@@ -84,7 +84,7 @@ type OutputService struct {
 	BranchCount *int `json:"branch_count,omitempty"`
 	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty"`
-	ConsoleURL       string `json:"console_url,omitempty"`
+	ConsoleURL       string `json:"console_url"`
 }
 
 // serviceOutputOptions controls what the service output functions include.
@@ -211,9 +211,7 @@ func outputServiceTable(output io.Writer, service OutputService) error {
 	if service.ConnectionString != "" {
 		table.Append("Connection String", service.ConnectionString)
 	}
-	if service.ConsoleURL != "" {
-		table.Append("Console URL", service.ConsoleURL)
-	}
+	table.Append("Console URL", service.ConsoleURL)
 
 	return table.Render()
 }
@@ -249,8 +247,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 		outputSvc.ConnectionString = connectionDetails.String()
 	}
 
-	// Build console URL
-	outputSvc.ConsoleURL = fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, service.ServiceID)
+	outputSvc.ConsoleURL = fmt.Sprintf("%s/projects/%s/services/%s/overview", cfg.ConsoleURL, service.ProjectID, service.ServiceID)
 
 	return outputSvc
 }
