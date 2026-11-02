@@ -2,9 +2,7 @@ package mcp
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -96,12 +94,8 @@ func (s *Server) handleBranchUpdatePassword(ctx context.Context, req *mcp.CallTo
 		slog.String("project_id", projectID),
 		slog.String("branch_id", input.BranchID))
 
-	resp, err := client.UpdateBranchPasswordWithResponse(ctx, projectID, branch.ServiceID, branch.ID, api.UpdatePasswordInput{Password: password})
-	if err != nil {
-		return nil, BranchUpdatePasswordOutput{}, fmt.Errorf("failed to update branch password: %w", err)
-	}
-	if resp.StatusCode() != http.StatusNoContent {
-		return nil, BranchUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	if err := common.Status204(client.UpdateBranchPasswordWithResponse(ctx, projectID, branch.ServiceID, branch.ID, api.UpdatePasswordInput{Password: password})); err != nil {
+		return nil, BranchUpdatePasswordOutput{}, err
 	}
 
 	storage, err := common.SavePasswordWithResult(cfg, common.BranchPasswordTarget(*branch), password, "tsdbadmin")

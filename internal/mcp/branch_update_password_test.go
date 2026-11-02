@@ -71,7 +71,7 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.UpdatePasswordInput{Password: "generated-pw"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to update branch password: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "password generation fails",

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -85,17 +84,10 @@ func (s *Server) handleBranchStop(ctx context.Context, req *mcp.CallToolRequest,
 		slog.String("project_id", projectID),
 		slog.String("branch_id", input.BranchID))
 
-	resp, err := client.StopBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID)
+	branch, err := common.JSON202(client.StopBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID))
 	if err != nil {
-		return nil, BranchStopOutput{}, fmt.Errorf("failed to stop branch: %w", err)
+		return nil, BranchStopOutput{}, err
 	}
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, BranchStopOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON202 == nil {
-		return nil, BranchStopOutput{}, fmt.Errorf("empty response from API")
-	}
-	branch := *resp.JSON202
 
 	message := "Branch stop request accepted. The branch may still be stopping."
 	if input.Wait {

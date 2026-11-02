@@ -2,9 +2,7 @@ package mcp
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -63,19 +61,13 @@ func (s *Server) handleBranchList(ctx context.Context, req *mcp.CallToolRequest,
 		slog.String("project_id", projectID),
 		slog.String("service_id", input.ServiceID))
 
-	resp, err := client.GetBranchesWithResponse(ctx, projectID, input.ServiceID, nil)
+	listed, err := common.JSON200(client.GetBranchesWithResponse(ctx, projectID, input.ServiceID, nil))
 	if err != nil {
-		return nil, BranchListOutput{}, fmt.Errorf("failed to list branches: %w", err)
-	}
-	if resp.StatusCode() != http.StatusOK {
-		return nil, BranchListOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON200 == nil {
-		return nil, BranchListOutput{}, fmt.Errorf("empty response from API")
+		return nil, BranchListOutput{}, err
 	}
 
-	branches := make([]BranchDetail, len(*resp.JSON200))
-	for i, branch := range *resp.JSON200 {
+	branches := make([]BranchDetail, len(listed))
+	for i, branch := range listed {
 		branches[i] = s.convertToBranchDetail(cfg, branch, false)
 	}
 

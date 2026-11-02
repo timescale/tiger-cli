@@ -60,7 +60,7 @@ func TestBranchStartTool(t *testing.T) {
 				m.EXPECT().StartBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to start branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name:       "starts without waiting by default",

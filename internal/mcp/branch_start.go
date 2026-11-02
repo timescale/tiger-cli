@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -85,17 +84,10 @@ func (s *Server) handleBranchStart(ctx context.Context, req *mcp.CallToolRequest
 		slog.String("project_id", projectID),
 		slog.String("branch_id", input.BranchID))
 
-	resp, err := client.StartBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID)
+	branch, err := common.JSON202(client.StartBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID))
 	if err != nil {
-		return nil, BranchStartOutput{}, fmt.Errorf("failed to start branch: %w", err)
+		return nil, BranchStartOutput{}, err
 	}
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, BranchStartOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON202 == nil {
-		return nil, BranchStartOutput{}, fmt.Errorf("empty response from API")
-	}
-	branch := *resp.JSON202
 
 	message := "Branch start request accepted. The branch may still be starting."
 	if input.Wait {

@@ -78,7 +78,7 @@ func TestBranchResizeTool(t *testing.T) {
 				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", req).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to resize branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "nil response body",
