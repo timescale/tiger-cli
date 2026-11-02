@@ -31,7 +31,9 @@ func buildServiceResizeCmd(app *common.App) *cobra.Command {
 
 The allowed --iops values depend on your plan, the service's platform, and its
 CPU/memory allocation. See the Tiger Data documentation for details. If only
---iops is given, the service keeps its current CPU and memory.`
+--iops is given, the service keeps its current CPU and memory. If --cpu or
+--memory is given without --iops on the fluid platform, the IOPS is reset to
+the baseline for the new size.`
 		iopsExampleHelp = "\n\n  # Change only the provisioned IOPS\n  tiger service resize --iops 16000"
 	} else {
 		iopsDescHelp = " and memory "

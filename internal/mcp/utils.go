@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -55,6 +56,17 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["with_password"].Description = "Whether to include the password in the response. NEVER set to true unless the user explicitly asks for the password."
 	schema.Properties["with_password"].Default = util.Must(json.Marshal(false))
 	schema.Properties["with_password"].Examples = []any{false, true}
+}
+
+// updatePasswordMessage returns the result message for an update that went
+// through, given the outcome of saving the new password. It warns when the
+// password was neither saved (because saving failed or password storage is
+// disabled) nor returned, since then nobody knows it.
+func updatePasswordMessage(withPassword bool, storage common.PasswordStorageResult) string {
+	if !storage.Success && !withPassword {
+		return "Password updated for tsdbadmin. Warning: the new password was not saved, and was not returned because with_password was false."
+	}
+	return "Password updated for tsdbadmin."
 }
 
 // setCPUMemorySchemaProperties sets a tool's cpu_memory property. shared
@@ -273,4 +285,141 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	}
 
 	return detail
+}
+
+// setBranchIDSchemaProperties sets common branch_id schema properties. Like
+// service_id, branch_id is IDs-only (see setServiceIDSchemaProperties), which
+// resolveBranchByID enforces.
+func setBranchIDSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["branch_id"].Description = "Unique identifier of the branch (10-character alphanumeric string). Use branch_list to find branch IDs."
+	schema.Properties["branch_id"].Examples = []any{"br4nch1d9x", "k2m9x2sd3a"}
+	schema.Properties["branch_id"].Pattern = "^[a-z0-9]{10}$"
+}
+
+// setBranchCPUMemorySchemaProperties sets a branch tool's cpu_memory property,
+// offering only the combinations a branch can have.
+func setBranchCPUMemorySchemaProperties(schema *jsonschema.Schema, description string) {
+	schema.Properties["cpu_memory"].Description = description
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.FluidCPUMemoryConfigs().Strings())
+}
+
+// resolveBranchByID looks up the branch with the given ID, through the API's
+// resolve endpoint, which also matches names. A match by name is reported as
+// not found, keeping the tools IDs-only. The branch carries its parent's ID,
+// which every other branch endpoint needs.
+func resolveBranchByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*api.Branch, error) {
+	branch, err := common.ResolveBranch(ctx, client, projectID, id)
+	if err != nil {
+		return nil, err
+	}
+	if branch.ID != id {
+		return nil, common.ExitWithCode(common.ExitServiceNotFound, fmt.Errorf("branch '%s' not found", id))
+	}
+	return branch, nil
+}
+
+// setBranchIOPSSchemaProperties sets a branch tool's iops input property.
+// defaultDescription, if any, says what happens when iops is omitted. As for
+// services, the allowed values aren't listed: they depend on too much to
+// describe, and would go stale. The API validates the value.
+func setBranchIOPSSchemaProperties(schema *jsonschema.Schema, defaultDescription string) {
+	property := schema.Properties["iops"]
+	property.Description = strings.TrimSpace("Provisioned IOPS for the branch's storage. " +
+		"Check the Tiger Data documentation for the allowed values, which depend on the user's plan and the branch's CPU/memory allocation. " +
+		defaultDescription)
+	property.Minimum = new(0.0)
+	property.Examples = []any{16000, 32000}
+}
+
+// BranchDetail represents detailed branch information
+type BranchDetail struct {
+	BranchID         string        `json:"id"`
+	Name             string        `json:"name"`
+	ServiceID        string        `json:"service_id"`
+	ServiceName      string        `json:"service_name,omitempty"`
+	Status           string        `json:"status"`
+	Created          string        `json:"created,omitempty"`
+	Resources        *ResourceInfo `json:"resources,omitempty"`
+	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
+	Password         string        `json:"password,omitempty"`
+	ConnectionString string        `json:"connection_string,omitempty"`
+}
+
+func (BranchDetail) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[BranchDetail](nil))
+
+	schema.Properties["id"].Description = "Branch identifier (10-character alphanumeric string)"
+	schema.Properties["name"].Description = "Branch name, unique within its parent service"
+	schema.Properties["service_id"].Description = "ID of the parent service the branch was created from"
+	schema.Properties["service_name"].Description = "Name of the parent service (only returned by branch_get)"
+
+	schema.Properties["status"].Description = "Branch status"
+	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "QUEUED", "CONFIGURING"}
+
+	// The branch tools only exist behind the experimental gate, so the IOPS
+	// are always included.
+	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
+
+	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint (absent while the branch is still provisioning)"
+	schema.Properties["password"].Description = "Password for the branch's tsdbadmin user (only included if with_password=true)"
+	schema.Properties["connection_string"].Description = "PostgreSQL connection string (password embedded only if with_password=true)"
+
+	return schema
+}
+
+// convertToBranchDetail converts an API Branch to MCP BranchDetail. With
+// withPassword, the branch's stored password is included, or the create
+// response's when none is stored.
+func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, withPassword bool) BranchDetail {
+	detail := BranchDetail{
+		BranchID:  branch.ID,
+		Name:      branch.Name,
+		ServiceID: branch.ServiceID,
+		Status:    string(branch.Status),
+		Created:   branch.Created.Format("2006-01-02T15:04:05Z"),
+		Resources: &ResourceInfo{
+			CPU:    common.FormatCPUCores(branch.CPUMillis) + " cores",
+			Memory: fmt.Sprintf("%d GB", branch.MemoryGbs),
+			IOPS:   util.Deref(branch.Iops),
+		},
+	}
+
+	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
+		detail.DirectEndpoint = fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port)
+	}
+
+	// Setting the password here ensures it's set even if
+	// GetConnectionDetails returns an error.
+	if withPassword {
+		detail.Password = util.Deref(branch.InitialPassword)
+	}
+
+	if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), common.ConnectionDetailsOptions{
+		Role:            "tsdbadmin",
+		WithPassword:    withPassword,
+		InitialPassword: util.Deref(branch.InitialPassword),
+		ReadOnly:        common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
+	}); err != nil {
+		s.logger.Error("MCP: Failed to build connection string", slog.Any("error", err))
+	} else {
+		if withPassword && details.Password == "" {
+			s.logger.Error("MCP: Requested password but password not available")
+		}
+		detail.ConnectionString = details.String()
+		detail.Password = details.Password
+	}
+
+	return detail
+}
+
+// parseBranchCPUMemory returns the branch configuration a cpu_memory value
+// names. The schema's enum already rejects anything else, so an error here
+// means the two have drifted apart.
+func parseBranchCPUMemory(cpuMemory string) (common.CPUMemoryConfig, error) {
+	for _, c := range common.FluidCPUMemoryConfigs() {
+		if c.String() == cpuMemory {
+			return c, nil
+		}
+	}
+	return common.CPUMemoryConfig{}, fmt.Errorf("invalid CPU/Memory specification '%s'. Valid options: %s", cpuMemory, common.FluidCPUMemoryConfigs())
 }

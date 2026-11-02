@@ -36,14 +36,11 @@ func newBranchCreateCmd(app *common.App, use, commandPath string) *cobra.Command
 		Short: "Create a branch of a database service",
 		Long: `Create a branch of a Fluid Service.
 
-A branch is a lightweight, ephemeral copy of a service, sharing the service's
-storage as of the moment it is created and getting its own compute. The
-tsdbadmin user gets a new password, which is saved the same way as a new
-service's.
-
-By default:
-- The name is auto-generated
-- The branch gets 0.25 CPU and 2GB of memory, whatever the service's size
+A branch is a lightweight, ephemeral copy of a service. It starts with a copy
+of the service's data as of the moment it is created, and gets its own compute.
+The tsdbadmin user gets a new password, which is saved the same way as a new
+service's. Unless --cpu or --memory is given, the branch gets the same CPU and
+memory as the service, up to a limit.
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. Branching from a branch isn't supported.
@@ -52,7 +49,8 @@ service from your configuration. Branching from a branch isn't supported.
 
 The allowed --iops values depend on your plan and the branch's CPU/memory
 allocation. See the Tiger Data documentation for details. If --iops is not
-given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
+given, the branch gets the same IOPS as the service where it can, and otherwise
+the baseline for its size.`,
 		Example: fmt.Sprintf(`  # Branch a service
   %[1]s svc-12345
 
@@ -176,8 +174,8 @@ given, the branch gets the baseline IOPS for your plan and its CPU allocation.`,
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Name for the branch (auto-generated if not provided)")
-	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (default 250)")
-	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes (default 2)")
+	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
+	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
 	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the branch to be ready")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")

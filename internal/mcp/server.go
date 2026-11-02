@@ -44,6 +44,15 @@ const (
 	toolServiceBackupRegionList   = "service_backup_region_list"
 	toolServiceBackupRegionAdd    = "service_backup_region_add"
 	toolServiceBackupRegionRemove = "service_backup_region_remove"
+	toolBranchCreate              = "branch_create"
+	toolBranchList                = "branch_list"
+	toolBranchGet                 = "branch_get"
+	toolBranchDelete              = "branch_delete"
+	toolBranchStart               = "branch_start"
+	toolBranchStop                = "branch_stop"
+	toolBranchResize              = "branch_resize"
+	toolBranchRename              = "branch_rename"
+	toolBranchUpdatePassword      = "branch_update_password"
 	toolDBQuery                   = "db_query"
 	toolDBSchema                  = "db_schema"
 	toolDBExtensionsList          = "db_extensions_list"
@@ -76,6 +85,13 @@ var readOnlyGatedTools = []string{
 	toolServiceBackupRegionAdd,
 	toolServiceBackupRegionRemove,
 	toolServiceDelete,
+	toolBranchCreate,
+	toolBranchDelete,
+	toolBranchStart,
+	toolBranchStop,
+	toolBranchResize,
+	toolBranchRename,
+	toolBranchUpdatePassword,
 }
 
 // addTool registers an MCP tool, skipping readOnlyGatedTools under read_only=all.
@@ -190,6 +206,9 @@ func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, ex
 	// Service management tools
 	s.registerServiceTools(mode, experimental)
 
+	// Branch management tools
+	s.registerBranchTools(mode, experimental)
+
 	// Database operation tools
 	s.registerDatabaseTools(mode)
 
@@ -228,6 +247,24 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 		addTool(s, mode, newServiceBackupRegionAddTool(), s.handleServiceBackupRegionAdd)
 		addTool(s, mode, newServiceBackupRegionRemoveTool(), s.handleServiceBackupRegionRemove)
 	}
+}
+
+// registerBranchTools registers branch management tools. Branches target
+// gateway endpoints marked `x-tigerdata-preview: true`, so the tools are
+// registered only when the experimental gate is on at server startup.
+func (s *Server) registerBranchTools(mode config.ReadOnlyMode, experimental bool) {
+	if !experimental {
+		return
+	}
+	addTool(s, mode, newBranchCreateTool(), s.handleBranchCreate)
+	addTool(s, mode, newBranchListTool(), s.handleBranchList)
+	addTool(s, mode, newBranchGetTool(), s.handleBranchGet)
+	addTool(s, mode, newBranchDeleteTool(), s.handleBranchDelete)
+	addTool(s, mode, newBranchStartTool(), s.handleBranchStart)
+	addTool(s, mode, newBranchStopTool(), s.handleBranchStop)
+	addTool(s, mode, newBranchResizeTool(), s.handleBranchResize)
+	addTool(s, mode, newBranchRenameTool(), s.handleBranchRename)
+	addTool(s, mode, newBranchUpdatePasswordTool(), s.handleBranchUpdatePassword)
 }
 
 // registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions

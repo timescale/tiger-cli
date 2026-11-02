@@ -72,11 +72,20 @@ func TestMCPListCmd(t *testing.T) {
 └──────┴───────────────────────────┘
 `
 
-	// TIGER_EXPERIMENTAL registers the preview backup tools on top of the
-	// (always-registered) default set, which already includes metrics.
+	// TIGER_EXPERIMENTAL registers the preview backup and branch tools on top
+	// of the (always-registered) default set, which already includes metrics.
 	wantTextExperimental := `┌──────┬──────────────────────────────┐
 │ TYPE │             NAME             │
 ├──────┼──────────────────────────────┤
+│ tool │ branch_create                │
+│ tool │ branch_delete                │
+│ tool │ branch_get                   │
+│ tool │ branch_list                  │
+│ tool │ branch_rename                │
+│ tool │ branch_resize                │
+│ tool │ branch_start                 │
+│ tool │ branch_stop                  │
+│ tool │ branch_update_password       │
 │ tool │ db_extensions_list           │
 │ tool │ db_query                     │
 │ tool │ db_schema                    │
@@ -182,7 +191,7 @@ func TestMCPListCmd(t *testing.T) {
 			wantStdout: wantTextReadOnly,
 		},
 		{
-			name: "experimental adds backups tool",
+			name: "experimental adds backup and branch tools",
 			args: []string{"mcp", "list"},
 			opts: append(noDocsProxy(nil),
 				withEnv("TIGER_EXPERIMENTAL", "true")),
