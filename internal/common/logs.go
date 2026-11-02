@@ -13,8 +13,11 @@ type FetchServiceLogsArgs struct {
 	ProjectID string
 	ServiceID string
 	Tail      int
-	Since     *time.Time
-	Until     *time.Time
+
+	// Since and Until bound the logs fetched. A zero Since fetches as far back
+	// as Tail allows, and a zero Until fetches up to the current time.
+	Since time.Time
+	Until time.Time
 
 	// Node selects a specific service node to fetch logs from, for services
 	// with HA replicas. If nil, the backend returns logs for the primary.
@@ -26,41 +29,100 @@ type FetchServiceLogsArgs struct {
 func FetchServiceLogs(ctx context.Context, args FetchServiceLogsArgs) ([]api.ServiceLogEntry, error) {
 	params := &api.GetServiceLogsParams{
 		Node:  args.Node,
-		Since: args.Since,
-		Until: args.Until,
+		Since: optionalTime(args.Since),
+		Until: fixedUntil(args.Until),
 	}
 
-	// Fix the upper time bound so that all paginated requests share the same
-	// window — without this, a clock tick between requests could cause the
-	// second page to return logs already included on the first page. UTC is
-	// the canonical form for the query parameter it becomes.
-	if params.Until == nil {
-		now := time.Now().UTC()
-		params.Until = &now
-	}
-
-	var entries []api.ServiceLogEntry
-	for {
+	return fetchLogs(args.Tail, func(cursor *string) ([]api.ServiceLogEntry, *string, error) {
+		params.Cursor = cursor
 		page, err := JSON200(args.Client.GetServiceLogsWithResponse(ctx, args.ProjectID, args.ServiceID, params))
+		if err != nil {
+			return nil, nil, err
+		}
+		var entries []api.ServiceLogEntry
+		if page.Entries != nil {
+			entries = *page.Entries
+		}
+		return entries, page.LastCursor, nil
+	})
+}
+
+type FetchBranchLogsArgs struct {
+	Client    api.ClientWithResponsesInterface
+	ProjectID string
+	// ServiceID is the branch's parent service, which the endpoint is nested under.
+	ServiceID string
+	BranchID  string
+	Tail      int
+
+	// Since and Until bound the logs fetched. A zero Since fetches as far back
+	// as Tail allows, and a zero Until fetches up to the current time.
+	Since time.Time
+	Until time.Time
+}
+
+// FetchBranchLogs is FetchServiceLogs for a branch.
+func FetchBranchLogs(ctx context.Context, args FetchBranchLogsArgs) ([]api.ServiceLogEntry, error) {
+	params := &api.GetBranchLogsParams{
+		Since: optionalTime(args.Since),
+		Until: fixedUntil(args.Until),
+	}
+
+	return fetchLogs(args.Tail, func(cursor *string) ([]api.ServiceLogEntry, *string, error) {
+		params.Cursor = cursor
+		page, err := JSON200(args.Client.GetBranchLogsWithResponse(ctx, args.ProjectID, args.ServiceID, args.BranchID, params))
+		if err != nil {
+			return nil, nil, err
+		}
+		return page.Entries, page.LastCursor, nil
+	})
+}
+
+// optionalTime returns a pointer to t, or nil if t is zero.
+func optionalTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
+
+// fixedUntil returns a pointer to until, or to the current time if until is
+// zero. Fixing the upper time bound makes every paginated request share the
+// same window — without it, a clock tick between requests could cause the
+// second page to return logs already included on the first page. UTC is the
+// canonical form for the query parameter it becomes.
+func fixedUntil(until time.Time) *time.Time {
+	if until.IsZero() {
+		return new(time.Now().UTC())
+	}
+	return &until
+}
+
+// fetchLogs pages through logs with fetchPage, which takes the cursor for the
+// page (nil for the first) and returns its entries newest-first along with
+// the next page's cursor (nil when there are none). It stops once it has tail
+// entries, and returns them oldest-first. With no entries, the result is an
+// empty slice rather than nil, so it serializes as [] rather than null.
+func fetchLogs(tail int, fetchPage func(cursor *string) ([]api.ServiceLogEntry, *string, error)) ([]api.ServiceLogEntry, error) {
+	entries := []api.ServiceLogEntry{}
+	var cursor *string
+	for {
+		page, next, err := fetchPage(cursor)
 		if err != nil {
 			return nil, err
 		}
-
-		if page.Entries != nil {
-			entries = append(entries, *page.Entries...)
-		}
+		entries = append(entries, page...)
 
 		// Stop when we have enough logs or the server signals no further pages.
-		if len(entries) >= args.Tail || page.LastCursor == nil {
+		if len(entries) >= tail || next == nil {
 			break
 		}
-
-		params.Cursor = page.LastCursor
+		cursor = next
 	}
 
 	// Trim to the requested tail count.
-	if len(entries) > args.Tail {
-		entries = entries[:args.Tail]
+	if len(entries) > tail {
+		entries = entries[:tail]
 	}
 
 	// Reverse: the API returns logs newest-first; terminal output is oldest-first.

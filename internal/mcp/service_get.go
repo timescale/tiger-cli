@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -27,12 +28,33 @@ func (ServiceGetInput) Schema() *jsonschema.Schema {
 
 // ServiceGetOutput represents output for service_get
 type ServiceGetOutput struct {
-	Service ServiceDetail `json:"service"`
+	Service ServiceGetDetail `json:"service"`
 }
 
 func (ServiceGetOutput) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceGetOutput](nil))
-	schema.Properties["service"] = ServiceDetail{}.Schema(experimental)
+	schema.Properties["service"] = ServiceGetDetail{}.Schema(experimental)
+	return schema
+}
+
+// ServiceGetDetail is a ServiceDetail plus the fields only service_get
+// returns.
+type ServiceGetDetail struct {
+	ServiceDetail
+	BranchCount *int `json:"branch_count,omitempty"`
+}
+
+func (ServiceGetDetail) Schema(experimental bool) *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceGetDetail](nil))
+	setServiceDetailSchemaProperties(schema, experimental)
+
+	// Branches are a preview, so the count is described only behind the gate.
+	if experimental {
+		schema.Properties["branch_count"].Description = "Number of branches of the service (only returned for Fluid Services)"
+	} else {
+		delete(schema.Properties, "branch_count")
+	}
+
 	return schema
 }
 
@@ -66,7 +88,17 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	}
 
 	output := ServiceGetOutput{
-		Service: s.convertToServiceDetail(cfg, service, input.WithPassword),
+		Service: ServiceGetDetail{ServiceDetail: s.convertToServiceDetail(cfg, service, input.WithPassword)},
+	}
+
+	// Branches are a preview, so they're counted only behind the gate. The
+	// rest of the output doesn't depend on the count.
+	if s.app.Experimental && common.CanHaveBranches(service) {
+		if branches, err := common.JSON200(client.GetBranchesWithResponse(ctx, projectID, input.ServiceID, nil)); err != nil {
+			s.logger.Error("MCP: Failed to count branches", slog.Any("error", err))
+		} else {
+			output.Service.BranchCount = new(len(branches))
+		}
 	}
 
 	// Check if password was requested but not available
