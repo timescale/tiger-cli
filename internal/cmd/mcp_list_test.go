@@ -81,6 +81,7 @@ func TestMCPListCmd(t *testing.T) {
 │ tool │ branch_delete                │
 │ tool │ branch_get                   │
 │ tool │ branch_list                  │
+│ tool │ branch_logs                  │
 │ tool │ branch_rename                │
 │ tool │ branch_resize                │
 │ tool │ branch_start                 │
