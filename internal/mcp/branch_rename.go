@@ -91,7 +91,7 @@ func (s *Server) handleBranchRename(ctx context.Context, req *mcp.CallToolReques
 	}
 
 	return nil, BranchRenameOutput{
-		Message:  fmt.Sprintf("Branch %q renamed to %q.", renamed.ID, renamed.Name),
+		Message:  fmt.Sprintf("Branch '%s' renamed to '%s'.", renamed.ID, renamed.Name),
 		BranchID: renamed.ID,
 		Name:     renamed.Name,
 	}, nil

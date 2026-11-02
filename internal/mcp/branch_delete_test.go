@@ -19,7 +19,7 @@ func TestBranchDeleteTool(t *testing.T) {
 	}
 	deleted := map[string]any{
 		"branch_id": "br4nch1d9x",
-		"message":   `Branch "br4nch1d9x" has been deleted.`,
+		"message":   `Branch 'br4nch1d9x' has been deleted.`,
 	}
 
 	runToolTests(t, []toolTest{

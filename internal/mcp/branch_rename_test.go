@@ -22,7 +22,7 @@ func TestBranchRenameTool(t *testing.T) {
 			}, nil)
 	}
 	renamed := map[string]any{
-		"message":   `Branch "br4nch1d9x" renamed to "feature/rbac".`,
+		"message":   `Branch 'br4nch1d9x' renamed to 'feature/rbac'.`,
 		"branch_id": "br4nch1d9x",
 		"name":      "feature/rbac",
 	}

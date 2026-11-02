@@ -76,6 +76,6 @@ func (s *Server) handleBranchDelete(ctx context.Context, req *mcp.CallToolReques
 
 	return nil, BranchDeleteOutput{
 		BranchID: input.BranchID,
-		Message:  fmt.Sprintf("Branch %q has been deleted.", input.BranchID),
+		Message:  fmt.Sprintf("Branch '%s' has been deleted.", input.BranchID),
 	}, nil
 }
