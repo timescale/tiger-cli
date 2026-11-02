@@ -113,7 +113,7 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchResizeOutput{}, err
 	}
 
-	message := "Resize request accepted. The branch may still be resizing."
+	message := "Branch resize request accepted. The branch may still be resizing."
 	if input.Wait {
 		if err := common.WaitForBranch(ctx, common.WaitForBranchArgs{
 			Client:       client,
