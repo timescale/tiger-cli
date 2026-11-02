@@ -200,7 +200,13 @@ type ServiceDetail struct {
 
 func (ServiceDetail) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceDetail](nil))
+	setServiceDetailSchemaProperties(schema, experimental)
+	return schema
+}
 
+// setServiceDetailSchemaProperties describes ServiceDetail's properties in
+// schema, which is ServiceDetail's or that of a type embedding it.
+func setServiceDetailSchemaProperties(schema *jsonschema.Schema, experimental bool) {
 	schema.Properties["id"].Description = "Service identifier (10-character alphanumeric string)"
 
 	schema.Properties["status"].Description = "Service status"
@@ -219,8 +225,6 @@ func (ServiceDetail) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["pooler_endpoint"].Description = "Connection pooler endpoint"
 	schema.Properties["password"].Description = "Password for tsdbadmin user (only included if with_password=true)"
 	schema.Properties["connection_string"].Description = "PostgreSQL connection string (password embedded only if with_password=true)"
-
-	return schema
 }
 
 // convertToServiceDetail converts an API Service to MCP ServiceDetail
@@ -285,6 +289,16 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	}
 
 	return detail
+}
+
+// branchIDHelp is the sentence a db tool's service_id description gains for
+// branches, saying what passing a branch ID does. Branches are a preview, so
+// it is empty without the experimental gate.
+func branchIDHelp(experimental bool, does string) string {
+	if !experimental {
+		return ""
+	}
+	return " A branch ID is also accepted — passing one " + does + " instead. Use branch_list to find branch IDs."
 }
 
 // setBranchIDSchemaProperties sets common branch_id schema properties. Like
