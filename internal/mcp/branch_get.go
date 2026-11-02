@@ -2,7 +2,7 @@ package mcp
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -66,7 +66,7 @@ func (s *Server) handleBranchGet(ctx context.Context, req *mcp.CallToolRequest, 
 
 	detail := s.convertToBranchDetail(cfg, *branch, input.WithPassword)
 	if input.WithPassword && detail.Password == "" {
-		return nil, BranchGetOutput{}, fmt.Errorf("requested password but password not available")
+		return nil, BranchGetOutput{}, errors.New("requested password but password not available")
 	}
 
 	// The branch carries only its parent's ID, so the name takes a second
