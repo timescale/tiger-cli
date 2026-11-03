@@ -55,6 +55,21 @@ func TestServiceLogsCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			name:    "zero tail",
+			args:    []string{"service", "logs", "svc-12345", "--tail", "0"},
+			wantErr: "tail must be positive, got 0",
+		},
+		{
+			name:    "negative tail",
+			args:    []string{"service", "logs", "svc-12345", "--tail=-1"},
+			wantErr: "tail must be positive, got -1",
+		},
+		{
+			name:    "negative node",
+			args:    []string{"service", "logs", "svc-12345", "--node=-1"},
+			wantErr: "node must be non-negative, got -1",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"service", "logs", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
@@ -88,7 +103,7 @@ func TestServiceLogsCmd(t *testing.T) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch logs: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name:     "API error",
@@ -114,7 +129,7 @@ func TestServiceLogsCmd(t *testing.T) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(logsResponse(nil), nil)
 			},
-			wantErr: "unexpected empty response",
+			wantErr: "empty response from API",
 		},
 		{
 			name:     "empty logs",

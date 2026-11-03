@@ -6,6 +6,10 @@ Create database resources
 
 Create database resources such as roles, databases, and extensions.
 
+```
+tiger db create [flags]
+```
+
 ### Options
 
 ```

@@ -2,9 +2,6 @@ package common
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net/http"
 	"slices"
 	"time"
 
@@ -38,21 +35,15 @@ func FetchServiceLogs(ctx context.Context, args FetchServiceLogsArgs) ([]api.Ser
 
 	return fetchLogs(args.Tail, func(cursor *string) ([]api.ServiceLogEntry, *string, error) {
 		params.Cursor = cursor
-		resp, err := args.Client.GetServiceLogsWithResponse(ctx, args.ProjectID, args.ServiceID, params)
+		page, err := JSON200(args.Client.GetServiceLogsWithResponse(ctx, args.ProjectID, args.ServiceID, params))
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to fetch logs: %w", err)
-		}
-		if resp.StatusCode() != http.StatusOK {
-			return nil, nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-		}
-		if resp.JSON200 == nil {
-			return nil, nil, errors.New("unexpected empty response")
+			return nil, nil, err
 		}
 		var entries []api.ServiceLogEntry
-		if resp.JSON200.Entries != nil {
-			entries = *resp.JSON200.Entries
+		if page.Entries != nil {
+			entries = *page.Entries
 		}
-		return entries, resp.JSON200.LastCursor, nil
+		return entries, page.LastCursor, nil
 	})
 }
 
@@ -79,17 +70,11 @@ func FetchBranchLogs(ctx context.Context, args FetchBranchLogsArgs) ([]api.Servi
 
 	return fetchLogs(args.Tail, func(cursor *string) ([]api.ServiceLogEntry, *string, error) {
 		params.Cursor = cursor
-		resp, err := args.Client.GetBranchLogsWithResponse(ctx, args.ProjectID, args.ServiceID, args.BranchID, params)
+		page, err := JSON200(args.Client.GetBranchLogsWithResponse(ctx, args.ProjectID, args.ServiceID, args.BranchID, params))
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to fetch logs: %w", err)
+			return nil, nil, err
 		}
-		if resp.StatusCode() != http.StatusOK {
-			return nil, nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-		}
-		if resp.JSON200 == nil {
-			return nil, nil, errors.New("unexpected empty response")
-		}
-		return resp.JSON200.Entries, resp.JSON200.LastCursor, nil
+		return page.Entries, page.LastCursor, nil
 	})
 }
 

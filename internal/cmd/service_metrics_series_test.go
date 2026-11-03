@@ -42,6 +42,29 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 		}
 	}
 
+	windowArgs := []string{
+		"service", "metrics", "series", "svc-12345",
+		"--metric", "some_metric",
+		"--from", "2026-05-13T00:00:00Z",
+		"--to", "2026-05-13T01:00:00Z",
+	}
+
+	// expectBody registers the mock for an unfiltered request over the same
+	// window, returning the given body.
+	expectBody := func(body *[]api.MetricSeries) func(m *mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveRefID(m, "svc-12345")
+			m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
+				MetricName: "some_metric",
+				From:       fromTime,
+				To:         toTime,
+			}).Return(&api.GetServiceMetricsSeriesResponse{
+				HTTPResponse: httpResponse(http.StatusOK),
+				JSON200:      body,
+			}, nil)
+		}
+	}
+
 	const noDataMsg = "No metric data returned for the requested window.\n"
 
 	runCmdTests(t, []cmdTest{
@@ -103,6 +126,20 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 				}, nil)
 			},
 			wantStderr: noDataMsg,
+		},
+		{
+			name:    "nil response body",
+			args:    windowArgs,
+			mock:    expectBody(nil),
+			wantErr: "empty response from API",
+		},
+		{
+			// A JSON `null` array is normalized to an empty one, so the output
+			// stays a valid array.
+			name:       "null series array json",
+			args:       append(windowArgs, "-o", "json"),
+			mock:       expectBody(new([]api.MetricSeries)),
+			wantStdout: "[]\n",
 		},
 		{
 			// synctest's bubble clock always starts at 2000-01-01 UTC, so the

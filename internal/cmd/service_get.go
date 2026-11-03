@@ -57,10 +57,10 @@ resource usage.`,
 			// The rest of the output doesn't depend on the count.
 			var branchCount *int
 			if app.Experimental && common.CanHaveBranches(service) {
-				if count, err := common.CountBranches(cmd.Context(), client, projectID, service.ServiceID); err != nil {
+				if branches, err := common.JSON200(client.GetBranchesWithResponse(cmd.Context(), projectID, service.ServiceID, nil)); err != nil {
 					cmd.PrintErrf("Warning: failed to count branches: %v\n", err)
 				} else {
-					branchCount = &count
+					branchCount = new(len(branches))
 				}
 			}
 

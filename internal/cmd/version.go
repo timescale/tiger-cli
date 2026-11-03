@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strings"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -60,7 +61,7 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 			}
 
 			output := cmd.OutOrStdout()
-			switch cfg.Output {
+			switch strings.ToLower(cfg.Output) {
 			case "json":
 				if err := util.SerializeToJSON(output, versionOutput); err != nil {
 					return err
@@ -85,7 +86,7 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&check, "check", false, "Force checking for updates (regardless of last check time)")
-	cmd.Flags().VarP(new(outputWithBareFlag), "output", "o", "Output format (table, json, yaml, bare)")
+	cmd.Flags().VarP(new(outputWithBareFlag), "output", "o", "Output format (json, yaml, bare, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion("bare"))
 
 	return cmd

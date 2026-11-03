@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -154,7 +155,7 @@ func (t *ConnectionTarget) Details(cfg *config.Config, opts ConnectionDetailsOpt
 		return nil, fmt.Errorf("failed to build connection string: %w", err)
 	}
 	if opts.Pooled && !details.IsPooler && t.Kind != TargetReadReplica {
-		return nil, fmt.Errorf("connection pooler not available for this service")
+		return nil, errors.New("connection pooler not available for this service")
 	}
 	return details, nil
 }
@@ -178,11 +179,11 @@ func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponses
 		return NewBranchConnectionTarget(*resolved.Branch), nil
 	case resolved.ReadReplicaSet != nil:
 		replica := *resolved.ReadReplicaSet
-		parent, err := GetService(ctx, client, projectID, replica.ServiceID)
+		parent, err := JSON200(client.GetServiceWithResponse(ctx, projectID, replica.ServiceID))
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", replica.ServiceID, err)
+			return nil, fmt.Errorf("failed to fetch parent service '%s' for read replica: %w", replica.ServiceID, err)
 		}
-		return NewReplicaConnectionTarget(replica, ServiceCredentials(*parent)), nil
+		return NewReplicaConnectionTarget(replica, ServiceCredentials(parent)), nil
 	default:
 		return NewServiceConnectionTarget(*resolved.Service), nil
 	}

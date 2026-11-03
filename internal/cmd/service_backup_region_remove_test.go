@@ -151,7 +151,7 @@ func TestServiceBackupRegionRemoveCmd(t *testing.T) {
 				m.EXPECT().DeleteBackupRegionWithResponse(validCtx, testProjectID, "svc-12345", "eu-central-1").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to remove backup region: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

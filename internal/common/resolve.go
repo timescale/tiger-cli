@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -46,7 +47,7 @@ func resolve(ctx context.Context, client api.ClientWithResponsesInterface, proje
 		return nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("empty response from API")
+		return nil, errors.New("empty response from API")
 	}
 
 	resolved, err := unpackResolveResult(*resp.JSON200)

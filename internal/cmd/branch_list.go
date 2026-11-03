@@ -46,7 +46,7 @@ service from your configuration.`,
 				return err
 			}
 
-			branches, err := common.ListBranches(cmd.Context(), client, projectID, service.ServiceID)
+			branches, err := common.JSON200(client.GetBranchesWithResponse(cmd.Context(), projectID, service.ServiceID, nil))
 			if err != nil {
 				return err
 			}

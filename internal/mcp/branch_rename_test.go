@@ -22,7 +22,7 @@ func TestBranchRenameTool(t *testing.T) {
 			}, nil)
 	}
 	renamed := map[string]any{
-		"message":   `Branch "br4nch1d9x" renamed to "feature/rbac".`,
+		"message":   `Branch 'br4nch1d9x' renamed to 'feature/rbac'.`,
 		"branch_id": "br4nch1d9x",
 		"name":      "feature/rbac",
 	}
@@ -66,7 +66,7 @@ func TestBranchRenameTool(t *testing.T) {
 				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.BranchRename{Name: "feature/rbac"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to rename branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "nil response body",

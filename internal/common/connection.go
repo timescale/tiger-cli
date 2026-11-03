@@ -24,7 +24,7 @@ func ReplicaPoolerWarning(target *ConnectionTarget, pooled bool) string {
 	if target.Kind != TargetReadReplica || !pooled || hasPooler(target.Pooler) {
 		return ""
 	}
-	return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", target.Name)
+	return fmt.Sprintf("read replica '%s' has no connection pooler; connecting directly instead", target.Name)
 }
 
 // ConnectionDetailsOptions configures how the connection string is built
@@ -81,10 +81,10 @@ func GetConnectionDetails(cfg *config.Config, target *ConnectionTarget, opts Con
 	}
 
 	if endpoint.Host == nil || *endpoint.Host == "" {
-		return nil, fmt.Errorf("endpoint host not available")
+		return nil, errors.New("endpoint host not available")
 	}
 	if endpoint.Port == nil || *endpoint.Port == 0 {
-		return nil, fmt.Errorf("endpoint port not available")
+		return nil, errors.New("endpoint port not available")
 	}
 
 	details := &ConnectionDetails{
@@ -135,18 +135,18 @@ func GetPassword(cfg *config.Config, target PasswordTarget, role string) (string
 		// Provide specific error messages based on storage type
 		switch storage.(type) {
 		case *NoStorage:
-			return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
+			return "", errors.New("password storage is disabled (--password-storage=none)")
 		case *KeyringStorage:
-			return "", fmt.Errorf("no password found in keyring for this service")
+			return "", errors.New("no password found in keyring for this service")
 		case *PgpassStorage:
-			return "", fmt.Errorf("no password found in ~/.pgpass for this service")
+			return "", errors.New("no password found in ~/.pgpass for this service")
 		default:
 			return "", fmt.Errorf("failed to retrieve password: %w", err)
 		}
 	}
 
 	if password == "" {
-		return "", fmt.Errorf("no password available for service")
+		return "", errors.New("no password available for service")
 	}
 	return password, nil
 }

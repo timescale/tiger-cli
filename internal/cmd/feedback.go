@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -68,15 +67,11 @@ console; the command prints the link for your project.`,
 				return errors.New("feedback message cannot be empty")
 			}
 
-			resp, err := client.SubmitFeedbackWithResponse(cmd.Context(), api.SubmitFeedbackJSONRequestBody{
+			if err := common.Status204(client.SubmitFeedbackWithResponse(cmd.Context(), api.SubmitFeedbackJSONRequestBody{
 				Message: message,
 				Source:  new(api.SubmitFeedbackJSONBodySourceCLI),
-			})
-			if err != nil {
-				return fmt.Errorf("failed to submit feedback: %w", err)
-			}
-			if resp.StatusCode() != http.StatusNoContent {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			})); err != nil {
+				return err
 			}
 
 			cmd.Println("Feedback submitted.")

@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/spf13/cobra"
 
@@ -85,7 +85,7 @@ services writable.`,
 			}
 
 			if withPassword && details.Password == "" {
-				return fmt.Errorf("password not available to include in connection string")
+				return errors.New("password not available to include in connection string")
 			}
 
 			cmd.Println(details.String())

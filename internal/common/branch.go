@@ -2,9 +2,7 @@ package common
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/util"
@@ -32,30 +30,6 @@ func ResolveBranch(ctx context.Context, client api.ClientWithResponsesInterface,
 // branched.
 func CanHaveBranches(service api.Service) bool {
 	return util.Deref(service.Platform) == api.ServicePlatformFLUID
-}
-
-// ListBranches returns serviceID's branches.
-func ListBranches(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) ([]api.Branch, error) {
-	resp, err := client.GetBranchesWithResponse(ctx, projectID, serviceID, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list branches: %w", err)
-	}
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON200 == nil {
-		return nil, errors.New("empty response from API")
-	}
-	return *resp.JSON200, nil
-}
-
-// CountBranches returns how many branches serviceID has.
-func CountBranches(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) (int, error) {
-	branches, err := ListBranches(ctx, client, projectID, serviceID)
-	if err != nil {
-		return 0, err
-	}
-	return len(branches), nil
 }
 
 // FormatBranchCount phrases a number of branches, as "1 branch" or

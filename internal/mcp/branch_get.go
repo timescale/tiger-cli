@@ -2,7 +2,7 @@ package mcp
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -59,10 +59,6 @@ func (s *Server) handleBranchGet(ctx context.Context, req *mcp.CallToolRequest, 
 		return nil, BranchGetOutput{}, err
 	}
 
-	s.logger.Info("MCP: Getting branch details",
-		slog.String("project_id", projectID),
-		slog.String("branch_id", input.BranchID))
-
 	branch, err := resolveBranchByID(ctx, client, projectID, input.BranchID)
 	if err != nil {
 		return nil, BranchGetOutput{}, err
@@ -70,12 +66,12 @@ func (s *Server) handleBranchGet(ctx context.Context, req *mcp.CallToolRequest, 
 
 	detail := s.convertToBranchDetail(cfg, *branch, input.WithPassword)
 	if input.WithPassword && detail.Password == "" {
-		return nil, BranchGetOutput{}, fmt.Errorf("requested password but password not available")
+		return nil, BranchGetOutput{}, errors.New("requested password but password not available")
 	}
 
 	// The branch carries only its parent's ID, so the name takes a second
 	// fetch. The rest of the output doesn't depend on it.
-	if parent, err := common.GetService(ctx, client, projectID, branch.ServiceID); err != nil {
+	if parent, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, branch.ServiceID)); err != nil {
 		s.logger.Error("MCP: Failed to get parent service", slog.Any("error", err))
 	} else {
 		detail.ServiceName = parent.Name

@@ -51,7 +51,7 @@ func TestAuthLoginCmd(t *testing.T) {
 		}, extra...)
 	}
 
-	multiNoTTYErr := "failed to select project: TTY not detected - cannot select between 3 projects. Log in with API keys instead (--public-key, --secret-key)"
+	multiNoTTYErr := "failed to select project: TTY not detected - cannot prompt to select between 3 projects. Use --project-id, or log in with API keys (--public-key, --secret-key)"
 	noAccessErr := "failed to select project: no access to the requested project"
 	noProjectsErr := "failed to select project: user has no accessible projects"
 
@@ -64,12 +64,12 @@ func TestAuthLoginCmd(t *testing.T) {
 		{
 			name:    "missing secret key without TTY",
 			args:    []string{"auth", "login", "--public-key", "test-public-key"},
-			wantErr: "failed to get credentials: TTY not detected - credentials required. Use flags (--public-key, --secret-key) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY)",
+			wantErr: "failed to get credentials: TTY not detected - cannot prompt for credentials. Use --public-key and --secret-key, or TIGER_PUBLIC_KEY and TIGER_SECRET_KEY",
 		},
 		{
 			name:    "missing public key without TTY",
 			args:    []string{"auth", "login", "--secret-key", "test-secret-key"},
-			wantErr: "failed to get credentials: TTY not detected - credentials required. Use flags (--public-key, --secret-key) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY)",
+			wantErr: "failed to get credentials: TTY not detected - cannot prompt for credentials. Use --public-key and --secret-key, or TIGER_PUBLIC_KEY and TIGER_SECRET_KEY",
 		},
 		{
 			name: "prompts for missing secret key",

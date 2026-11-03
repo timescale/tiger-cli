@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -96,50 +95,42 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 
 	// The service's tag decides both the prod half of the read-only gate and
 	// whether the user has to confirm, so fetch it unconditionally.
-	service, err := common.GetService(ctx, client, projectID, input.ServiceID)
+	service, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
 		return nil, ServiceDeleteOutput{}, err
 	}
 
-	tag := common.ServiceEnvironmentTag(*service)
+	tag := common.ServiceEnvironmentTag(service)
 	if err := common.CheckReadOnly(cfg, tag); err != nil {
 		return nil, ServiceDeleteOutput{}, err
 	}
 
 	// Listed on every run, PROD's prompting run included, so both the prompt
 	// and the result can name them.
-	branches, branchesErr := s.listBranchesToDelete(ctx, client, projectID, *service)
+	branches, branchesErr := s.listBranchesToDelete(ctx, client, projectID, service)
 
 	if tag == api.EnvironmentTagPROD {
 		answer, answered := req.Params.InputResponses[deleteConfirmationKey]
 		if !answered {
-			result, err := promptProdDelete(req, *service, branchesToDeleteMessage(branches, branchesErr))
+			result, err := promptProdDelete(req, service, branchesToDeleteMessage(branches, branchesErr))
 			return result, ServiceDeleteOutput{}, err
 		}
 		if !serviceIDConfirmed(answer, input.ServiceID) {
 			return nil, ServiceDeleteOutput{
 				ServiceID: input.ServiceID,
 				Deleted:   false,
-				Message:   fmt.Sprintf("Deletion cancelled: the user did not confirm deleting PROD service %q by typing its ID.", input.ServiceID),
+				Message:   fmt.Sprintf("Deletion cancelled: the user did not confirm deleting PROD service '%s' by typing its ID.", input.ServiceID),
 			}, nil
 		}
 	}
 
-	s.logger.Info("MCP: Deleting service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
-
-	resp, err := client.DeleteServiceWithResponse(ctx, projectID, input.ServiceID)
-	if err != nil {
-		return nil, ServiceDeleteOutput{}, fmt.Errorf("failed to delete service: %w", err)
-	}
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceDeleteOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	if err := common.Status202(client.DeleteServiceWithResponse(ctx, projectID, input.ServiceID)); err != nil {
+		return nil, ServiceDeleteOutput{}, err
 	}
 
-	message := fmt.Sprintf("Service %q has been deleted.", input.ServiceID)
+	message := fmt.Sprintf("Service '%s' has been deleted.", input.ServiceID)
 	if len(branches) > 0 {
-		message = fmt.Sprintf("Service %q has been deleted, along with its %s: %s.", input.ServiceID, common.FormatBranchCount(len(branches)), branchLabels(branches))
+		message = fmt.Sprintf("Service '%s' has been deleted, along with its %s: %s.", input.ServiceID, common.FormatBranchCount(len(branches)), branchLabels(branches))
 	}
 	return nil, ServiceDeleteOutput{
 		ServiceID: input.ServiceID,
@@ -157,7 +148,7 @@ func (s *Server) listBranchesToDelete(ctx context.Context, client api.ClientWith
 	if !common.CanHaveBranches(service) {
 		return nil, nil
 	}
-	branches, err := common.ListBranches(ctx, client, projectID, service.ServiceID)
+	branches, err := common.JSON200(client.GetBranchesWithResponse(ctx, projectID, service.ServiceID, nil))
 	if err != nil {
 		s.logger.Error("MCP: Failed to list branches", slog.Any("error", err))
 	}
@@ -177,11 +168,11 @@ func branchesToDeleteMessage(branches []api.Branch, err error) string {
 	return fmt.Sprintf(" Its %s will also be deleted: %s.", common.FormatBranchCount(len(branches)), branchLabels(branches))
 }
 
-// branchLabels lists branches by name and ID, e.g. `"a" (id1), "b" (id2)`.
+// branchLabels lists branches by name and ID, e.g. `'a' (id1), 'b' (id2)`.
 func branchLabels(branches []api.Branch) string {
 	labels := make([]string, len(branches))
 	for i, branch := range branches {
-		labels[i] = fmt.Sprintf("%q (%s)", branch.Name, branch.ID)
+		labels[i] = fmt.Sprintf("'%s' (%s)", branch.Name, branch.ID)
 	}
 	return strings.Join(labels, ", ")
 }
@@ -195,6 +186,6 @@ func promptProdDelete(req *mcp.CallToolRequest, service api.Service, branchesNot
 	if !clientSupportsFormElicitation(req) {
 		return nil, fmt.Errorf("deleting service %s requires the user's confirmation because it is tagged PROD, but this MCP client does not support elicitation; ask the user to run 'tiger service delete %s' instead", service.ServiceID, service.ServiceID)
 	}
-	message := fmt.Sprintf("Delete PRODUCTION service %q (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID)
+	message := fmt.Sprintf("Delete PRODUCTION service '%s' (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID)
 	return serviceIDConfirmationRequest(deleteConfirmationKey, message+branchesNote, service.ServiceID), nil
 }

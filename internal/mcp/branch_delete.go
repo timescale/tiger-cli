@@ -3,8 +3,6 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -72,20 +70,12 @@ func (s *Server) handleBranchDelete(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchDeleteOutput{}, err
 	}
 
-	s.logger.Info("MCP: Deleting branch",
-		slog.String("project_id", projectID),
-		slog.String("branch_id", input.BranchID))
-
-	resp, err := client.DeleteBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID)
-	if err != nil {
-		return nil, BranchDeleteOutput{}, fmt.Errorf("failed to delete branch: %w", err)
-	}
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, BranchDeleteOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	if err := common.Status202(client.DeleteBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID)); err != nil {
+		return nil, BranchDeleteOutput{}, err
 	}
 
 	return nil, BranchDeleteOutput{
 		BranchID: input.BranchID,
-		Message:  fmt.Sprintf("Branch %q has been deleted.", input.BranchID),
+		Message:  fmt.Sprintf("Branch '%s' has been deleted.", input.BranchID),
 	}, nil
 }

@@ -35,28 +35,17 @@ func buildStatusCmd(app *common.App) *cobra.Command {
 			}
 
 			// Make API call to get auth information
-			resp, err := client.GetAuthInfoWithResponse(cmd.Context())
+			authInfo, err := common.JSON200(client.GetAuthInfoWithResponse(cmd.Context()))
 			if err != nil {
-				return fmt.Errorf("failed to get auth information: %w", err)
+				return err
 			}
-
-			// Handle API response
-			if resp.StatusCode() != 200 {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-
-			authInfo := *resp.JSON200
 
 			// Output auth info in requested format
 			return outputAuthInfo(cmd, authInfo, cfg.Output)
 		},
 	}
 
-	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd

@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -38,6 +36,10 @@ service from your configuration.`,
 		Args:              cobra.MaximumNArgs(1),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateWaitTimeout(waitTimeout); err != nil {
+				return err
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
@@ -55,30 +57,20 @@ service from your configuration.`,
 			}
 
 			// Make the stop request
-			resp, err := client.StopServiceWithResponse(
+			service, err := common.JSON202(client.StopServiceWithResponse(
 				cmd.Context(),
 				api.ProjectID(projectID),
 				api.ServiceID(resolved.ServiceID),
-			)
+			))
 			if err != nil {
-				return fmt.Errorf("failed to stop service: %w", err)
+				return err
 			}
-
-			// Handle API response
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-			service := *resp.JSON202
 
 			cmd.PrintErrf("Stop request accepted for service %s.\n", serviceLabel(*resolved))
 
 			// If not waiting, return early
 			if noWait {
-				cmd.PrintErrln("Use 'tiger service get' to check service status.")
+				cmd.PrintErrf("Use 'tiger service get %s' to check service status.\n", resolved.ServiceID)
 				return nil
 			}
 
@@ -108,7 +100,7 @@ service from your configuration.`,
 
 	// Add flags
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 
 	return cmd
 }

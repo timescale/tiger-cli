@@ -14,7 +14,7 @@ tiger auth status [flags]
 
 ```
   -h, --help            help for status
-  -o, --output string   output format (json, yaml, table)
+  -o, --output string   Output format (json, yaml, table)
 ```
 
 ### Options inherited from parent commands

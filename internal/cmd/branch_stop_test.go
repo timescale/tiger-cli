@@ -23,9 +23,21 @@ func TestBranchStopCmd(t *testing.T) {
 		}
 	}
 	noWaitStderr := "Stop request accepted for branch 'test-branch' (br-12345).\n" +
-		"Use 'tiger branch get' to check branch status.\n"
+		"Use 'tiger branch get br-12345' to check branch status.\n"
 
 	runCmdTests(t, []cmdTest{
+		{
+			name:    "zero wait timeout",
+			args:    []string{"branch", "stop", "br-12345", "--wait-timeout", "0s"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
+			name:    "negative wait timeout",
+			args:    []string{"branch", "stop", "br-12345", "--wait-timeout=-30m"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got -30m0s",
+		},
 		{
 			name:    "not logged in",
 			args:    []string{"branch", "stop", "br-12345"},
@@ -62,7 +74,7 @@ func TestBranchStopCmd(t *testing.T) {
 				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to stop branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

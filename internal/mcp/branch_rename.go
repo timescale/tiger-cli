@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
-	"net/http"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -87,24 +85,13 @@ func (s *Server) handleBranchRename(ctx context.Context, req *mcp.CallToolReques
 		return nil, BranchRenameOutput{}, err
 	}
 
-	s.logger.Info("MCP: Renaming branch",
-		slog.String("project_id", projectID),
-		slog.String("branch_id", input.BranchID))
-
-	resp, err := client.RenameBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID, api.BranchRename{Name: name})
+	renamed, err := common.JSON200(client.RenameBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID, api.BranchRename{Name: name}))
 	if err != nil {
-		return nil, BranchRenameOutput{}, fmt.Errorf("failed to rename branch: %w", err)
+		return nil, BranchRenameOutput{}, err
 	}
-	if resp.StatusCode() != http.StatusOK {
-		return nil, BranchRenameOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON200 == nil {
-		return nil, BranchRenameOutput{}, errors.New("empty response from API")
-	}
-	renamed := *resp.JSON200
 
 	return nil, BranchRenameOutput{
-		Message:  fmt.Sprintf("Branch %q renamed to %q.", renamed.ID, renamed.Name),
+		Message:  fmt.Sprintf("Branch '%s' renamed to '%s'.", renamed.ID, renamed.Name),
 		BranchID: renamed.ID,
 		Name:     renamed.Name,
 	}, nil

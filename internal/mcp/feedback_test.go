@@ -75,7 +75,7 @@ func TestFeedbackTool(t *testing.T) {
 			tool:    toolFeedback,
 			args:    args,
 			mock:    expectSubmit("Great tool!", nil, errors.New("connection refused")),
-			wantErr: "failed to submit feedback: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

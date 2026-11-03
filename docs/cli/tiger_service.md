@@ -6,6 +6,10 @@ Manage database services
 
 Manage database services within Tiger Cloud platform.
 
+```
+tiger service [flags]
+```
+
 ### Options
 
 ```

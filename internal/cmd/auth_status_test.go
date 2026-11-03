@@ -82,7 +82,7 @@ func TestAuthStatusCmd(t *testing.T) {
 				m.EXPECT().GetAuthInfoWithResponse(validCtx).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to get auth information: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

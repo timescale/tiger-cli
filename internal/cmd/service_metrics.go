@@ -10,9 +10,12 @@ import (
 // unconditionally in buildServiceCmd.
 func buildServiceMetricsCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "metrics",
-		Short: "View service metrics",
-		Long:  `Commands for querying time-series metrics for a Tiger Cloud service.`,
+		Use:          "metrics",
+		Short:        "View service metrics",
+		Long:         `Commands for querying time-series metrics for a Tiger Cloud service.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 	cmd.AddCommand(buildServiceMetricsAvailableCmd(app))
 	cmd.AddCommand(buildServiceMetricsDetailsCmd(app))

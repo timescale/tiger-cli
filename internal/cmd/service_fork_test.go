@@ -37,7 +37,7 @@ PGUSER=tsdbadmin
 	noWaitStderr := func(firstLine string) string {
 		return firstLine + `
 Service ID: svc-67890
-Service is being forked. Use 'tiger service list' to check status.
+Service is being forked. Use 'tiger service get svc-67890' to check service status.
 `
 	}
 
@@ -88,6 +88,16 @@ is not given, the fork inherits the source service's IOPS.`),
 			name:    "invalid environment",
 			args:    []string{"service", "fork", "svc-12345", "--environment", "staging"},
 			wantErr: "environment must be one of: DEV, PROD (got 'STAGING')",
+		},
+		{
+			name:    "zero wait timeout",
+			args:    []string{"service", "fork", "svc-12345", "--wait-timeout", "0s"},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
+			name:    "negative wait timeout",
+			args:    []string{"service", "fork", "svc-12345", "--wait-timeout=-30m"},
+			wantErr: "wait timeout must be positive, got -30m0s",
 		},
 		{
 			name:    "not logged in",
@@ -166,8 +176,8 @@ is not given, the fork inherits the source service's IOPS.`),
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr:    "failed to fork service: connection refused",
-			wantStderr: "Forking service 'test-service' (svc-12345) at current state...\nError: failed to fork service: connection refused\n",
+			wantErr:    "failed to call API: connection refused",
+			wantStderr: "Forking service 'test-service' (svc-12345) at current state...\nError: failed to call API: connection refused\n",
 		},
 		{
 			name: "API error",

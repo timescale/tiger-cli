@@ -92,7 +92,7 @@ func TestFeedbackCmd(t *testing.T) {
 			name:    "network error",
 			args:    []string{"feedback", "it broke"},
 			mock:    expectSubmit("it broke", nil, errors.New("connection refused")),
-			wantErr: "failed to submit feedback: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

@@ -2,9 +2,8 @@ package mcp
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -82,42 +81,29 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 		return nil, ServiceGetOutput{}, err
 	}
 
-	s.logger.Info("MCP: Getting service details",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
-
 	// Make API call to get service details
-	resp, err := client.GetServiceWithResponse(ctx, projectID, input.ServiceID)
+	service, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
-		return nil, ServiceGetOutput{}, fmt.Errorf("failed to get service details: %w", err)
-	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceGetOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, ServiceGetOutput{}, fmt.Errorf("empty response from API")
+		return nil, ServiceGetOutput{}, err
 	}
 
 	output := ServiceGetOutput{
-		Service: ServiceGetDetail{ServiceDetail: s.convertToServiceDetail(cfg, *resp.JSON200, input.WithPassword)},
+		Service: ServiceGetDetail{ServiceDetail: s.convertToServiceDetail(cfg, service, input.WithPassword)},
 	}
 
 	// Branches are a preview, so they're counted only behind the gate. The
 	// rest of the output doesn't depend on the count.
-	if s.app.Experimental && common.CanHaveBranches(*resp.JSON200) {
-		if count, err := common.CountBranches(ctx, client, projectID, input.ServiceID); err != nil {
+	if s.app.Experimental && common.CanHaveBranches(service) {
+		if branches, err := common.JSON200(client.GetBranchesWithResponse(ctx, projectID, input.ServiceID, nil)); err != nil {
 			s.logger.Error("MCP: Failed to count branches", slog.Any("error", err))
 		} else {
-			output.Service.BranchCount = &count
+			output.Service.BranchCount = new(len(branches))
 		}
 	}
 
 	// Check if password was requested but not available
 	if input.WithPassword && output.Service.Password == "" {
-		return nil, ServiceGetOutput{}, fmt.Errorf("requested password but password not available")
+		return nil, ServiceGetOutput{}, errors.New("requested password but password not available")
 	}
 
 	return nil, output, nil

@@ -6,6 +6,10 @@ Database operations and management
 
 Database-specific operations including connection management, testing, and configuration.
 
+```
+tiger db [flags]
+```
+
 ### Options
 
 ```

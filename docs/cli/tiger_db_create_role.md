@@ -75,7 +75,7 @@ tiger db create role [name-or-id] [flags]
       --from strings                 Roles to inherit grants from (e.g., --from app_role --from readonly_role or --from app_role,readonly_role)
   -h, --help                         help for role
       --name string                  Role name to create (required)
-  -o, --output string                output format (json, yaml, table)
+  -o, --output string                Output format (json, yaml, table)
       --password string              Password for the role. If not provided, checks TIGER_NEW_PASSWORD environment variable, otherwise auto-generates a secure random password.
       --read-only                    Enable permanent read-only enforcement via tsdb_admin.read_only_role
       --statement-timeout duration   Set statement timeout for the role (e.g., 30s, 5m)

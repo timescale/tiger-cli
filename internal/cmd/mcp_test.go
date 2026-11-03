@@ -30,3 +30,25 @@ func matchLog(want string) matcher {
 		assertOutput(t, logTimestamp.ReplaceAllString(got, ""), want)
 	})
 }
+
+// TestMCPCmd covers the group command itself (see groupRun and groupArgs).
+func TestMCPCmd(t *testing.T) {
+	runCmdTests(t, []cmdTest{
+		{
+			name:       "no subcommand prints help without loading",
+			args:       []string{"mcp"},
+			wantStdout: matchHelp("Tiger Model Context Protocol (MCP) server for AI assistant integration."),
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:    "unknown subcommand suggests close matches",
+			args:    []string{"mcp", "instal"},
+			wantErr: "unknown command \"instal\" for \"tiger mcp\"\n\nDid you mean this?\n\tinstall",
+		},
+		{
+			name:    "unknown subcommand with no close match",
+			args:    []string{"mcp", "frobnicate"},
+			wantErr: `unknown command "frobnicate" for "tiger mcp"`,
+		},
+	})
+}

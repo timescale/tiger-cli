@@ -118,14 +118,13 @@ func TestServiceListTool(t *testing.T) {
 			wantErr: "insufficient permissions",
 		},
 		{
-			// A 200 with no body is an empty list, not an error.
-			name: "nil response body lists nothing",
+			name: "nil response body",
 			tool: toolServiceList,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 					Return(&api.GetServicesResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
 			},
-			wantOutput: map[string]any{"services": []any{}},
+			wantErr: "empty response from API",
 		},
 		{
 			name:       "empty list",

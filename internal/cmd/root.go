@@ -35,7 +35,7 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, *common.App, error) {
 	// command literally does not exist when the env var is unset/false, so it
 	// won't appear in help, tab-completion, or `unknown command` disambiguation.
 	// This is intentionally undocumented (env var only, no config key); see
-	// CLAUDE.md's "Experimental Feature Gating" section.
+	// AGENTS.md's "Experimental Feature Gating" section.
 	experimental, _ := strconv.ParseBool(os.Getenv("TIGER_EXPERIMENTAL"))
 
 	app := &common.App{

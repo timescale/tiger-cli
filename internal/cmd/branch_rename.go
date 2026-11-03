@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -49,17 +47,10 @@ or by its current name.`,
 				return err
 			}
 
-			resp, err := client.RenameBranchWithResponse(cmd.Context(), projectID, branch.ServiceID, branch.ID, api.BranchRename{Name: newName})
+			renamed, err := common.JSON200(client.RenameBranchWithResponse(cmd.Context(), projectID, branch.ServiceID, branch.ID, api.BranchRename{Name: newName}))
 			if err != nil {
-				return fmt.Errorf("failed to rename branch: %w", err)
+				return err
 			}
-			if resp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-			if resp.JSON200 == nil {
-				return errors.New("empty response from API")
-			}
-			renamed := *resp.JSON200
 
 			cmd.Printf("Renamed branch %s to '%s'.\n", branchLabel(*branch), renamed.Name)
 			return nil

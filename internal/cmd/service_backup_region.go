@@ -17,6 +17,9 @@ func buildServiceBackupRegionCmd(app *common.App) *cobra.Command {
 
 The region the service runs in always has a copy; these commands manage
 regions beyond that one.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	cmd.AddCommand(buildServiceBackupRegionListCmd(app))

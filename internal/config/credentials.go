@@ -53,7 +53,7 @@ func (c *Config) StoreCredentials(apiKey, projectID string) error {
 // project ID. Use this for the PKCE login path; use StoreCredentials for PAT.
 func (c *Config) StoreOAuthCredentials(token *oauth2.Token, projectID string) error {
 	if token == nil {
-		return fmt.Errorf("oauth token must not be nil")
+		return errors.New("oauth token must not be nil")
 	}
 	return c.storeCredentials(storedCredentials{
 		OAuth:     token,
@@ -131,7 +131,7 @@ func (c *Config) GetStoredCredentials() (*Credentials, error) {
 		return nil, fmt.Errorf("failed to parse credentials: %w", err)
 	}
 	if stored.ProjectID == "" {
-		return nil, fmt.Errorf("project ID not found in stored credentials")
+		return nil, errors.New("project ID not found in stored credentials")
 	}
 
 	switch {
@@ -140,7 +140,7 @@ func (c *Config) GetStoredCredentials() (*Credentials, error) {
 	case stored.APIKey != "":
 		return &Credentials{APIKey: stored.APIKey, ProjectID: stored.ProjectID}, nil
 	default:
-		return nil, fmt.Errorf("stored credentials have neither API key nor OAuth token")
+		return nil, errors.New("stored credentials have neither API key nor OAuth token")
 	}
 }
 

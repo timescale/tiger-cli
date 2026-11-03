@@ -63,10 +63,10 @@ tiger service fork [name-or-id] [flags]
       --memory string           Memory allocation in gigabytes (inherits from source if not specified)
       --name string             Name for the forked service (auto-generated if not provided)
       --no-set-default          Don't set this service as the default service
-      --no-wait                 Don't wait for fork operation to complete
+      --no-wait                 Don't wait for the operation to complete
   -o, --output string           Output format (json, yaml, env, table)
       --to-timestamp time       Fork at a specific point in time (RFC3339 format, e.g., 2025-01-15T10:30:00Z)
-      --wait-timeout duration   Wait timeout duration (e.g., 30m, 1h30m, 90s) (default 30m0s)
+      --wait-timeout duration   Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s) (default 30m0s)
       --with-password           Include password in output
 ```
 

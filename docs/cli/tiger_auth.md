@@ -6,6 +6,10 @@ Manage authentication and credentials
 
 Manage authentication and credentials for Tiger Cloud platform.
 
+```
+tiger auth [flags]
+```
+
 ### Options
 
 ```

@@ -2,6 +2,7 @@ package version
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -70,7 +71,7 @@ func fetchLatestVersion(ctx context.Context, checkURL string) (string, error) {
 	// Trim whitespace and leading "v"
 	version := strings.TrimPrefix(strings.TrimSpace(string(body)), "v")
 	if version == "" {
-		return "", fmt.Errorf("empty version string in response")
+		return "", errors.New("empty version string in response")
 	}
 
 	return version, nil

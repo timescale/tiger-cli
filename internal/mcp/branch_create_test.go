@@ -89,7 +89,7 @@ func TestBranchCreateTool(t *testing.T) {
 				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to create branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

@@ -68,11 +68,11 @@ tiger service create [flags]
       --memory string           Memory allocation in gigabytes or 'shared'
       --name string             Service name (auto-generated if not provided)
       --no-set-default          Don't set this service as the default service
-      --no-wait                 Don't wait for operation to complete
+      --no-wait                 Don't wait for the operation to complete
   -o, --output string           Output format (json, yaml, env, table)
       --region string           Region code
       --replicas int            Number of high-availability replicas
-      --wait-timeout duration   Wait timeout duration (e.g., 30m, 1h30m, 90s) (default 30m0s)
+      --wait-timeout duration   Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s) (default 30m0s)
       --with-password           Include password in output
 ```
 

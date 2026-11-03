@@ -60,7 +60,7 @@ Unit tests are fully isolated from your machine: they run against a temporary
 config directory, an in-memory keyring (never the system keyring), and a mocked
 API client, so no credentials, config files, or network access are needed.
 Command tests are table-driven and share a single harness in
-`internal/cmd/main_test.go` — see the "Unit Test Pattern" section in CLAUDE.md
+`internal/cmd/main_test.go` — see the "Testing" section in AGENTS.md
 when adding tests.
 
 ## Integration Tests
@@ -208,10 +208,10 @@ Run `go run ./cmd/generate-docs -help` for other output formats and options.
 2. **Write tests** for new functionality
 3. **Update documentation** when adding new features or commands
 4. **Follow the existing code structure** and patterns
-5. **Use the pure functional builder pattern** for new commands (see CLAUDE.md)
+5. **Use the pure functional builder pattern** for new commands (see AGENTS.md)
 6. **Test with multiple output formats** (json, yaml, table)
 7. **Validate configuration changes** don't break existing functionality
-8. **Use CLAUDE.md** other guidelines are listed there and you can use it with any AI-enabled coding editor.
+8. **Read AGENTS.md** for the remaining guidelines, which coding agents follow too.
 
 ## Contributing Guidelines
 

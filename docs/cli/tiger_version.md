@@ -15,7 +15,7 @@ tiger version [flags]
 ```
       --check           Force checking for updates (regardless of last check time)
   -h, --help            help for version
-  -o, --output string   Output format (table, json, yaml, bare)
+  -o, --output string   Output format (json, yaml, bare, table)
 ```
 
 ### Options inherited from parent commands

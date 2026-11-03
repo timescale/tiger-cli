@@ -37,10 +37,13 @@ The server listens on the given port and fails if that port is already in use.`,
 
   # Start server and bind to specific interface
   tiger mcp start http --host 192.168.1.100 --port 9000`,
-		Args:          cobra.NoArgs,
-		SilenceUsage:  true,
-		SilenceErrors: true, // HTTP server uses slog for all output, including errors
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// The server logs its own failures, so don't print them again.
+			// Set here rather than on the struct so flag, argument, and
+			// config errors, which come before it, still print.
+			cmd.SilenceErrors = true
 			return startHTTPServer(cmd, app, host, port)
 		},
 	}

@@ -2,9 +2,9 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
-	"net/http"
+	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -71,30 +71,23 @@ func (s *Server) handleServiceRename(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceRenameOutput{}, err
 	}
 
+	// Checked before the read-only gate, which may fetch the service.
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return nil, ServiceRenameOutput{}, errors.New("new name cannot be empty")
+	}
+
 	if err := common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, input.ServiceID); err != nil {
 		return nil, ServiceRenameOutput{}, err
 	}
 
-	s.logger.Info("MCP: Renaming service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
-
-	resp, err := client.RenameServiceWithResponse(ctx, projectID, input.ServiceID, api.ServiceRename{Name: input.Name})
+	service, err := common.JSON200(client.RenameServiceWithResponse(ctx, projectID, input.ServiceID, api.ServiceRename{Name: name}))
 	if err != nil {
-		return nil, ServiceRenameOutput{}, fmt.Errorf("failed to rename service: %w", err)
+		return nil, ServiceRenameOutput{}, err
 	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceRenameOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, ServiceRenameOutput{}, fmt.Errorf("empty response from API")
-	}
-	service := *resp.JSON200
 
 	output := ServiceRenameOutput{
-		Message:   "Service renamed successfully.",
+		Message:   fmt.Sprintf("Service '%s' renamed to '%s'.", service.ServiceID, service.Name),
 		ServiceID: service.ServiceID,
 		Name:      service.Name,
 	}

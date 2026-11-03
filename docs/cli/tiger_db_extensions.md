@@ -6,6 +6,10 @@ Manage PostgreSQL extensions
 
 Manage the PostgreSQL extensions installed in a database service.
 
+```
+tiger db extensions [flags]
+```
+
 ### Options
 
 ```

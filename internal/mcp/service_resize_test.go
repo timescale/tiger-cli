@@ -46,7 +46,7 @@ func TestServiceResizeTool(t *testing.T) {
 	accepted := map[string]any{
 		"status":    "CONFIGURING",
 		"resources": resources,
-		"message":   "Resize request accepted. The service may still be resizing.",
+		"message":   "Service resize request accepted. The service may still be resizing.",
 	}
 	resized := map[string]any{
 		"status":    "READY",
@@ -151,7 +151,7 @@ func TestServiceResizeTool(t *testing.T) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			// Not gated on experimental: only a fluid service gets these.
@@ -184,7 +184,7 @@ func TestServiceResizeTool(t *testing.T) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to resize service: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",
@@ -243,7 +243,7 @@ func TestServiceResizeTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"status":    "CONFIGURING",
 				"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
-				"message":   "Resize request accepted. The service may still be resizing.",
+				"message":   "Service resize request accepted. The service may still be resizing.",
 			},
 		},
 		{
@@ -273,7 +273,7 @@ func TestServiceResizeTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"status":    "READY",
 				"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB", "iops": float64(12000)},
-				"message":   "Resize request accepted. The service may still be resizing.",
+				"message":   "Service resize request accepted. The service may still be resizing.",
 			},
 		},
 		{

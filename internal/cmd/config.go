@@ -8,10 +8,13 @@ import (
 
 func buildConfigCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "config",
-		Aliases: []string{"cfg"},
-		Short:   "Manage CLI configuration",
-		Long:    `Manage CLI configuration settings stored in ~/.config/tiger/config.yaml`,
+		Use:          "config",
+		Aliases:      []string{"cfg"},
+		Short:        "Manage CLI configuration",
+		Long:         `Manage CLI configuration settings stored in ~/.config/tiger/config.yaml`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	cmd.AddCommand(buildConfigListCmd(app))

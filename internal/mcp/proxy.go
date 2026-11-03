@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -137,7 +138,7 @@ func NewProxyClient(ctx context.Context, url string, logger *slog.Logger) (*Prox
 // RegisterTools discovers tools from remote server and registers them as proxy tools
 func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) error {
 	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
+		return errors.New("not connected to remote server")
 	}
 
 	// List tools from remote server
@@ -170,7 +171,7 @@ func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) err
 func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if p.session == nil {
-			return nil, fmt.Errorf("not connected to remote MCP server")
+			return nil, errors.New("not connected to remote MCP server")
 		}
 
 		// Forward the request to remote server with original tool name
@@ -194,7 +195,7 @@ func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 // as proxy resources
 func (p *ProxyClient) RegisterResources(ctx context.Context, server *mcp.Server) error {
 	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
+		return errors.New("not connected to remote server")
 	}
 
 	// List resources from remote server
@@ -226,7 +227,7 @@ func (p *ProxyClient) RegisterResources(ctx context.Context, server *mcp.Server)
 // RegisterResourceTemplates discovers resource templates from remote server and registers them as proxy resource templates
 func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp.Server) error {
 	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
+		return errors.New("not connected to remote server")
 	}
 
 	// List resource templates from remote server
@@ -259,7 +260,7 @@ func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp
 func (p *ProxyClient) createProxyResourceHandler() mcp.ResourceHandler {
 	return func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 		if p.session == nil {
-			return nil, fmt.Errorf("not connected to remote MCP server")
+			return nil, errors.New("not connected to remote MCP server")
 		}
 
 		// Call remote resource
@@ -275,7 +276,7 @@ func (p *ProxyClient) createProxyResourceHandler() mcp.ResourceHandler {
 // RegisterPrompts discovers prompts from remote server and registers them as proxy prompts
 func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) error {
 	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
+		return errors.New("not connected to remote server")
 	}
 
 	// List prompts from remote server
@@ -308,7 +309,7 @@ func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) e
 func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
 	return func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		if p.session == nil {
-			return nil, fmt.Errorf("not connected to remote MCP server")
+			return nil, errors.New("not connected to remote MCP server")
 		}
 
 		// Call remote prompt

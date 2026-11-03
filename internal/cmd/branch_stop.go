@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -35,6 +33,10 @@ The branch can be given by ID or name.`,
 		ValidArgsFunction: branchRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateWaitTimeout(waitTimeout); err != nil {
+				return err
+			}
+
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
@@ -50,22 +52,15 @@ The branch can be given by ID or name.`,
 				return err
 			}
 
-			resp, err := client.StopBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID)
+			branch, err := common.JSON202(client.StopBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID))
 			if err != nil {
-				return fmt.Errorf("failed to stop branch: %w", err)
+				return err
 			}
-			if resp.StatusCode() != http.StatusAccepted {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-			if resp.JSON202 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-			branch := *resp.JSON202
 
 			cmd.PrintErrf("Stop request accepted for branch %s.\n", branchLabel(*resolved))
 
 			if noWait {
-				cmd.PrintErrln("Use 'tiger branch get' to check branch status.")
+				cmd.PrintErrf("Use 'tiger branch get %s' to check branch status.\n", resolved.ID)
 				return nil
 			}
 
@@ -94,7 +89,7 @@ The branch can be given by ID or name.`,
 	}
 
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s)")
 
 	return cmd
 }

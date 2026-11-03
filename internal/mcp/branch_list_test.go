@@ -52,7 +52,7 @@ func TestBranchListTool(t *testing.T) {
 				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to list branches: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

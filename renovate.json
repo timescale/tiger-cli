@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "customManagers:dockerfileVersions"],
+  "extends": ["config:recommended"],
   "timezone": "America/New_York",
   "schedule": ["before 10am on monday"],
   "minimumReleaseAge": "3 days",

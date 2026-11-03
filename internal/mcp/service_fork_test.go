@@ -67,7 +67,7 @@ func TestServiceForkTool(t *testing.T) {
 
 	const (
 		acceptedMsg = "Service fork request accepted. The forked service may still be provisioning."
-		readyMsg    = "Forked service is ready."
+		readyMsg    = "Service is ready."
 	)
 	accepted := map[string]any{"service": baseDetail, "message": acceptedMsg}
 	ready := map[string]any{"service": baseDetail, "message": readyMsg}
@@ -173,7 +173,7 @@ func TestServiceForkTool(t *testing.T) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			// Not gated on experimental: only a fluid source gets these.
@@ -195,7 +195,7 @@ func TestServiceForkTool(t *testing.T) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fork service: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

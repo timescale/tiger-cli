@@ -95,7 +95,7 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 				m.EXPECT().CreateBackupRegionWithResponse(validCtx, testProjectID, "svc-12345", api.BackupRegionCreate{RegionCode: "eu-central-1"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to add backup region: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",
@@ -184,14 +184,19 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 		},
 		{
 			// The flag rejects env at parse time, but a hand-edited config file
-			// can still reach the RunE's env branch.
-			name:    "env output from config file",
-			args:    []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1"},
-			opts:    []runOption{experimental, withConfig(map[string]any{"output": "env"})},
-			mock:    setupAdd(),
-			wantErr: "environment variable output is not supported for backup regions",
-			wantStderr: "Backups for service 'test-service' (svc-12345) will now be copied to 'eu-central-1'.\n" +
-				"Error: environment variable output is not supported for backup regions\n",
+			// can still set it, and an unsupported format falls through to the
+			// table.
+			name:       "env output from config file",
+			args:       []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1"},
+			opts:       []runOption{experimental, withConfig(map[string]any{"output": "env"})},
+			mock:       setupAdd(),
+			wantStderr: "Backups for service 'test-service' (svc-12345) will now be copied to 'eu-central-1'.\n",
+			wantStdout: `┌──────────────┬──────────────────────┐
+│    REGION    │        ADDED         │
+├──────────────┼──────────────────────┤
+│ eu-central-1 │ 2026-01-15 09:30 UTC │
+└──────────────┴──────────────────────┘
+`,
 		},
 	})
 }

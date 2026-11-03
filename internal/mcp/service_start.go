@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -75,26 +73,11 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 		return nil, ServiceStartOutput{}, err
 	}
 
-	s.logger.Info("MCP: Starting service",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
-
 	// Make API call to start service
-	resp, err := client.StartServiceWithResponse(ctx, projectID, input.ServiceID)
+	service, err := common.JSON202(client.StartServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
-		return nil, ServiceStartOutput{}, fmt.Errorf("failed to start service: %w", err)
+		return nil, ServiceStartOutput{}, err
 	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceStartOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON202 == nil {
-		return nil, ServiceStartOutput{}, fmt.Errorf("empty response from API")
-	}
-
-	service := *resp.JSON202
 
 	// If wait is explicitly requested, wait for service to be ready
 	message := "Service start request accepted. The service may still be starting."

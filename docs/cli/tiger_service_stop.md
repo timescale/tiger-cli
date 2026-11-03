@@ -33,7 +33,7 @@ tiger service stop [name-or-id] [flags]
 ```
   -h, --help                    help for stop
       --no-wait                 Don't wait for the operation to complete
-      --wait-timeout duration   Maximum time to wait for operation to complete (default 10m0s)
+      --wait-timeout duration   Maximum time to wait for the operation to complete (e.g., 30m, 1h30m, 90s) (default 10m0s)
 ```
 
 ### Options inherited from parent commands

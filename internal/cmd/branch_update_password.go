@@ -39,11 +39,6 @@ The branch can be given by ID or name.`,
 		ValidArgsFunction: branchRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, client, projectID, err := app.GetAll()
-			if err != nil {
-				return err
-			}
-
 			// The password comes from the flag, falling back to the env var
 			password := newPassword
 			if password == "" {
@@ -51,6 +46,11 @@ The branch can be given by ID or name.`,
 			}
 			if autoGenerate && password != "" {
 				return errors.New("cannot use --auto-generate and --new-password together")
+			}
+
+			cfg, client, projectID, err := app.GetAll()
+			if err != nil {
+				return err
 			}
 
 			branchRef, err := getBranchRef(args)
@@ -75,7 +75,7 @@ The branch can be given by ID or name.`,
 				}
 			} else {
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return errors.New("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
+					return errors.New("TTY not detected - cannot prompt for a new password. Use --new-password, --auto-generate, or TIGER_NEW_PASSWORD")
 				}
 				if _, err := promptAndResetPassword(ctx, cmd, cfg, client, credentials, "tsdbadmin"); err != nil {
 					return err

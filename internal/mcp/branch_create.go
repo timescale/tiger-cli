@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -110,25 +109,10 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 	}
 	createReq.Iops = input.IOPS
 
-	s.logger.Info("MCP: Creating branch",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID),
-		slog.String("name", input.Name),
-		slog.String("cpu_memory", input.CPUMemory),
-		slog.Any("iops", input.IOPS),
-	)
-
-	resp, err := client.CreateBranchWithResponse(ctx, projectID, input.ServiceID, createReq)
+	branch, err := common.JSON202(client.CreateBranchWithResponse(ctx, projectID, input.ServiceID, createReq))
 	if err != nil {
-		return nil, BranchCreateOutput{}, fmt.Errorf("failed to create branch: %w", err)
+		return nil, BranchCreateOutput{}, err
 	}
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, BranchCreateOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON202 == nil {
-		return nil, BranchCreateOutput{}, fmt.Errorf("empty response from API")
-	}
-	branch := *resp.JSON202
 
 	// Saved before any waiting, so the password is stored even if the wait
 	// fails or is interrupted.

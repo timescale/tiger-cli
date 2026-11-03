@@ -8,9 +8,12 @@ import (
 
 func buildAuthCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "auth",
-		Short: "Manage authentication and credentials",
-		Long:  `Manage authentication and credentials for Tiger Cloud platform.`,
+		Use:          "auth",
+		Short:        "Manage authentication and credentials",
+		Long:         `Manage authentication and credentials for Tiger Cloud platform.`,
+		Args:         groupArgs,
+		SilenceUsage: true,
+		Run:          groupRun,
 	}
 
 	cmd.AddCommand(buildLoginCmd(app))

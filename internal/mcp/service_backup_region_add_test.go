@@ -106,7 +106,7 @@ func TestServiceBackupRegionAddTool(t *testing.T) {
 				m.EXPECT().CreateBackupRegionWithResponse(validCtx, testProjectID, "e6ue9697jf", api.BackupRegionCreate{RegionCode: "eu-central-1"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to add backup region: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

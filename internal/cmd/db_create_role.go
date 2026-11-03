@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -86,7 +88,16 @@ PostgreSQL Configuration Parameters That May Be Set:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments
 			if name == "" {
-				return fmt.Errorf("--name is required")
+				return errors.New("--name is required")
+			}
+			if slices.Contains(from, "tsdbadmin") {
+				if !readOnly {
+					return errors.New("roles inheriting from tsdbadmin must be read-only (use --read-only flag)")
+				}
+				// Roles created by create_bare_readonly_role can't be altered.
+				if statementTimeout > 0 {
+					return errors.New("cannot use --statement-timeout with --from tsdbadmin (permission denied to alter special roles)")
+				}
 			}
 
 			cfg, client, projectID, err := app.GetAll()
@@ -169,7 +180,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 	cmd.Flags().StringSliceVar(&from, "from", []string{}, "Roles to inherit grants from (e.g., --from app_role --from readonly_role or --from app_role,readonly_role)")
 	cmd.Flags().DurationVar(&statementTimeout, "statement-timeout", 0, "Set statement timeout for the role (e.g., 30s, 5m)")
 	cmd.Flags().StringVar(&password, "password", "", "Password for the role. If not provided, checks TIGER_NEW_PASSWORD environment variable, otherwise auto-generates a secure random password.")
-	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	markFlagRequired(cmd, "name")
@@ -230,17 +241,6 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 
 	// If tsdbadmin is requested, use special TimescaleDB Cloud functions
 	if hasTsdbadmin {
-		// Enforce read-only requirement when inheriting from tsdbadmin
-		if !readOnly {
-			return fmt.Errorf("roles inheriting from tsdbadmin must be read-only (use --read-only flag)")
-		}
-
-		// Cannot set statement_timeout on roles created with create_bare_readonly_role
-		// due to permission restrictions on altering special roles
-		if statementTimeout > 0 {
-			return fmt.Errorf("cannot use --statement-timeout with --from tsdbadmin (permission denied to alter special roles)")
-		}
-
 		// Use timescale_functions.create_bare_readonly_role to create the role
 		// This function creates a read-only role that can inherit tsdbadmin privileges
 		if _, err := tx.Exec(ctx, "SELECT timescale_functions.create_bare_readonly_role($1, $2)",
@@ -268,7 +268,7 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 		// Use standard CREATE ROLE for non-tsdbadmin cases
 		// Fail if password contains a single quote (we don't support escaping)
 		if strings.Contains(rolePassword, "'") {
-			return fmt.Errorf("password cannot contain single quotes")
+			return errors.New("password cannot contain single quotes")
 		}
 		// Wrap password in single quotes for SQL literal
 		quotedPassword := "'" + rolePassword + "'"

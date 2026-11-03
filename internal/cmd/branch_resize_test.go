@@ -25,9 +25,33 @@ func TestBranchResizeCmd(t *testing.T) {
 	req2000 := api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}
 	noWaitStderr := "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
 		"Resize request accepted for branch 'test-branch' (br-12345).\n" +
-		"Use 'tiger branch get' to check branch status.\n"
+		"Use 'tiger branch get br-12345' to check branch status.\n"
 
 	runCmdTests(t, []cmdTest{
+		{
+			name:    "missing cpu and memory",
+			args:    []string{"branch", "resize", "br-12345"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "must specify at least one of --cpu, --memory, or --iops",
+		},
+		{
+			name:    "invalid cpu/memory combination",
+			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000", "--memory", "8"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
+		},
+		{
+			name:    "zero wait timeout",
+			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000", "--wait-timeout", "0s"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
+			name:    "negative wait timeout",
+			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000", "--wait-timeout=-30m"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got -30m0s",
+		},
 		{
 			name:    "not logged in",
 			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000"},
@@ -41,18 +65,6 @@ func TestBranchResizeCmd(t *testing.T) {
 			args:    []string{"branch", "resize", "--cpu", "2000"},
 			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
 			wantErr: "branch name or ID is required",
-		},
-		{
-			name:    "missing cpu and memory",
-			args:    []string{"branch", "resize", "br-12345"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "must specify at least one of --cpu, --memory, or --iops",
-		},
-		{
-			name:    "invalid cpu/memory combination",
-			args:    []string{"branch", "resize", "br-12345", "--cpu", "2000", "--memory", "8"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name:    "read-only all refuses",
@@ -76,9 +88,9 @@ func TestBranchResizeCmd(t *testing.T) {
 				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", req2000).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to resize branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
-				"Error: failed to resize branch: connection refused\n",
+				"Error: failed to call API: connection refused\n",
 		},
 		{
 			name: "nil response body",
@@ -101,7 +113,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			mock: setupResize(api.BranchResizeInput{Iops: new(16000)}, api.DeployStatusCONFIGURING),
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 16000 IOPS...\n" +
 				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
-				"Use 'tiger branch get' to check branch status.\n",
+				"Use 'tiger branch get br-12345' to check branch status.\n",
 		},
 		{
 			name: "cpu and iops",
@@ -110,7 +122,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			mock: setupResize(api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16"), Iops: new(16000)}, api.DeployStatusCONFIGURING),
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB, 16000 IOPS...\n" +
 				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
-				"Use 'tiger branch get' to check branch status.\n",
+				"Use 'tiger branch get br-12345' to check branch status.\n",
 		},
 		{
 			name:       "no-wait with cpu only",

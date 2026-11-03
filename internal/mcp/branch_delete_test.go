@@ -19,7 +19,7 @@ func TestBranchDeleteTool(t *testing.T) {
 	}
 	deleted := map[string]any{
 		"branch_id": "br4nch1d9x",
-		"message":   `Branch "br4nch1d9x" has been deleted.`,
+		"message":   `Branch 'br4nch1d9x' has been deleted.`,
 	}
 
 	runToolTests(t, []toolTest{
@@ -63,7 +63,7 @@ func TestBranchDeleteTool(t *testing.T) {
 				m.EXPECT().DeleteBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to delete branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

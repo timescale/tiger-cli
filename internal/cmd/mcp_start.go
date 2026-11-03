@@ -28,7 +28,9 @@ through Claude and other AI assistants. By default, it uses stdio transport.`,
 
   # Start with HTTP transport
   tiger mcp start http`,
-		Args:         cobra.NoArgs,
+		// Runnable and a parent, so an unknown subcommand gets the same
+		// error and suggestions as under a group command.
+		Args:         groupArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio

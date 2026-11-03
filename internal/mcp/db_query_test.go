@@ -254,7 +254,7 @@ func TestDBQueryTool(t *testing.T) {
 						JSON4XX:      &api.ClientError{Message: new("service not found")},
 					}, nil)
 			},
-			wantErr: `failed to fetch parent service "e6ue9697jf" for read replica: service not found`,
+			wantErr: `failed to fetch parent service 'e6ue9697jf' for read replica: service not found`,
 		},
 		{
 			name:    "service paused",
@@ -447,7 +447,7 @@ func TestDBQueryTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"result_sets":    wantResultSets,
 				"execution_time": "12ms",
-				"warning":        `read replica "replica-service" has no connection pooler; connecting directly instead`,
+				"warning":        `read replica 'replica-service' has no connection pooler; connecting directly instead`,
 			},
 		},
 		{

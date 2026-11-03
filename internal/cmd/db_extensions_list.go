@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"io"
+	"strings"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -58,7 +59,7 @@ immutable read-only mode.` + branchRefHelp(app.Experimental, "You can also pass 
 
 			// A bare list, where the db_extensions_list MCP tool wraps it in an
 			// object because structured tool output must be one.
-			switch cfg.Output {
+			switch strings.ToLower(cfg.Output) {
 			case "json":
 				return util.SerializeToJSON(cmd.OutOrStdout(), extensions)
 			case "yaml":
@@ -70,7 +71,7 @@ immutable read-only mode.` + branchRefHelp(app.Experimental, "You can also pass 
 	}
 
 	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
-	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (table, json, yaml)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -535,7 +536,7 @@ func TestNoStorage_GetStorageResult(t *testing.T) {
 	}
 
 	// Test with error (should still return same message)
-	result = storage.GetStorageResult(fmt.Errorf("some error"), testPassword)
+	result = storage.GetStorageResult(errors.New("some error"), testPassword)
 	if result.Method != "none" {
 		t.Errorf("NoStorage.GetStorageResult() with error should still have method 'none', got: %s", result.Method)
 	}
@@ -571,7 +572,7 @@ func TestKeyringStorage_GetStorageResult_Error(t *testing.T) {
 	testPassword := "test-password"
 
 	// Test error case
-	testErr := fmt.Errorf("keyring service not available")
+	testErr := errors.New("keyring service not available")
 	result := storage.GetStorageResult(testErr, testPassword)
 	if result.Success {
 		t.Errorf("KeyringStorage.GetStorageResult() error should have success=false, got: %t", result.Success)
@@ -615,7 +616,7 @@ func TestPgpassStorage_GetStorageResult_Error(t *testing.T) {
 	testPassword := "test-password"
 
 	// Test error case
-	testErr := fmt.Errorf("permission denied")
+	testErr := errors.New("permission denied")
 	result := storage.GetStorageResult(testErr, testPassword)
 	if result.Success {
 		t.Errorf("PgpassStorage.GetStorageResult() error should have success=false, got: %t", result.Success)
@@ -919,25 +920,25 @@ func TestSanitizeErrorMessage(t *testing.T) {
 		},
 		{
 			name:     "error without password",
-			err:      fmt.Errorf("connection failed"),
+			err:      errors.New("connection failed"),
 			password: "secret",
 			expected: "connection failed",
 		},
 		{
 			name:     "error containing password",
-			err:      fmt.Errorf("failed to save secret to keyring"),
+			err:      errors.New("failed to save secret to keyring"),
 			password: "secret",
 			expected: "failed to save *** to keyring",
 		},
 		{
 			name:     "error with multiple password occurrences",
-			err:      fmt.Errorf("secret failed: secret not found"),
+			err:      errors.New("secret failed: secret not found"),
 			password: "secret",
 			expected: "*** failed: *** not found",
 		},
 		{
 			name:     "empty password",
-			err:      fmt.Errorf("failed to save secret"),
+			err:      errors.New("failed to save secret"),
 			password: "",
 			expected: "failed to save secret",
 		},

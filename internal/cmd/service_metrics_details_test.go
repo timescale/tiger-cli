@@ -117,7 +117,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to get metric details: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",

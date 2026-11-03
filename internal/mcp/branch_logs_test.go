@@ -105,7 +105,7 @@ func TestBranchLogsTool(t *testing.T) {
 				m.EXPECT().GetBranchLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", defaultParams).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch logs: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name:     "API error",
@@ -134,7 +134,7 @@ func TestBranchLogsTool(t *testing.T) {
 				m.EXPECT().GetBranchLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", defaultParams).
 					Return(logsResponse(nil), nil)
 			},
-			wantErr: "unexpected empty response",
+			wantErr: "empty response from API",
 		},
 		{
 			name:       "no log entries",

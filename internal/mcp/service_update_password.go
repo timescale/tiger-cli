@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -105,17 +104,17 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	// The service's tag decides both the prod half of the read-only gate and
 	// whether the user has to confirm, and the service is reused for password
 	// storage below.
-	service, err := common.GetService(ctx, client, projectID, input.ServiceID)
+	service, err := common.JSON200(client.GetServiceWithResponse(ctx, projectID, input.ServiceID))
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
-	tag := common.ServiceEnvironmentTag(*service)
+	tag := common.ServiceEnvironmentTag(service)
 	if err := common.CheckReadOnly(cfg, tag); err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
-	if common.IsReadReplica(*service) {
+	if common.IsReadReplica(service) {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("'%s' is a read replica; update the password on its primary service '%s' instead",
 			input.ServiceID, util.DerefStr(service.ForkedFrom.ServiceID))
 	}
@@ -123,13 +122,13 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	if tag == api.EnvironmentTagPROD {
 		answer, answered := req.Params.InputResponses[updatePasswordConfirmationKey]
 		if !answered {
-			result, err := promptProdUpdatePassword(req, *service)
+			result, err := promptProdUpdatePassword(req, service)
 			return result, ServiceUpdatePasswordOutput{}, err
 		}
 		if !serviceIDConfirmed(answer, input.ServiceID) {
 			return nil, ServiceUpdatePasswordOutput{
 				Updated: false,
-				Message: fmt.Sprintf("Password update cancelled: the user did not confirm updating the password of PROD service %q by typing its ID.", input.ServiceID),
+				Message: fmt.Sprintf("Password update cancelled: the user did not confirm updating the password of PROD service '%s' by typing its ID.", input.ServiceID),
 			}, nil
 		}
 	}
@@ -139,23 +138,13 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
-	s.logger.Info("MCP: Updating service password",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
-
-	resp, err := client.UpdatePasswordWithResponse(ctx, projectID, input.ServiceID, api.UpdatePasswordInput{Password: password})
-	if err != nil {
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
-	}
-	if resp.StatusCode() != http.StatusNoContent {
-		return nil, ServiceUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	if err := common.Status204(client.UpdatePasswordWithResponse(ctx, projectID, input.ServiceID, api.UpdatePasswordInput{Password: password})); err != nil {
+		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
-	storage, err := common.SavePasswordWithResult(cfg, common.ServicePasswordTarget(*service), password, "tsdbadmin")
+	storage, err := common.SavePasswordWithResult(cfg, common.ServicePasswordTarget(service), password, "tsdbadmin")
 	if err != nil {
 		s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
-	} else {
-		s.logger.Info("MCP: Password saved successfully", slog.String("method", storage.Method))
 	}
 
 	output := ServiceUpdatePasswordOutput{
@@ -178,7 +167,7 @@ func promptProdUpdatePassword(req *mcp.CallToolRequest, service api.Service) (*m
 	}
 	return serviceIDConfirmationRequest(
 		updatePasswordConfirmationKey,
-		fmt.Sprintf("Update the password of PRODUCTION service %q (%s)? The tsdbadmin password is replaced with a newly generated one: existing connections may be terminated, and applications using the old password will fail to authenticate.", service.Name, service.ServiceID),
+		fmt.Sprintf("Update the password of PRODUCTION service '%s' (%s)? The tsdbadmin password is replaced with a newly generated one: existing connections may be terminated, and applications using the old password will fail to authenticate.", service.Name, service.ServiceID),
 		service.ServiceID,
 	), nil
 }

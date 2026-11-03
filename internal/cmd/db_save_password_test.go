@@ -93,7 +93,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name:    "no password without a TTY",
 			args:    []string{"db", "save-password", "svc-12345"},
 			mock:    setupGetService,
-			wantErr: "TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable",
+			wantErr: "TTY not detected - cannot prompt for a password. Use --password or TIGER_NEW_PASSWORD",
 		},
 		{
 			name:       "empty password at prompt",

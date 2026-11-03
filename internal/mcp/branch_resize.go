@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
-	"net/http"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -110,26 +108,12 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 		resizeReq.MemoryGbs = cpuMemoryCfg.MemoryGBsString()
 	}
 
-	s.logger.Info("MCP: Resizing branch",
-		slog.String("project_id", projectID),
-		slog.String("branch_id", input.BranchID),
-		slog.String("cpu_memory", input.CPUMemory),
-		slog.Any("iops", input.IOPS),
-	)
-
-	resp, err := client.ResizeBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID, resizeReq)
+	branch, err := common.JSON202(client.ResizeBranchWithResponse(ctx, projectID, resolved.ServiceID, resolved.ID, resizeReq))
 	if err != nil {
-		return nil, BranchResizeOutput{}, fmt.Errorf("failed to resize branch: %w", err)
+		return nil, BranchResizeOutput{}, err
 	}
-	if resp.StatusCode() != http.StatusAccepted {
-		return nil, BranchResizeOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON202 == nil {
-		return nil, BranchResizeOutput{}, fmt.Errorf("empty response from API")
-	}
-	branch := *resp.JSON202
 
-	message := "Resize request accepted. The branch may still be resizing."
+	message := "Branch resize request accepted. The branch may still be resizing."
 	if input.Wait {
 		if err := common.WaitForBranch(ctx, common.WaitForBranchArgs{
 			Client:       client,

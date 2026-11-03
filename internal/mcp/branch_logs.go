@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -63,14 +62,6 @@ func (s *Server) handleBranchLogs(ctx context.Context, req *mcp.CallToolRequest,
 	if err != nil {
 		return nil, BranchLogsOutput{}, err
 	}
-
-	s.logger.Info("MCP: Fetching branch logs",
-		slog.String("project_id", projectID),
-		slog.String("branch_id", input.BranchID),
-		slog.Int("tail", input.Tail),
-		slog.Any("since", input.Since),
-		slog.Any("until", input.Until),
-	)
 
 	// The logs endpoint is nested under the branch's parent service.
 	branch, err := resolveBranchByID(ctx, client, projectID, input.BranchID)

@@ -168,7 +168,7 @@ func waitForStatus(ctx context.Context, args waitArgs) error {
 			switch code {
 			case http.StatusOK:
 				if current == nil {
-					return errors.New("no response body returned from API")
+					return errors.New("empty response from API")
 				}
 				*args.status = *current
 				if *args.status == args.targetStatus {

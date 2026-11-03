@@ -46,13 +46,13 @@ func BranchPasswordTarget(branch api.Branch) PasswordTarget {
 // buildPasswordKeyringUsername creates a unique keyring username for a password
 func buildPasswordKeyringUsername(target PasswordTarget, role string) (string, error) {
 	if target.ID == "" {
-		return "", fmt.Errorf("service ID is required")
+		return "", errors.New("service ID is required")
 	}
 	if target.ProjectID == "" {
-		return "", fmt.Errorf("project ID is required")
+		return "", errors.New("project ID is required")
 	}
 	if role == "" {
-		return "", fmt.Errorf("role is required")
+		return "", errors.New("role is required")
 	}
 
 	return fmt.Sprintf("password-%s-%s-%s", target.ProjectID, target.ID, role), nil
@@ -140,7 +140,7 @@ func (p *PgpassStorage) Save(target PasswordTarget, password string, role string
 		return errors.New("endpoint not available")
 	}
 	if role == "" {
-		return fmt.Errorf("role is required")
+		return errors.New("role is required")
 	}
 
 	homeDir, err := os.UserHomeDir()
@@ -181,7 +181,7 @@ func (p *PgpassStorage) Get(target PasswordTarget, role string) (string, error) 
 		return "", errors.New("endpoint not available")
 	}
 	if role == "" {
-		return "", fmt.Errorf("role is required")
+		return "", errors.New("role is required")
 	}
 
 	homeDir, err := os.UserHomeDir()
@@ -193,7 +193,7 @@ func (p *PgpassStorage) Get(target PasswordTarget, role string) (string, error) 
 
 	// Check if .pgpass file exists
 	if _, err := os.Stat(pgpassPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("no .pgpass file found")
+		return "", errors.New("no .pgpass file found")
 	}
 
 	host := *target.Endpoint.Host
@@ -224,7 +224,7 @@ func (p *PgpassStorage) Get(target PasswordTarget, role string) (string, error) 
 		}
 	}
 
-	return "", fmt.Errorf("no matching entry found in .pgpass file")
+	return "", errors.New("no matching entry found in .pgpass file")
 }
 
 func (p *PgpassStorage) Remove(target PasswordTarget, role string) error {
@@ -232,7 +232,7 @@ func (p *PgpassStorage) Remove(target PasswordTarget, role string) error {
 		return errors.New("endpoint not available")
 	}
 	if role == "" {
-		return fmt.Errorf("role is required")
+		return errors.New("role is required")
 	}
 
 	homeDir, err := os.UserHomeDir()
@@ -330,7 +330,7 @@ func (n *NoStorage) Save(target PasswordTarget, password string, role string) er
 }
 
 func (n *NoStorage) Get(target PasswordTarget, role string) (string, error) {
-	return "", fmt.Errorf("password storage disabled")
+	return "", errors.New("password storage disabled")
 }
 
 func (n *NoStorage) Remove(target PasswordTarget, role string) error {
@@ -373,7 +373,7 @@ func SavePasswordWithResult(cfg *config.Config, target PasswordTarget, password 
 			Success: false,
 			Method:  "none",
 			Message: "Role is required",
-		}, fmt.Errorf("role is required")
+		}, errors.New("role is required")
 	}
 
 	storage := GetPasswordStorage(cfg)

@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"net/http"
 	"slices"
 	"strconv"
 	"strings"
@@ -97,22 +95,7 @@ func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {
 		return nil, err
 	}
 
-	// Make API call to list services
-	resp, err := client.GetServicesWithResponse(cmd.Context(), projectID, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list services: %w", err)
-	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusOK {
-		return nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil || len(*resp.JSON200) == 0 {
-		return []api.Service{}, nil
-	}
-
-	return *resp.JSON200, nil
+	return common.JSON200(client.GetServicesWithResponse(cmd.Context(), projectID, nil))
 }
 
 // branchRefCompletion completes the branch argument of the branch commands.
@@ -129,12 +112,11 @@ func branchRefCompletion(app *common.App) cobra.CompletionFunc {
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		resp, err := client.GetProjectBranchesWithResponse(cmd.Context(), projectID)
-		if err != nil || resp.StatusCode() != http.StatusOK || resp.JSON200 == nil {
+		branches, err := common.JSON200(client.GetProjectBranchesWithResponse(cmd.Context(), projectID))
+		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		branches := *resp.JSON200
 		results := make([]string, 0, len(branches))
 		for _, branch := range branches {
 			if strings.HasPrefix(branch.Name, toComplete) {
@@ -175,20 +157,7 @@ func listProjects(cmd *cobra.Command, app *common.App) ([]api.Project, error) {
 		return nil, err
 	}
 
-	resp, err := client.GetProjectsWithResponse(cmd.Context())
-	if err != nil {
-		return nil, fmt.Errorf("failed to list projects: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return []api.Project{}, nil
-	}
-
-	return *resp.JSON200, nil
+	return common.JSON200(client.GetProjectsWithResponse(cmd.Context()))
 }
 
 // configKeyCompletion completes the <key> argument of `tiger config unset`,
@@ -253,12 +222,12 @@ func metricNameCompletion(app *common.App) cobra.CompletionFunc {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(cmd.Context(), projectID, service.ServiceID)
-		if err != nil || resp.StatusCode() != http.StatusOK || resp.JSON200 == nil {
+		series, err := common.JSON200(client.GetServiceMetricsAvailableSeriesWithResponse(cmd.Context(), projectID, service.ServiceID))
+		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		return filterCompletionsByPrefix(*resp.JSON200, toComplete), cobra.ShellCompDirectiveNoFileComp
+		return filterCompletionsByPrefix(series, toComplete), cobra.ShellCompDirectiveNoFileComp
 	})
 }
 

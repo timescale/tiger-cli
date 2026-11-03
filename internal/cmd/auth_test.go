@@ -75,3 +75,25 @@ func checkNoStoredCredentials(t *testing.T, result cmdResult) {
 		t.Errorf("expected no stored credentials, got: %+v", creds)
 	}
 }
+
+// TestAuthCmd covers the group command itself (see groupRun and groupArgs).
+func TestAuthCmd(t *testing.T) {
+	runCmdTests(t, []cmdTest{
+		{
+			name:       "no subcommand prints help without loading",
+			args:       []string{"auth"},
+			wantStdout: matchHelp("Manage authentication and credentials for Tiger Cloud platform."),
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:    "unknown subcommand suggests close matches",
+			args:    []string{"auth", "logn"},
+			wantErr: "unknown command \"logn\" for \"tiger auth\"\n\nDid you mean this?\n\tlogin",
+		},
+		{
+			name:    "unknown subcommand with no close match",
+			args:    []string{"auth", "frobnicate"},
+			wantErr: `unknown command "frobnicate" for "tiger auth"`,
+		},
+	})
+}

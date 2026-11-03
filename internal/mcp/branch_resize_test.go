@@ -36,7 +36,7 @@ func TestBranchResizeTool(t *testing.T) {
 	accepted := map[string]any{
 		"status":    "CONFIGURING",
 		"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
-		"message":   "Resize request accepted. The branch may still be resizing.",
+		"message":   "Branch resize request accepted. The branch may still be resizing.",
 	}
 
 	runToolTests(t, []toolTest{
@@ -78,7 +78,7 @@ func TestBranchResizeTool(t *testing.T) {
 				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", req).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to resize branch: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "nil response body",
@@ -104,7 +104,7 @@ func TestBranchResizeTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"status":    "CONFIGURING",
 				"resources": map[string]any{"cpu": "0.25 cores", "memory": "2 GB", "iops": float64(16000)},
-				"message":   "Resize request accepted. The branch may still be resizing.",
+				"message":   "Branch resize request accepted. The branch may still be resizing.",
 			},
 		},
 		{

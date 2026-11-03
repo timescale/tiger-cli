@@ -111,7 +111,7 @@ func TestServiceBackupListTool(t *testing.T) {
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to list backups: connection refused",
+			wantErr: "failed to call API: connection refused",
 		},
 		{
 			name: "API error",
@@ -141,13 +141,12 @@ func TestServiceBackupListTool(t *testing.T) {
 			wantErr: "unknown error",
 		},
 		{
-			// A 200 with no parsed body is reported as no backups, not an error.
-			name:       "nil response body",
-			tool:       toolServiceBackupList,
-			args:       args,
-			opts:       []runOption{experimental},
-			mock:       expectBackups(nil),
-			wantOutput: noBackups,
+			name:    "nil response body",
+			tool:    toolServiceBackupList,
+			args:    args,
+			opts:    []runOption{experimental},
+			mock:    expectBackups(nil),
+			wantErr: "empty response from API",
 		},
 		{
 			// A JSON `null` array is normalized to an empty one, so the output
