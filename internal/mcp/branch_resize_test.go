@@ -36,7 +36,7 @@ func TestBranchResizeTool(t *testing.T) {
 	accepted := map[string]any{
 		"status":    "CONFIGURING",
 		"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
-		"message":   "Resize request accepted. The branch may still be resizing.",
+		"message":   "Resize request accepted. The resize is in progress and may take several minutes to complete.",
 	}
 
 	runToolTests(t, []toolTest{
@@ -104,32 +104,16 @@ func TestBranchResizeTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"status":    "CONFIGURING",
 				"resources": map[string]any{"cpu": "0.25 cores", "memory": "2 GB", "iops": float64(16000)},
-				"message":   "Resize request accepted. The branch may still be resizing.",
+				"message":   "Resize request accepted. The resize is in progress and may take several minutes to complete.",
 			},
 		},
 		{
-			name:       "resizes without waiting by default",
+			name:       "returns once the resize is accepted",
 			tool:       toolBranchResize,
 			args:       args,
 			opts:       []runOption{experimental},
 			mock:       expectResize(api.DeployStatusCONFIGURING),
 			wantOutput: accepted,
-		},
-		{
-			name:     "wait polls until ready",
-			synctest: true,
-			tool:     toolBranchResize,
-			args:     map[string]any{"branch_id": "br4nch1d9x", "cpu_memory": "2 CPU/16 GB", "wait": true},
-			opts:     []runOption{experimental},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResize(api.DeployStatusCONFIGURING)(m)
-				expectGetBranch(m, resized(api.DeployStatusREADY))
-			},
-			wantOutput: map[string]any{
-				"status":    "READY",
-				"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
-				"message":   "Branch resized.",
-			},
 		},
 	})
 }

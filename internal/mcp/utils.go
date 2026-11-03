@@ -26,6 +26,11 @@ const (
 // Wait timeout for MCP tool operations
 const waitTimeout = 10 * time.Minute
 
+// resizeInProgressMessage is the message of an accepted resize. The resize
+// tools don't wait for it to finish, because the API doesn't reliably report
+// when it has: the status can read READY before the resize has even started.
+const resizeInProgressMessage = "Resize request accepted. The resize is in progress and may take several minutes to complete."
+
 // validServiceTypes returns a slice of all valid service type values
 func validServiceTypes() []string {
 	return []string{
