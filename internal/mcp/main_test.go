@@ -304,7 +304,9 @@ var errMockFailed = errors.New("mock controller reported a failure; see the test
 // so that would leave the client's CallTool waiting until the test timeout.
 // This Fatalf records the failure and panics with errMockFailed instead, which
 // recoverMockFailure turns into an error so the call returns right away.
-type mockReporter struct{ *testing.T }
+type mockReporter struct {
+	*testing.T
+}
 
 func (r mockReporter) Fatalf(format string, args ...any) {
 	r.Helper()
