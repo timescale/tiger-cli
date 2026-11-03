@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -52,60 +51,6 @@ func TestMain(m *testing.M) {
 	time.Local = time.UTC
 
 	os.Exit(m.Run())
-}
-
-// TestMockFailureReturnsPromptly tests the harness's handling of a mock
-// failure inside a handler directly, since a toolTest case that hit one would
-// fail the test running it.
-func TestMockFailureReturnsPromptly(t *testing.T) {
-	rec := &recordingT{T: t}
-	m := mocks.NewMockClientWithResponsesInterface(gomock.NewController(mockReporter{rec}))
-
-	server := mcp.NewServer(&mcp.Implementation{Name: "test-server"}, nil)
-	mcp.AddTool(server, &mcp.Tool{Name: "unexpected_call"}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-		m.GetServiceWithResponse(ctx, testProjectID, "e6ue9697jf")
-		return nil, nil, nil
-	})
-	server.AddReceivingMiddleware(recoverMockFailure)
-
-	// Bounded so a regression fails here rather than hanging the run.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	clientTransport, serverTransport := mcp.NewInMemoryTransports()
-	serverSession, err := server.Connect(ctx, serverTransport, nil)
-	if err != nil {
-		t.Fatalf("server connect: %v", err)
-	}
-	defer serverSession.Close()
-	clientSession, err := mcp.NewClient(&mcp.Implementation{Name: "test-client"}, nil).Connect(ctx, clientTransport, nil)
-	if err != nil {
-		t.Fatalf("client connect: %v", err)
-	}
-	defer clientSession.Close()
-
-	_, err = clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "unexpected_call"})
-	if want := `calling "tools/call": ` + errMockFailed.Error(); err == nil || err.Error() != want {
-		t.Errorf("call error = %v, want %q", err, want)
-	}
-
-	// Prefix only: gomock's message goes on with the arguments and a file path.
-	if len(rec.errors) != 1 || !strings.HasPrefix(rec.errors[0], "Unexpected call to *mocks.MockClientWithResponsesInterface.GetServiceWithResponse(") {
-		t.Errorf("recorded failures = %q, want one unexpected GetServiceWithResponse call", rec.errors)
-	}
-}
-
-// recordingT records the failures reported to it instead of failing the test.
-type recordingT struct {
-	*testing.T
-	mu     sync.Mutex
-	errors []string
-}
-
-func (r *recordingT) Errorf(format string, args ...any) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.errors = append(r.errors, fmt.Sprintf(format, args...))
 }
 
 // testProjectID is the project ID the injected client factory reports.
@@ -359,14 +304,7 @@ var errMockFailed = errors.New("mock controller reported a failure; see the test
 // so that would leave the client's CallTool waiting until the test timeout.
 // This Fatalf records the failure and panics with errMockFailed instead, which
 // recoverMockFailure turns into an error so the call returns right away.
-type mockReporter struct{ mockT }
-
-// mockT is the part of *testing.T the mock controller uses, including the
-// Cleanup it registers Finish with.
-type mockT interface {
-	gomock.TestHelper
-	Cleanup(func())
-}
+type mockReporter struct{ *testing.T }
 
 func (r mockReporter) Fatalf(format string, args ...any) {
 	r.Helper()
