@@ -1313,19 +1313,16 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"service", "resize", serviceID,
 			"--cpu", targetCPUMillis,
 			"--memory", targetMemoryGB,
-			"--wait-timeout", "10m", // Longer timeout for resize operations
 		)
 		if err != nil {
 			t.Fatalf("Service resize failed: %v\nOutput: %s", err, output)
 		}
 
-		// Verify resize success message
-		if !strings.Contains(output, "Resize completed successfully") &&
-			!strings.Contains(output, "Service resized") {
-			t.Logf("Note: Expected resize success message, got: %s", output)
+		if !strings.Contains(output, "Resize request accepted") {
+			t.Errorf("Expected resize request accepted message, got: %s", output)
 		}
 
-		t.Logf("Service resize command completed successfully")
+		t.Logf("Service resize request accepted")
 	})
 
 	t.Run("VerifyServiceResized", func(t *testing.T) {

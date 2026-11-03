@@ -23,9 +23,9 @@ func TestBranchResizeCmd(t *testing.T) {
 		}
 	}
 	req2000 := api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}
-	noWaitStderr := "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
+	acceptedStderr := "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
 		"Resize request accepted for branch 'test-branch' (br-12345).\n" +
-		"Use 'tiger branch get' to check branch status.\n"
+		"The resize is in progress and may take several minutes to complete.\n"
 
 	runCmdTests(t, []cmdTest{
 		{
@@ -62,10 +62,10 @@ func TestBranchResizeCmd(t *testing.T) {
 		},
 		{
 			name:       "read-only prod allows",
-			args:       []string{"branch", "resize", "br-12345", "--cpu", "2000", "--no-wait"},
+			args:       []string{"branch", "resize", "br-12345", "--cpu", "2000"},
 			opts:       []runOption{withExperimental(), withConfig(map[string]any{"read_only": "prod"})},
 			mock:       setupResize(req2000, api.DeployStatusCONFIGURING),
-			wantStderr: noWaitStderr,
+			wantStderr: acceptedStderr,
 		},
 		{
 			name: "network error",
@@ -96,43 +96,39 @@ func TestBranchResizeCmd(t *testing.T) {
 		{
 			// CPU and memory are left out, so the API keeps the current ones.
 			name: "iops only omits cpu and memory",
-			args: []string{"branch", "resize", "br-12345", "--iops", "16000", "--no-wait"},
+			args: []string{"branch", "resize", "br-12345", "--iops", "16000"},
 			opts: []runOption{withExperimental()},
 			mock: setupResize(api.BranchResizeInput{Iops: new(16000)}, api.DeployStatusCONFIGURING),
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 16000 IOPS...\n" +
 				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
-				"Use 'tiger branch get' to check branch status.\n",
+				"The resize is in progress and may take several minutes to complete.\n",
 		},
 		{
 			name: "cpu and iops",
-			args: []string{"branch", "resize", "br-12345", "--cpu", "2000", "--iops", "16000", "--no-wait"},
+			args: []string{"branch", "resize", "br-12345", "--cpu", "2000", "--iops", "16000"},
 			opts: []runOption{withExperimental()},
 			mock: setupResize(api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16"), Iops: new(16000)}, api.DeployStatusCONFIGURING),
 			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB, 16000 IOPS...\n" +
 				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
-				"Use 'tiger branch get' to check branch status.\n",
+				"The resize is in progress and may take several minutes to complete.\n",
 		},
 		{
-			name:       "no-wait with cpu only",
-			args:       []string{"branch", "resize", "br-12345", "--cpu", "2000", "--no-wait"},
+			name:       "memory only auto-configures cpu",
+			args:       []string{"branch", "resize", "br-12345", "--memory", "16"},
 			opts:       []runOption{withExperimental()},
 			mock:       setupResize(req2000, api.DeployStatusCONFIGURING),
-			wantStderr: noWaitStderr,
+			wantStderr: acceptedStderr,
 		},
 		{
-			name:     "wait polls until ready",
-			synctest: true,
-			args:     []string{"branch", "resize", "br-12345", "--memory", "16"},
-			opts:     []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				setupResize(req2000, api.DeployStatusCONFIGURING)(m)
-				expectGetBranch(m, sampleBranch())
-			},
-			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
-				"Resize request accepted for branch 'test-branch' (br-12345).\n" +
-				"Waiting for resize to complete (timeout: 10m0s)...\n" +
-				"⢎  Branch status: CONFIGURING\n" +
-				"Branch resized to 2 CPU/16 GB.\n",
+			// The former wait flags are still accepted, so scripts that pass
+			// them don't break.
+			name: "deprecated wait flags accepted",
+			args: []string{"branch", "resize", "br-12345", "--cpu", "2000", "--no-wait", "--wait-timeout", "5m"},
+			opts: []runOption{withExperimental()},
+			mock: setupResize(req2000, api.DeployStatusCONFIGURING),
+			wantStderr: "Warning: --no-wait has no effect; resize no longer waits for completion\n" +
+				"Warning: --wait-timeout has no effect; resize no longer waits for completion\n" +
+				acceptedStderr,
 		},
 	})
 }
