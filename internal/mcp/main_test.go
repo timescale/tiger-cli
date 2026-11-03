@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -294,24 +293,29 @@ func runTool(
 	return result
 }
 
-// errMockFailed is what mockReporter panics with once it has recorded a mock
-// failure, and what a call that hit one returns.
-var errMockFailed = errors.New("mock controller reported a failure; see the test log")
-
 // mockReporter is the mock controller's reporter. gomock reports an
 // unexpected call with Fatalf, and *testing.T's Fatalf ends the calling
 // goroutine with runtime.Goexit. A tool handler runs on a server goroutine,
 // so that would leave the client's CallTool waiting until the test timeout.
-// This Fatalf records the failure and panics with errMockFailed instead, which
-// recoverMockFailure turns into an error so the call returns right away.
+// This Fatalf marks the test failed and panics with a mockFailure instead,
+// which recoverMockFailure returns as the call's error, so the call returns
+// right away and gomock's message shows up in the failure that ends the test.
 type mockReporter struct {
 	*testing.T
 }
 
 func (r mockReporter) Fatalf(format string, args ...any) {
-	r.Helper()
-	r.Errorf(format, args...)
-	panic(errMockFailed)
+	r.Fail()
+	panic(mockFailure{msg: fmt.Sprintf(format, args...)})
+}
+
+// mockFailure is what mockReporter panics with, carrying gomock's message.
+type mockFailure struct {
+	msg string
+}
+
+func (f mockFailure) Error() string {
+	return f.msg
 }
 
 // recoverMockFailure is a receiving middleware that turns a mockReporter
@@ -321,10 +325,11 @@ func recoverMockFailure(next mcp.MethodHandler) mcp.MethodHandler {
 	return func(ctx context.Context, method string, req mcp.Request) (res mcp.Result, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				if r != errMockFailed {
+				f, ok := r.(mockFailure)
+				if !ok {
 					panic(r)
 				}
-				err = errMockFailed
+				err = f
 			}
 		}()
 		return next(ctx, method, req)
@@ -332,13 +337,14 @@ func recoverMockFailure(next mcp.MethodHandler) mcp.MethodHandler {
 }
 
 // failOnMockPanic, deferred on the test goroutine, turns a mockReporter panic
-// (e.g. from a malformed Return while setting up expectations) into FailNow.
+// (e.g. from a malformed Return while setting up expectations) into Fatal.
 func failOnMockPanic(t *testing.T) {
 	if r := recover(); r != nil {
-		if r != errMockFailed {
+		f, ok := r.(mockFailure)
+		if !ok {
 			panic(r)
 		}
-		t.FailNow()
+		t.Fatal(f)
 	}
 }
 
