@@ -37,7 +37,7 @@ func (ServiceResizeInput) Schema(experimental bool) *jsonschema.Schema {
 	setCPUMemorySchemaProperties(schema, false, experimental, cpuMemoryDescription,
 		"The valid combinations depend on the service's platform (the platform field from service_get).")
 
-	setIOPSSchemaProperties(schema, experimental, "If not specified while changing CPU/memory on the fluid platform, the IOPS is reset to the baseline for the new size.")
+	setIOPSSchemaProperties(schema, experimental, "If not specified while changing CPU/memory on the fluid platform, the IOPS is set to the baseline for the new size.")
 
 	return schema
 }

@@ -29,7 +29,7 @@ func (BranchResizeInput) Schema() *jsonschema.Schema {
 
 	setBranchIDSchemaProperties(schema)
 	setBranchCPUMemorySchemaProperties(schema, "CPU and memory allocation combination. If not specified, the branch keeps its current CPU and memory.")
-	setBranchIOPSSchemaProperties(schema, "If not specified while changing CPU/memory, the IOPS is reset to the baseline for the new size.")
+	setBranchIOPSSchemaProperties(schema, "If not specified while changing CPU/memory, the IOPS is set to the baseline for the new size.")
 
 	return schema
 }
