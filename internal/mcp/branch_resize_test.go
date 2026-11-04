@@ -14,8 +14,8 @@ func TestBranchResizeTool(t *testing.T) {
 	args := map[string]any{"branch_id": "br4nch1d9x", "cpu_memory": "2 CPU/16 GB"}
 	req := api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}
 	// The resized branch, as the API reports it once the new spec is applied.
-	resized := func(status api.DeployStatus) api.Branch {
-		return sampleBranch(branchStatus(status), func(b *api.Branch) {
+	resized := func() api.Branch {
+		return sampleBranch(func(b *api.Branch) {
 			b.CPUMillis = 2000
 			b.MemoryGbs = 16
 		})
@@ -30,11 +30,8 @@ func TestBranchResizeTool(t *testing.T) {
 				}, nil)
 		}
 	}
-	expectResize := func(status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
-		return expectResizeWith(req, resized(status))
-	}
+	expectResize := expectResizeWith(req, resized())
 	accepted := map[string]any{
-		"status":    "CONFIGURING",
 		"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
 		"message":   "Resize request accepted. The resize is in progress and may take several minutes to complete.",
 	}
@@ -65,7 +62,7 @@ func TestBranchResizeTool(t *testing.T) {
 			tool:       toolBranchResize,
 			args:       args,
 			opts:       []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
-			mock:       expectResize(api.DeployStatusCONFIGURING),
+			mock:       expectResize,
 			wantOutput: accepted,
 		},
 		{
@@ -98,11 +95,10 @@ func TestBranchResizeTool(t *testing.T) {
 			tool: toolBranchResize,
 			args: map[string]any{"branch_id": "br4nch1d9x", "iops": 16000},
 			opts: []runOption{experimental},
-			mock: expectResizeWith(api.BranchResizeInput{Iops: new(16000)}, sampleBranch(branchStatus(api.DeployStatusCONFIGURING), func(b *api.Branch) {
+			mock: expectResizeWith(api.BranchResizeInput{Iops: new(16000)}, sampleBranch(func(b *api.Branch) {
 				b.Iops = new(16000)
 			})),
 			wantOutput: map[string]any{
-				"status":    "CONFIGURING",
 				"resources": map[string]any{"cpu": "0.25 cores", "memory": "2 GB", "iops": float64(16000)},
 				"message":   "Resize request accepted. The resize is in progress and may take several minutes to complete.",
 			},
@@ -112,7 +108,7 @@ func TestBranchResizeTool(t *testing.T) {
 			tool:       toolBranchResize,
 			args:       args,
 			opts:       []runOption{experimental},
-			mock:       expectResize(api.DeployStatusCONFIGURING),
+			mock:       expectResize,
 			wantOutput: accepted,
 		},
 	})

@@ -44,14 +44,12 @@ func (ServiceResizeInput) Schema(experimental bool) *jsonschema.Schema {
 
 // ServiceResizeOutput represents output for service_resize
 type ServiceResizeOutput struct {
-	Status    string        `json:"status"`
 	Resources *ResourceInfo `json:"resources,omitempty"`
 	Message   string        `json:"message"`
 }
 
 func (ServiceResizeOutput) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceResizeOutput](nil))
-	schema.Properties["status"].Description = "Service status when the resize request was accepted. It doesn't indicate whether the resize has completed: the service can still read READY before the resize starts."
 	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
 	schema.Properties["message"].Description = "Human-readable outcome of the operation"
 	return schema
@@ -159,9 +157,8 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 
 	detail := s.convertToServiceDetail(cfg, service, false)
 	output := ServiceResizeOutput{
-		Status:    detail.Status,
 		Resources: detail.Resources,
-		Message:   resizeInProgressMessage,
+		Message:   "Resize request accepted. The resize is in progress and may take several minutes to complete.",
 	}
 
 	return nil, output, nil

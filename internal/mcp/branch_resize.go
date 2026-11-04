@@ -36,14 +36,12 @@ func (BranchResizeInput) Schema() *jsonschema.Schema {
 
 // BranchResizeOutput represents output for branch_resize
 type BranchResizeOutput struct {
-	Status    string        `json:"status"`
 	Resources *ResourceInfo `json:"resources,omitempty"`
 	Message   string        `json:"message"`
 }
 
 func (BranchResizeOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[BranchResizeOutput](nil))
-	schema.Properties["status"].Description = "Branch status when the resize request was accepted. It doesn't indicate whether the resize has completed: the branch can still read READY before the resize starts."
 	// The branch tools only exist behind the experimental gate, so the IOPS
 	// are always included.
 	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
@@ -127,8 +125,7 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 
 	detail := s.convertToBranchDetail(cfg, branch, false)
 	return nil, BranchResizeOutput{
-		Status:    detail.Status,
 		Resources: detail.Resources,
-		Message:   resizeInProgressMessage,
+		Message:   "Resize request accepted. The resize is in progress and may take several minutes to complete.",
 	}, nil
 }

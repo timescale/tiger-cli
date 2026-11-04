@@ -16,9 +16,8 @@ func TestServiceResizeTool(t *testing.T) {
 	resizeReq := api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}
 
 	// The resized service, as the API reports it once the new spec is applied.
-	resizedService := func(status api.DeployStatus) api.Service {
+	resizedService := func() api.Service {
 		return sampleService(func(s *api.Service) {
-			s.Status = status
 			s.Resources = []api.Resource{{
 				Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(8)},
 			}}
@@ -29,21 +28,18 @@ func TestServiceResizeTool(t *testing.T) {
 	expectLookup := func(m *mocks.MockClientWithResponsesInterface) {
 		expectGetService(m, "e6ue9697jf", sampleService())
 	}
-	expectResize := func(status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
-		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectLookup(m)
-			svc := resizedService(status)
-			m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
-				Return(&api.ResizeServiceResponse{
-					HTTPResponse: httpResponse(http.StatusAccepted),
-					JSON202:      &svc,
-				}, nil)
-		}
+	expectResize := func(m *mocks.MockClientWithResponsesInterface) {
+		expectLookup(m)
+		svc := resizedService()
+		m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
+			Return(&api.ResizeServiceResponse{
+				HTTPResponse: httpResponse(http.StatusAccepted),
+				JSON202:      &svc,
+			}, nil)
 	}
 
 	resources := map[string]any{"cpu": "2 cores", "memory": "8 GB"}
 	accepted := map[string]any{
-		"status":    "CONFIGURING",
 		"resources": resources,
 		"message":   "Resize request accepted. The resize is in progress and may take several minutes to complete.",
 	}
@@ -128,7 +124,7 @@ func TestServiceResizeTool(t *testing.T) {
 				// The one lookup serves both the read-only gate and the
 				// cpu_memory check.
 				expectTaggedService("DEV", 1)(m)
-				svc := resizedService(api.DeployStatusCONFIGURING)
+				svc := resizedService()
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -209,7 +205,7 @@ func TestServiceResizeTool(t *testing.T) {
 			name:       "returns once the resize is accepted",
 			tool:       toolServiceResize,
 			args:       args,
-			mock:       expectResize(api.DeployStatusCONFIGURING),
+			mock:       expectResize,
 			wantOutput: accepted,
 		},
 		{
@@ -222,7 +218,6 @@ func TestServiceResizeTool(t *testing.T) {
 					s.Platform = new(api.ServicePlatformFLUID)
 				}))
 				svc := sampleService(func(s *api.Service) {
-					s.Status = api.DeployStatusCONFIGURING
 					s.Platform = new(api.ServicePlatformFLUID)
 					s.Resources = []api.Resource{{
 						Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(16)},
@@ -235,7 +230,6 @@ func TestServiceResizeTool(t *testing.T) {
 					}, nil)
 			},
 			wantOutput: map[string]any{
-				"status":    "CONFIGURING",
 				"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
 				"message":   "Resize request accepted. The resize is in progress and may take several minutes to complete.",
 			},
@@ -265,7 +259,6 @@ func TestServiceResizeTool(t *testing.T) {
 					}, nil)
 			},
 			wantOutput: map[string]any{
-				"status":    "READY",
 				"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB", "iops": float64(12000)},
 				"message":   "Resize request accepted. The resize is in progress and may take several minutes to complete.",
 			},
