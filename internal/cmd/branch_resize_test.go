@@ -116,16 +116,5 @@ func TestBranchResizeCmd(t *testing.T) {
 			mock:       setupResize(req2000, api.DeployStatusCONFIGURING),
 			wantStderr: acceptedStderr,
 		},
-		{
-			// The former wait flags are still accepted, so scripts that pass
-			// them don't break.
-			name: "deprecated wait flags accepted",
-			args: []string{"branch", "resize", "br-12345", "--cpu", "2000", "--no-wait", "--wait-timeout", "5m"},
-			opts: []runOption{withExperimental()},
-			mock: setupResize(req2000, api.DeployStatusCONFIGURING),
-			wantStderr: "Warning: --no-wait has no effect; resize no longer waits for completion\n" +
-				"Warning: --wait-timeout has no effect; resize no longer waits for completion\n" +
-				acceptedStderr,
-		},
 	})
 }

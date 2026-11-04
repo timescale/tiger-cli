@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -49,15 +48,6 @@ given without --iops, the IOPS is reset to the baseline for the new size.`,
 		ValidArgsFunction: branchRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// The former wait flags are hidden no-ops, kept so scripts that pass
-			// them don't break. The warning is printed here because cobra's flag
-			// deprecation notice goes to stdout.
-			for _, flag := range []string{"no-wait", "wait-timeout"} {
-				if cmd.Flags().Changed(flag) {
-					cmd.PrintErrf("Warning: --%s has no effect; resize no longer waits for completion\n", flag)
-				}
-			}
-
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
@@ -119,10 +109,6 @@ given without --iops, the IOPS is reset to the baseline for the new size.`,
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
 	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
-	cmd.Flags().Bool("no-wait", false, "Don't wait for resize operation to complete")
-	cmd.Flags().Duration("wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
-	markFlagHidden(cmd, "no-wait")
-	markFlagHidden(cmd, "wait-timeout")
 
 	registerFlagCompletion(cmd, "cpu", branchCPUCompletion)
 	registerFlagCompletion(cmd, "memory", branchMemoryCompletion)

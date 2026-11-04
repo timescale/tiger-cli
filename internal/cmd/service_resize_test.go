@@ -201,25 +201,6 @@ The resize is in progress and may take several minutes to complete.
 `,
 		},
 		{
-			// The former wait flags are still accepted, so scripts that pass
-			// them don't break.
-			name: "deprecated wait flags accepted",
-			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8", "--no-wait", "--wait-timeout", "5m"},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService())
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
-					Return(&api.ResizeServiceResponse{
-						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &svc,
-					}, nil)
-			},
-			wantStderr: `Warning: --no-wait has no effect; resize no longer waits for completion
-Warning: --wait-timeout has no effect; resize no longer waits for completion
-Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
-The resize is in progress and may take several minutes to complete.
-`,
-		},
-		{
 			name: "service id from config, cpu only auto-configures memory",
 			args: []string{"service", "resize", "--cpu", "2000"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
