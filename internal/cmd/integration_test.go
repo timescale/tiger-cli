@@ -1318,8 +1318,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Fatalf("Service resize failed: %v\nOutput: %s", err, output)
 		}
 
-		if !strings.Contains(output, "Resize request accepted") {
-			t.Errorf("Expected resize request accepted message, got: %s", output)
+		if !strings.Contains(output, "The resize is in progress") {
+			t.Errorf("Expected resize in progress message, got: %s", output)
 		}
 
 		t.Logf("Service resize request accepted")

@@ -103,8 +103,7 @@ given without --iops, the IOPS is reset to the baseline for the new size.`,
 				return fmt.Errorf("empty response from API")
 			}
 
-			cmd.PrintErrf("Resize request accepted for branch %s.\n", branchLabel(*resolved))
-			cmd.PrintErrln(resizeInProgressMsg)
+			cmd.PrintErrln("The resize is in progress and may take several minutes to complete.")
 			return nil
 		},
 	}

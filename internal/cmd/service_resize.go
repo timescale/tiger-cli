@@ -139,8 +139,7 @@ other will be automatically configured).` + iopsSectionHelp,
 				return fmt.Errorf("empty response from API")
 			}
 
-			cmd.PrintErrf("Resize request accepted for service %s.\n", serviceLabel(*resolved))
-			cmd.PrintErrln(resizeInProgressMsg)
+			cmd.PrintErrln("The resize is in progress and may take several minutes to complete.")
 			return nil
 		},
 	}

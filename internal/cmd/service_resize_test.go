@@ -85,7 +85,6 @@ CPU/memory allocation. See the Tiger Data documentation for details. If only
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
-Resize request accepted for service 'test-service' (svc-12345).
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -198,7 +197,6 @@ The resize is in progress and may take several minutes to complete.
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
-Resize request accepted for service 'test-service' (svc-12345).
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -218,7 +216,6 @@ The resize is in progress and may take several minutes to complete.
 			wantStderr: `Warning: --no-wait has no effect; resize no longer waits for completion
 Warning: --wait-timeout has no effect; resize no longer waits for completion
 Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
-Resize request accepted for service 'test-service' (svc-12345).
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -235,7 +232,6 @@ The resize is in progress and may take several minutes to complete.
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
-Resize request accepted for service 'test-service' (svc-12345).
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -251,7 +247,6 @@ The resize is in progress and may take several minutes to complete.
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 4 CPU/16 GB...
-Resize request accepted for service 'test-service' (svc-12345).
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -267,7 +262,6 @@ The resize is in progress and may take several minutes to complete.
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB...
-Resize request accepted for service 'test-service' (svc-12345).
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -286,7 +280,6 @@ The resize is in progress and may take several minutes to complete.
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 12000 IOPS...
-Resize request accepted for service 'test-service' (svc-12345).
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -303,7 +296,6 @@ The resize is in progress and may take several minutes to complete.
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB, 16000 IOPS...
-Resize request accepted for service 'test-service' (svc-12345).
 The resize is in progress and may take several minutes to complete.
 `,
 		},

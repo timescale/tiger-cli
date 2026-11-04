@@ -6,11 +6,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// resizeInProgressMsg follows an accepted resize. The resize commands don't
-// wait for it to finish, because the API doesn't reliably report when it has:
-// the status can read READY before the resize has even started.
-const resizeInProgressMsg = "The resize is in progress and may take several minutes to complete."
-
 // resizeWaitFlags are the resize commands' former wait flags. They're kept as
 // hidden no-ops so scripts that pass them don't break.
 var resizeWaitFlags = []string{"no-wait", "wait-timeout"}
