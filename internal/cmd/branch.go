@@ -42,6 +42,7 @@ moment it was created and gets its own compute.`,
 	cmd.AddCommand(buildBranchResizeCmd(app))
 	cmd.AddCommand(buildBranchRenameCmd(app))
 	cmd.AddCommand(buildBranchUpdatePasswordCmd(app))
+	cmd.AddCommand(buildBranchLogsCmd(app))
 
 	return cmd
 }
@@ -53,6 +54,7 @@ type OutputBranch struct {
 	ServiceName string `json:"service_name,omitempty"`
 	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty"`
+	ConsoleURL       string `json:"console_url"`
 }
 
 // branchOutputOptions controls what the branch output functions include.
@@ -128,6 +130,7 @@ func outputBranchTable(output io.Writer, branch OutputBranch) error {
 	if branch.ConnectionString != "" {
 		table.Append("Connection String", branch.ConnectionString)
 	}
+	table.Append("Console URL", branch.ConsoleURL)
 
 	return table.Render()
 }
@@ -156,7 +159,7 @@ func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.B
 		outputBr.ConnectionString = details.String()
 	}
 
-	// TODO: add a Console URL once the Console supports branches.
+	outputBr.ConsoleURL = fmt.Sprintf("%s/projects/%s/services/%s/branches/%s/overview", cfg.ConsoleURL, branch.ProjectID, branch.ServiceID, branch.ID)
 
 	return outputBr
 }

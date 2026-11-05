@@ -39,7 +39,8 @@ func registeredToolNames(t *testing.T, readOnly config.ReadOnlyMode) []string {
 		logger: ensureLogger(nil),
 	}
 	s.registerServiceTools(readOnly, true)
-	s.registerDatabaseTools(readOnly)
+	s.registerBranchTools(readOnly, true)
+	s.registerDatabaseTools(readOnly, true)
 
 	clientTransport, serverTransport := mcp.NewInMemoryTransports()
 

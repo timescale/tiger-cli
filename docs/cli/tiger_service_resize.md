@@ -10,9 +10,10 @@ The service can be given by ID or name as an argument, or will use the default
 service from your configuration. This command changes the compute and memory
 resources allocated to your database service.
 
-The service may be temporarily unavailable during the resize operation. Note
-that changing resources will affect your billing - increasing resources will
-increase costs.
+The command returns once the resize request is accepted, without waiting for
+the resize to complete, which may take several minutes. The service may be
+temporarily unavailable during the resize operation. Note that changing
+resources will affect your billing - increasing resources will increase costs.
 
 Allowed CPU/Memory Configurations:
   0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
@@ -39,22 +40,14 @@ tiger service resize [name-or-id] [flags]
 
   # Resize service using only memory (CPU will be auto-configured to 4000m)
   tiger service resize --memory 16
-
-  # Resize without waiting for completion (waits by default)
-  tiger service resize --cpu 2000 --memory 8 --no-wait
-
-  # Resize with custom wait timeout
-  tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m
 ```
 
 ### Options
 
 ```
-      --cpu string              CPU allocation in millicores
-  -h, --help                    help for resize
-      --memory string           Memory allocation in gigabytes
-      --no-wait                 Don't wait for resize operation to complete
-      --wait-timeout duration   Maximum time to wait for operation to complete (default 10m0s)
+      --cpu string      CPU allocation in millicores
+  -h, --help            help for resize
+      --memory string   Memory allocation in gigabytes
 ```
 
 ### Options inherited from parent commands

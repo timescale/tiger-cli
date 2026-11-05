@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -18,8 +17,6 @@ import (
 func buildServiceResizeCmd(app *common.App) *cobra.Command {
 	var cpu string
 	var memory string
-	var noWait bool
-	var waitTimeout time.Duration
 	var iops int
 
 	// IOPS are a preview, so their help text is shown only behind the
@@ -31,7 +28,9 @@ func buildServiceResizeCmd(app *common.App) *cobra.Command {
 
 The allowed --iops values depend on your plan, the service's platform, and its
 CPU/memory allocation. See the Tiger Data documentation for details. If only
---iops is given, the service keeps its current CPU and memory.`
+--iops is given, the service keeps its current CPU and memory. If --cpu or
+--memory is given without --iops on the fluid platform, the IOPS is set to
+the baseline for the new size.`
 		iopsExampleHelp = "\n\n  # Change only the provisioned IOPS\n  tiger service resize --iops 16000"
 	} else {
 		iopsDescHelp = " and memory "
@@ -46,9 +45,10 @@ The service can be given by ID or name as an argument, or will use the default
 service from your configuration. This command changes the compute and memory
 resources allocated to your database service.
 
-The service may be temporarily unavailable during the resize operation. Note
-that changing resources will affect your billing - increasing resources will
-increase costs.
+The command returns once the resize request is accepted, without waiting for
+the resize to complete, which may take several minutes. The service may be
+temporarily unavailable during the resize operation. Note that changing
+resources will affect your billing - increasing resources will increase costs.
 
 ` + cpuMemoryHelp(false, app.Experimental) + `
 
@@ -64,13 +64,7 @@ other will be automatically configured).` + iopsSectionHelp,
   tiger service resize --cpu 2000
 
   # Resize service using only memory (CPU will be auto-configured to 4000m)
-  tiger service resize --memory 16
-
-  # Resize without waiting for completion (waits by default)
-  tiger service resize --cpu 2000 --memory 8 --no-wait
-
-  # Resize with custom wait timeout
-  tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m` + iopsExampleHelp,
+  tiger service resize --memory 16` + iopsExampleHelp,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
@@ -142,36 +136,8 @@ other will be automatically configured).` + iopsSectionHelp,
 			if resp.JSON202 == nil {
 				return fmt.Errorf("empty response from API")
 			}
-			service := *resp.JSON202
 
-			cmd.PrintErrf("Resize request accepted for service %s.\n", serviceLabel(*resolved))
-
-			// If not waiting, return early
-			if noWait {
-				cmd.PrintErrln("Use 'tiger service get' to check service status.")
-				return nil
-			}
-
-			// Wait for resize to complete
-			cmd.PrintErrf("Waiting for resize to complete (timeout: %v)...\n", waitTimeout)
-			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:       client,
-				ProjectID:    projectID,
-				ServiceID:    resolved.ServiceID,
-				Service:      &service,
-				TargetStatus: api.DeployStatusREADY,
-				Input:        cmd.InOrStdin(),
-				Output:       cmd.ErrOrStderr(),
-				Timeout:      waitTimeout,
-				TimeoutMsg:   "service may still be resizing",
-			}); err != nil {
-				// Return error for sake of exit code, but silence since we already output it
-				cmd.PrintErrf("Error: %s\n", err)
-				cmd.SilenceErrors = true
-				return err
-			}
-
-			cmd.PrintErrf("Service resized to %s.\n", target)
+			cmd.PrintErrln("The resize is in progress and may take several minutes to complete.")
 			return nil
 		},
 	}
@@ -183,8 +149,6 @@ other will be automatically configured).` + iopsSectionHelp,
 		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 		registerFlagCompletion(cmd, "iops", iopsCompletion)
 	}
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
 	registerFlagCompletion(cmd, "cpu", cpuCompletion(false, app.Experimental))
 	registerFlagCompletion(cmd, "memory", memoryCompletion(false, app.Experimental))
