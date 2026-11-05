@@ -33,8 +33,8 @@ func (BranchCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].Description = "Name for the branch, unique within the parent service (auto-generated if not provided)"
 	schema.Properties["name"].Examples = []any{"ci-4821", "feature/user-auth"}
 
-	setBranchCPUMemorySchemaProperties(schema, "CPU and memory allocation combination. If not specified, the branch gets the same CPU and memory as the parent service, up to a limit.")
-	setBranchIOPSSchemaProperties(schema, "If not specified, the branch gets the same IOPS as the parent service where it can, and otherwise the baseline for its CPU/memory allocation.")
+	setBranchCPUMemorySchemaProperties(schema, "CPU and memory allocation combination. If not specified, the branch gets the same CPU and memory as the parent service.")
+	setBranchIOPSSchemaProperties(schema, "If not specified, the branch gets the same IOPS as the parent service, unless cpu_memory is specified, in which case it gets the baseline for its CPU/memory allocation.")
 
 	schema.Properties["wait"].Description = "Whether to wait for the branch to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying the branch. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -68,7 +68,7 @@ func newBranchCreateTool() *mcp.Tool {
 
 A branch is a lightweight, ephemeral copy of a service for development, testing, CI/CD, and agent workflows. It starts with a copy of the parent's data as of the moment it is created, and gets its own compute. The tsdbadmin user gets a new password, which is saved to the configured password storage. Branches are always treated as DEV, so under read-only mode for production services a PROD service can still be branched.
 
-By default, the branch gets the same CPU and memory as the parent service, up to a limit, and its name is auto-generated. Branching from a branch isn't supported.
+By default, the branch gets the same CPU and memory as the parent service, and its name is auto-generated. Branching from a branch isn't supported.
 
 WARNING: Creates billable resources.`,
 		InputSchema:  BranchCreateInput{}.Schema(),
