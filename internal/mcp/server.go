@@ -66,12 +66,24 @@ type Server struct {
 	docsProxyClient *ProxyClient
 	logger          *slog.Logger
 
+	// transport decides what the tools may touch on the server's machine: only
+	// a stdio server is known to share a machine with its client.
+	transport Transport
+
 	// app holds the config and API client. The analytics middleware reloads it
 	// once per request, so config changes and logins made while the session is
 	// open take effect on the next request; handlers then read that state via
 	// s.app.GetAll and friends.
 	app *common.App
 }
+
+// Transport is the MCP transport a Server is started with.
+type Transport int
+
+const (
+	TransportStdio Transport = iota
+	TransportHTTP
+)
 
 // readOnlyGatedTools are the service-mutating tools addTool skips under
 // read_only=all.
@@ -149,8 +161,10 @@ func buildServerInstructions(cfg *config.Config) string {
 // NewServer creates a new Tiger MCP server instance. The app must already be
 // loaded: its config renders the read-only warning in the server instructions
 // and gates which tools are registered, both evaluated once here at startup.
-// A nil logger discards the server's log output.
-func NewServer(ctx context.Context, app *common.App, logger *slog.Logger) (*Server, error) {
+// The transport is the one the server will be started with, which decides
+// whether tools may read local files. A nil logger discards the server's log
+// output.
+func NewServer(ctx context.Context, app *common.App, logger *slog.Logger, transport Transport) (*Server, error) {
 	cfg := app.GetConfig()
 	logger = ensureLogger(logger)
 
@@ -166,6 +180,7 @@ func NewServer(ctx context.Context, app *common.App, logger *slog.Logger) (*Serv
 	server := &Server{
 		mcpServer: mcpServer,
 		logger:    logger,
+		transport: transport,
 		app:       app,
 	}
 
@@ -271,10 +286,19 @@ func (s *Server) registerBranchTools(mode config.ReadOnlyMode, experimental bool
 
 // registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions
 func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode, experimental bool) {
-	addTool(s, mode, newDBQueryTool(experimental), s.handleDBQuery)
+	if !s.localFiles() {
+		s.logger.Info("Disabling db_query's file parameter over HTTP")
+	}
+	addTool(s, mode, newDBQueryTool(experimental, s.localFiles()), s.handleDBQuery)
 
 	mcp.AddTool(s.mcpServer, newDBSchemaTool(experimental), s.handleDBSchema)
 	mcp.AddTool(s.mcpServer, newDBExtensionsListTool(experimental), s.handleDBExtensionsList)
+}
+
+// localFiles reports whether tools may read files on the server's machine. Over
+// HTTP the client may be on another machine, so those files aren't its own.
+func (s *Server) localFiles() bool {
+	return s.transport == TransportStdio
 }
 
 // analyticsMiddleware tracks analytics for all MCP requests

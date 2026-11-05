@@ -51,7 +51,8 @@ INFO Gracefully shutting down HTTP server, press control-C twice to immediately 
 			name: "binds the requested port and shuts down on cancel",
 			args: []string{"mcp", "start", "http", "--port", fmt.Sprint(port)},
 			opts: append(noDocsProxy(nil), withContext(cancelled)),
-			wantStderr: matchLog(fmt.Sprintf(`INFO Docs MCP proxy is disabled
+			wantStderr: matchLog(fmt.Sprintf(`INFO Disabling db_query's file parameter over HTTP
+INFO Docs MCP proxy is disabled
 INFO Tiger MCP server started address=localhost:%d
 `, port) + shutdown),
 		},
@@ -60,7 +61,8 @@ INFO Tiger MCP server started address=localhost:%d
 			args:    []string{"mcp", "start", "http", "--port", fmt.Sprint(busyPort)},
 			opts:    append(noDocsProxy(nil), withContext(cancelled)),
 			wantErr: fmt.Sprintf("failed to listen: listen tcp 127.0.0.1:%d: bind: address already in use", busyPort),
-			wantStderr: matchLog(fmt.Sprintf(`INFO Docs MCP proxy is disabled
+			wantStderr: matchLog(fmt.Sprintf(`INFO Disabling db_query's file parameter over HTTP
+INFO Docs MCP proxy is disabled
 ERROR Failed to listen error="listen tcp 127.0.0.1:%d: bind: address already in use"
 `, busyPort)),
 		},

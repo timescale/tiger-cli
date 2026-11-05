@@ -34,17 +34,25 @@ type DBQueryInput struct {
 	Pooled         bool     `json:"pooled,omitempty"`
 }
 
-func (DBQueryInput) Schema(experimental bool) *jsonschema.Schema {
+// Schema returns the input schema. Without localFiles the file property is left
+// out, so the schema rejects it.
+func (DBQueryInput) Schema(experimental, localFiles bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBQueryInput](nil))
 
 	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service." + branchIDHelp(experimental, "runs the query against that branch")
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
-	schema.Properties["query"].Description = "PostgreSQL query to execute. Exactly one of 'query' or 'file' must be provided."
+	if localFiles {
+		schema.Properties["query"].Description = "PostgreSQL query to execute. Exactly one of 'query' or 'file' must be provided."
 
-	schema.Properties["file"].Description = "Path to a SQL file on disk to execute, instead of passing its contents as 'query'. Exactly one of 'query' or 'file' must be provided."
-	schema.Properties["file"].Examples = []any{"./migrations/001_init.sql", "~/schema.sql"}
+		schema.Properties["file"].Description = "Path to a SQL file on disk to execute, instead of passing its contents as 'query'. Exactly one of 'query' or 'file' must be provided."
+		schema.Properties["file"].Examples = []any{"./migrations/001_init.sql", "~/schema.sql"}
+	} else {
+		schema.Properties["query"].Description = "PostgreSQL query to execute."
+		schema.Required = append(schema.Required, "query")
+		delete(schema.Properties, "file")
+	}
 
 	schema.Properties["parameters"].Description = "Query parameters. Values are substituted for $1, $2, etc. placeholders in the query. Only supported for single-statement queries."
 	schema.Properties["parameters"].Examples = []any{[]string{"1", "alice"}, []string{"2024-01-01", "100"}}
@@ -112,20 +120,25 @@ func (DBQueryOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newDBQueryTool(experimental bool) *mcp.Tool {
+func newDBQueryTool(experimental, localFiles bool) *mcp.Tool {
+	sqlSource := "Pass the SQL as 'query'."
+	if localFiles {
+		sqlSource = "Pass the SQL as 'query', or point 'file' at a .sql file on disk to run its contents."
+	}
+
 	return &mcp.Tool{
 		Name:  toolDBQuery,
 		Title: "Execute SQL Query",
 		Description: `Execute SQL queries against a service database.
 
-Connects to a PostgreSQL database service in Tiger Cloud and executes the provided SQL query, returning the results with column information, row data, and execution metadata. Pass the SQL as 'query', or point 'file' at a .sql file on disk to run its contents.
+Connects to a PostgreSQL database service in Tiger Cloud and executes the provided SQL query, returning the results with column information, row data, and execution metadata. ` + sqlSource + `
 
 Multi-statement queries (semicolon-separated) are supported when no parameters are provided. All result sets are returned. By default, statements execute in an implicit transaction that automatically commits on success or rolls back on error. Explicit transactions (opened with BEGIN) must be explicitly committed with COMMIT, or they roll back when the connection closes.
 
 Process data in the database, not in your context: aggregate, filter, sort/limit, and join in SQL rather than fetching raw rows.
 
 WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
-		InputSchema:  DBQueryInput{}.Schema(experimental),
+		InputSchema:  DBQueryInput{}.Schema(experimental, localFiles),
 		OutputSchema: DBQueryOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
@@ -144,7 +157,7 @@ func (s *Server) handleDBQuery(ctx context.Context, req *mcp.CallToolRequest, in
 		return nil, DBQueryOutput{}, err
 	}
 
-	query, err := resolveQueryInput(input.Query, input.File)
+	query, err := s.resolveQueryInput(input.Query, input.File)
 	if err != nil {
 		return nil, DBQueryOutput{}, err
 	}
@@ -211,7 +224,15 @@ func (s *Server) handleDBQuery(ctx context.Context, req *mcp.CallToolRequest, in
 
 // resolveQueryInput returns the SQL to run, read from file when that's what the
 // caller passed instead of inline query text.
-func resolveQueryInput(query, file string) (string, error) {
+func (s *Server) resolveQueryInput(query, file string) (string, error) {
+	if !s.localFiles() {
+		// The schema rejects file here, and requires query, but not that it's
+		// non-empty.
+		if query == "" {
+			return "", errors.New("'query' must be provided")
+		}
+		return query, nil
+	}
 	if (query == "") == (file == "") {
 		return "", errors.New("exactly one of 'query' or 'file' must be provided")
 	}

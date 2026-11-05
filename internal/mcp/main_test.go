@@ -165,6 +165,9 @@ type runConfig struct {
 	clientErr    error // if set, the client factory returns this error (nil client)
 	experimental bool  // turns on the App's experimental gate, so the gated tools are registered
 
+	// Server
+	transport Transport // the transport the server is built for; stdio unless withTransport sets it
+
 	// MCP client
 	clientCaps *mcp.ClientCapabilities // overrides the client's advertised capabilities
 	answer     *mcp.ElicitResult       // if set, the client supports elicitation and answers every prompt with this
@@ -243,7 +246,9 @@ func runTool(
 		t.Fatalf("load app: %v", err)
 	}
 
-	server, err := NewServer(ctx, app, nil)
+	// The session itself always runs over an in-memory transport; rc.transport
+	// only decides what the server exposes.
+	server, err := NewServer(ctx, app, nil, rc.transport)
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
@@ -343,6 +348,14 @@ func withNotLoggedIn() runOption {
 func withExperimental() runOption {
 	return func(rc *runConfig) {
 		rc.experimental = true
+	}
+}
+
+// withTransport builds the server for the given transport instead of stdio,
+// which decides whether its tools may read local files.
+func withTransport(transport Transport) runOption {
+	return func(rc *runConfig) {
+		rc.transport = transport
 	}
 }
 

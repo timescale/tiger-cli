@@ -139,6 +139,29 @@ func TestDBQueryTool(t *testing.T) {
 			wantErr: bothOrNeitherMsg,
 		},
 		{
+			// The client may be on another machine, so the server's files aren't
+			// its own: the schema leaves file out and rejects it.
+			name:    "file is rejected over HTTP",
+			tool:    toolDBQuery,
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
+			opts:    []runOption{withTransport(TransportHTTP)},
+			wantErr: `validating "arguments": validating root: unexpected additional properties ["file"]`,
+		},
+		{
+			name:    "query is required over HTTP",
+			tool:    toolDBQuery,
+			args:    map[string]any{"service_id": "e6ue9697jf"},
+			opts:    []runOption{withTransport(TransportHTTP)},
+			wantErr: `validating "arguments": validating root: required: missing properties: ["query"]`,
+		},
+		{
+			name:    "empty query over HTTP",
+			tool:    toolDBQuery,
+			args:    map[string]any{"service_id": "e6ue9697jf", "query": ""},
+			opts:    []runOption{withTransport(TransportHTTP)},
+			wantErr: "'query' must be provided",
+		},
+		{
 			name:    "missing SQL file",
 			tool:    toolDBQuery,
 			args:    map[string]any{"service_id": "e6ue9697jf", "file": missingFile},
@@ -354,6 +377,14 @@ func TestDBQueryTool(t *testing.T) {
 				MaxRows:  config.DefaultMCPMaxRows,
 				MaxBytes: mcpMaxResponseBytes,
 			}, result, nil)},
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
+		},
+		{
+			name:       "runs the query over HTTP",
+			tool:       toolDBQuery,
+			args:       args,
+			opts:       []runOption{withTransport(TransportHTTP), withExecuteQuery(primaryTarget, baseArgs, result, nil)},
 			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: wantResult,
 		},

@@ -212,7 +212,8 @@ following:
 The above instructions install the MCP server using the stdio transport. If you
 need to use the Streamable HTTP transport instead, you can start the server with
 `tiger mcp start http --port 8080` and install it into your client using
-`http://localhost:8080` as the URL.
+`http://localhost:8080` as the URL. Over HTTP the client may be on a different
+machine, so `db_query` doesn't accept a SQL file path, only inline SQL.
 
 ### Available MCP Tools
 
