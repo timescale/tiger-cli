@@ -51,7 +51,11 @@ func TestDBQueryTool(t *testing.T) {
 
 	// The SQL files are read from the working directory the cases run in
 	// (withWorkingDir); anything outside it is off limits, even via symlink.
-	workDir := t.TempDir()
+	// linkedWorkDir names the same directory through a symlink, the way /tmp
+	// names /private/tmp on macOS.
+	baseDir := t.TempDir()
+	workDir := filepath.Join(baseDir, "project")
+	linkedWorkDir := filepath.Join(baseDir, "linked")
 	outsideDir := t.TempDir()
 	writeFile := func(path string, data string) {
 		t.Helper()
@@ -74,11 +78,11 @@ func TestDBQueryTool(t *testing.T) {
 	if err := os.Symlink("query.sql", filepath.Join(workDir, "link.sql")); err != nil {
 		t.Fatalf("failed to create symlink: %v", err)
 	}
-	resolvedSQLFile, err := filepath.EvalSymlinks(sqlFile)
-	if err != nil {
-		t.Fatalf("failed to resolve SQL file path: %v", err)
+	if err := os.Symlink("project", linkedWorkDir); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
 	}
 	inWorkDir := withWorkingDir(workDir)
+	inLinkedWorkDir := withWorkingDir(linkedWorkDir)
 	outsideMsg := func(path string) string {
 		return "SQL file " + path + " is outside the working directory " + workDir
 	}
@@ -205,6 +209,33 @@ func TestDBQueryTool(t *testing.T) {
 			args:    map[string]any{"service_id": "e6ue9697jf", "file": outsideFile},
 			opts:    []runOption{inWorkDir},
 			wantErr: outsideMsg(outsideFile),
+		},
+		{
+			// A missing file outside gets the same error as an existing one, so
+			// the error doesn't reveal what exists outside.
+			name:    "missing file outside the working directory",
+			tool:    toolDBQuery,
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": filepath.Join(outsideDir, "nope.sql")},
+			opts:    []runOption{inWorkDir},
+			wantErr: outsideMsg(filepath.Join(outsideDir, "nope.sql")),
+		},
+		{
+			// A missing file can't be resolved, so it's compared as given: named
+			// the same way as the working directory, it's reported missing.
+			name:    "missing file by absolute path within the working directory",
+			tool:    toolDBQuery,
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": filepath.Join(workDir, "nope.sql")},
+			opts:    []runOption{inWorkDir},
+			wantErr: "failed to read SQL file: openat nope.sql: no such file or directory",
+		},
+		{
+			// Named through a different symlink than the working directory, a
+			// missing file can't be matched to it, and is refused as outside.
+			name:    "missing file named through a symlink to the working directory",
+			tool:    toolDBQuery,
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": filepath.Join(linkedWorkDir, "nope.sql")},
+			opts:    []runOption{inWorkDir},
+			wantErr: outsideMsg(filepath.Join(linkedWorkDir, "nope.sql")),
 		},
 		{
 			// The home directory isn't the working directory, so a ~ path is
@@ -464,12 +495,20 @@ func TestDBQueryTool(t *testing.T) {
 			wantOutput: wantResult,
 		},
 		{
-			// On macOS the temp directory is under /var, a symlink to
-			// /private/var, so the resolved form must be accepted too.
-			name:       "runs a file given by its symlink-resolved absolute path",
+			// The working directory and the path may name the same place
+			// through different symlinks, in either direction.
+			name:       "runs a file named through a symlink to the working directory",
 			tool:       toolDBQuery,
-			args:       map[string]any{"service_id": "e6ue9697jf", "file": resolvedSQLFile},
+			args:       map[string]any{"service_id": "e6ue9697jf", "file": filepath.Join(linkedWorkDir, "query.sql")},
 			opts:       []runOption{inWorkDir, withExecuteQuery(primaryTarget, fileArgs, result, nil)},
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
+		},
+		{
+			name:       "runs a file when the working directory is named through a symlink",
+			tool:       toolDBQuery,
+			args:       map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
+			opts:       []runOption{inLinkedWorkDir, withExecuteQuery(primaryTarget, fileArgs, result, nil)},
 			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: wantResult,
 		},

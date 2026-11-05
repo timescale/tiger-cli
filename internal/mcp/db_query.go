@@ -285,23 +285,21 @@ func readWorkingDirFile(path string) ([]byte, error) {
 }
 
 // relativeToDir returns path relative to dir, reporting whether it lies within
-// it. An absolute path is accepted under either dir as given or dir with its
-// symlinks resolved, since os.Getwd may return either form (e.g. /var or
-// /private/var on macOS) and a client may have been told the other.
+// it. An absolute path and dir may name the same place through different
+// symlinks (e.g. /tmp and /private/tmp on macOS), so both are resolved before
+// comparing. A path that can't be resolved, such as a missing file, is compared
+// as given instead, so the result doesn't depend on what exists outside dir.
 func relativeToDir(dir, path string) (string, bool) {
 	if !filepath.IsAbs(path) {
 		return path, filepath.IsLocal(path)
 	}
-	dirs := []string{dir}
-	if resolved, err := filepath.EvalSymlinks(dir); err == nil && resolved != dir {
-		dirs = append(dirs, resolved)
-	}
-	for _, d := range dirs {
-		if rel, err := filepath.Rel(d, path); err == nil && filepath.IsLocal(rel) {
-			return rel, true
+	if resolvedPath, err := filepath.EvalSymlinks(path); err == nil {
+		if resolvedDir, err := filepath.EvalSymlinks(dir); err == nil {
+			dir, path = resolvedDir, resolvedPath
 		}
 	}
-	return "", false
+	rel, err := filepath.Rel(dir, path)
+	return rel, err == nil && filepath.IsLocal(rel)
 }
 
 // resolveMaxRows returns the row cap from mcp_max_rows, falling back to the
