@@ -286,11 +286,6 @@ func (s *Server) registerBranchTools(mode config.ReadOnlyMode, experimental bool
 
 // registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions
 func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode, experimental bool) {
-	// Over HTTP the client may be on another machine, so the server's files
-	// aren't its own.
-	if s.transport != TransportStdio {
-		s.logger.Info("Disabling db_query's file parameter over HTTP")
-	}
 	addTool(s, mode, newDBQueryTool(experimental, s.transport), s.handleDBQuery)
 
 	mcp.AddTool(s.mcpServer, newDBSchemaTool(experimental), s.handleDBSchema)
