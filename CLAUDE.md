@@ -223,7 +223,7 @@ The server exposes two kinds of tools: native Tiger tools for service management
 
 ### Server State
 
-`NewServer(ctx, app, logger, transport)` takes the already-loaded `*common.App` and keeps it on the `Server` along with the logger and the transport it will be started with. Only a stdio server is known to share a machine with its client, so tools that read local files (`db_query`'s `file`) check for `TransportStdio` and leave those parameters out of their schema otherwise, and even over stdio read only within the working directory, through `os.Root`; `mcp list`, `mcp get`, and completion describe the stdio server. The experimental gate and the docs-proxy settings are read once here at startup (a client must restart the server to pick up changes to those), as are read-only mode's startup decisions — which write tools get registered, and the warning in the server instructions. The analytics middleware, though, reloads the App on every request, so handlers see current config and credentials — including the live `read_only` value in the per-call gates (see [Read-Only Mode](#read-only-mode)). Handlers therefore never load anything themselves — they read `s.app.GetAll()`/`GetClient()`/`GetConfig()` and log via `s.logger`.
+`NewServer(ctx, app, logger, transport)` takes the already-loaded `*common.App` and keeps it on the `Server` along with the logger and the transport it will be started with (see [Local Files](#local-files)). The experimental gate and the docs-proxy settings are read once here at startup (a client must restart the server to pick up changes to those), as are read-only mode's startup decisions — which write tools get registered, and the warning in the server instructions. The analytics middleware, though, reloads the App on every request, so handlers see current config and credentials — including the live `read_only` value in the per-call gates (see [Read-Only Mode](#read-only-mode)). Handlers therefore never load anything themselves — they read `s.app.GetAll()`/`GetClient()`/`GetConfig()` and log via `s.logger`.
 
 ### One File Per Tool
 
@@ -264,6 +264,12 @@ A destructive tool that needs a human in the loop asks through MCP elicitation, 
 - The tool description should say that the tool prompts the user itself, so agents don't ask for confirmation first and the user isn't asked twice.
 
 The CLI can be used to get around the MCP server's safeguards: `tiger config set read_only off` disables read-only mode, and `--confirm` skips the confirmation prompts that PROD elicitation stands in for. Text the server sends to agents should therefore never tell an agent to run a CLI command itself. Where the CLI is the way forward, it should tell the agent to ask the user to run the command.
+
+### Local Files
+
+A tool parameter that reads a file on the server's machine (`db_query`'s `file`) depends on the transport. Only a stdio server is known to share a machine with its client, so under any other transport the tool leaves the parameter out of its schema, which then rejects it. `mcp list`, `mcp get`, and completion describe the stdio server, since that's what a default `tiger mcp start` runs.
+
+Over stdio, reads are confined to the server's working directory — the directory the client launched it in — by going through `os.Root`, which also refuses symlinks that lead out of it. Unlike the CLI's path flags, such a path never has environment variables expanded: it comes from the model, and expansion would let it read the server's environment back out. `readWorkingDirFile` in `db_query.go` is the model.
 
 ## Read-Only Mode
 

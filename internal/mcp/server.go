@@ -288,11 +288,10 @@ func (s *Server) registerBranchTools(mode config.ReadOnlyMode, experimental bool
 func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode, experimental bool) {
 	// Over HTTP the client may be on another machine, so the server's files
 	// aren't its own.
-	localFiles := s.transport == TransportStdio
-	if !localFiles {
+	if s.transport != TransportStdio {
 		s.logger.Info("Disabling db_query's file parameter over HTTP")
 	}
-	addTool(s, mode, newDBQueryTool(experimental, localFiles), s.handleDBQuery)
+	addTool(s, mode, newDBQueryTool(experimental, s.transport), s.handleDBQuery)
 
 	mcp.AddTool(s.mcpServer, newDBSchemaTool(experimental), s.handleDBSchema)
 	mcp.AddTool(s.mcpServer, newDBExtensionsListTool(experimental), s.handleDBExtensionsList)

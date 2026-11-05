@@ -35,16 +35,16 @@ type DBQueryInput struct {
 	Pooled         bool     `json:"pooled,omitempty"`
 }
 
-// Schema returns the input schema. Without localFiles the file property is left
-// out, so the schema rejects it.
-func (DBQueryInput) Schema(experimental, localFiles bool) *jsonschema.Schema {
+// Schema returns the input schema. Over any transport but stdio the file
+// property is left out, so the schema rejects it.
+func (DBQueryInput) Schema(experimental bool, transport Transport) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBQueryInput](nil))
 
 	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service." + branchIDHelp(experimental, "runs the query against that branch")
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
-	if localFiles {
+	if transport == TransportStdio {
 		schema.Properties["query"].Description = "PostgreSQL query to execute. Exactly one of 'query' or 'file' must be provided."
 
 		schema.Properties["file"].Description = "Path to a SQL file on disk to execute, instead of passing its contents as 'query'. The file must be within the MCP server's working directory, and a relative path is resolved against it. Exactly one of 'query' or 'file' must be provided."
@@ -121,9 +121,9 @@ func (DBQueryOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newDBQueryTool(experimental, localFiles bool) *mcp.Tool {
+func newDBQueryTool(experimental bool, transport Transport) *mcp.Tool {
 	sqlSource := "Pass the SQL as 'query'."
-	if localFiles {
+	if transport == TransportStdio {
 		sqlSource = "Pass the SQL as 'query', or point 'file' at a .sql file within the MCP server's working directory to run its contents."
 	}
 
@@ -139,7 +139,7 @@ Multi-statement queries (semicolon-separated) are supported when no parameters a
 Process data in the database, not in your context: aggregate, filter, sort/limit, and join in SQL rather than fetching raw rows.
 
 WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
-		InputSchema:  DBQueryInput{}.Schema(experimental, localFiles),
+		InputSchema:  DBQueryInput{}.Schema(experimental, transport),
 		OutputSchema: DBQueryOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
