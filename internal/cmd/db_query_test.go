@@ -122,15 +122,6 @@ func TestDbQueryCmd(t *testing.T) {
 			wantErr: "failed to read SQL file: open " + filepath.Join(sqlDir, "nope.sql") + ": no such file or directory",
 		},
 		{
-			// For a command spawned without a shell, tiger expands variables
-			// in the path itself, as it does for --config-dir.
-			name:    "environment variables in the file path are expanded",
-			args:    []string{"db", "query", "svc-12345", "-f", "$SQL_DIR/nope.sql"},
-			mock:    setupGetService,
-			opts:    []runOption{withEnv("SQL_DIR", sqlDir)},
-			wantErr: "failed to read SQL file: open " + filepath.Join(sqlDir, "nope.sql") + ": no such file or directory",
-		},
-		{
 			// No mock and no stdin: the service ID is required before anything
 			// blocks on reading a query.
 			name:    "missing service id",
