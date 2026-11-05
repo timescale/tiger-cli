@@ -257,6 +257,10 @@ func (s *Server) resolveQueryInput(query, file string) (string, error) {
 // working directory: the directory the client launched it in, and so the
 // project it's working on. Going through os.Root also refuses a symlink that
 // leads out of it.
+//
+// Unlike tiger db query --file, the path doesn't have environment variables
+// expanded: it comes from the model, and expanding them would let it read the
+// server's environment back out through the error.
 func readWorkingDirFile(path string) ([]byte, error) {
 	wd, err := os.Getwd()
 	if err != nil {
