@@ -49,16 +49,46 @@ func TestDBQueryTool(t *testing.T) {
 		}
 	}
 
-	sqlDir := t.TempDir()
-	sqlFile := filepath.Join(sqlDir, "query.sql")
-	if err := os.WriteFile(sqlFile, []byte("SELECT * FROM users;\n"), 0o600); err != nil {
-		t.Fatalf("failed to write SQL file: %v", err)
+	// The SQL files are read from the working directory the cases run in
+	// (withWorkingDir); anything outside it is off limits, even via symlink.
+	workDir := t.TempDir()
+	outsideDir := t.TempDir()
+	writeFile := func(path string, data string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatalf("failed to create directory: %v", err)
+		}
+		if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+			t.Fatalf("failed to write file: %v", err)
+		}
 	}
-	emptyFile := filepath.Join(sqlDir, "empty.sql")
-	if err := os.WriteFile(emptyFile, nil, 0o600); err != nil {
-		t.Fatalf("failed to write empty SQL file: %v", err)
+	sqlFile := filepath.Join(workDir, "query.sql")
+	writeFile(sqlFile, "SELECT * FROM users;\n")
+	writeFile(filepath.Join(workDir, "migrations", "001_init.sql"), "CREATE TABLE users (id int);\n")
+	writeFile(filepath.Join(workDir, "empty.sql"), "")
+	outsideFile := filepath.Join(outsideDir, "secret.sql")
+	writeFile(outsideFile, "SELECT 'secret';\n")
+	if err := os.Symlink(outsideFile, filepath.Join(workDir, "escape.sql")); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
 	}
-	missingFile := filepath.Join(sqlDir, "nope.sql")
+	if err := os.Symlink("query.sql", filepath.Join(workDir, "link.sql")); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+	resolvedSQLFile, err := filepath.EvalSymlinks(sqlFile)
+	if err != nil {
+		t.Fatalf("failed to resolve SQL file path: %v", err)
+	}
+	inWorkDir := withWorkingDir(workDir)
+	outsideMsg := func(path string) string {
+		return "SQL file " + path + " is outside the working directory " + workDir
+	}
+	// fileArgs is what the handler builds from query.sql.
+	fileArgs := common.ExecuteQueryArgs{
+		Query:    "SELECT * FROM users;\n",
+		Role:     "tsdbadmin",
+		MaxRows:  config.DefaultMCPMaxRows,
+		MaxBytes: mcpMaxResponseBytes,
+	}
 
 	const bothOrNeitherMsg = "exactly one of 'query' or 'file' must be provided"
 
@@ -135,7 +165,8 @@ func TestDBQueryTool(t *testing.T) {
 		{
 			name:    "both query and file",
 			tool:    toolDBQuery,
-			args:    map[string]any{"service_id": "e6ue9697jf", "query": "SELECT 1", "file": sqlFile},
+			args:    map[string]any{"service_id": "e6ue9697jf", "query": "SELECT 1", "file": "query.sql"},
+			opts:    []runOption{inWorkDir},
 			wantErr: bothOrNeitherMsg,
 		},
 		{
@@ -143,8 +174,8 @@ func TestDBQueryTool(t *testing.T) {
 			// its own: the schema leaves file out and rejects it.
 			name:    "file is rejected over HTTP",
 			tool:    toolDBQuery,
-			args:    map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
-			opts:    []runOption{withTransport(TransportHTTP)},
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": "query.sql"},
+			opts:    []runOption{inWorkDir, withTransport(TransportHTTP)},
 			wantErr: `validating "arguments": validating root: unexpected additional properties ["file"]`,
 		},
 		{
@@ -162,10 +193,44 @@ func TestDBQueryTool(t *testing.T) {
 			wantErr: "'query' must be provided",
 		},
 		{
+			name:    "relative path escaping the working directory",
+			tool:    toolDBQuery,
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": "../secret.sql"},
+			opts:    []runOption{inWorkDir},
+			wantErr: outsideMsg("../secret.sql"),
+		},
+		{
+			name:    "absolute path outside the working directory",
+			tool:    toolDBQuery,
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": outsideFile},
+			opts:    []runOption{inWorkDir},
+			wantErr: outsideMsg(outsideFile),
+		},
+		{
+			// The home directory isn't the working directory, so a ~ path is
+			// refused like any other path outside it.
+			name: "home directory path outside the working directory",
+			tool: toolDBQuery,
+			args: map[string]any{"service_id": "e6ue9697jf", "file": "~/secret.sql"},
+			opts: []runOption{inWorkDir, withSetup(func(t *testing.T) {
+				t.Setenv("HOME", outsideDir)
+			})},
+			wantErr: outsideMsg("~/secret.sql"),
+		},
+		{
+			// The path itself is inside, but os.Root won't follow the link out.
+			name:    "symlink escaping the working directory",
+			tool:    toolDBQuery,
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": "escape.sql"},
+			opts:    []runOption{inWorkDir},
+			wantErr: "failed to read SQL file: openat escape.sql: path escapes from parent",
+		},
+		{
 			name:    "missing SQL file",
 			tool:    toolDBQuery,
-			args:    map[string]any{"service_id": "e6ue9697jf", "file": missingFile},
-			wantErr: "failed to read SQL file: open " + missingFile + ": no such file or directory",
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": "nope.sql"},
+			opts:    []runOption{inWorkDir},
+			wantErr: "failed to read SQL file: openat nope.sql: no such file or directory",
 		},
 		{
 			// Expanding them would let a tool argument read any variable in the
@@ -173,23 +238,25 @@ func TestDBQueryTool(t *testing.T) {
 			name: "environment variables in the file path are not expanded",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "e6ue9697jf", "file": "$SQL_DIR/query.sql"},
-			opts: []runOption{withSetup(func(t *testing.T) {
-				t.Setenv("SQL_DIR", sqlDir)
+			opts: []runOption{inWorkDir, withSetup(func(t *testing.T) {
+				t.Setenv("SQL_DIR", workDir)
 			})},
-			wantErr: "failed to read SQL file: open $SQL_DIR/query.sql: no such file or directory",
+			wantErr: "failed to read SQL file: openat $SQL_DIR/query.sql: no such file or directory",
 		},
 		{
 			name:    "empty SQL file",
 			tool:    toolDBQuery,
-			args:    map[string]any{"service_id": "e6ue9697jf", "file": emptyFile},
-			wantErr: "SQL file " + emptyFile + " is empty",
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": "empty.sql"},
+			opts:    []runOption{inWorkDir},
+			wantErr: "SQL file empty.sql is empty",
 		},
 		{
 			// The file is read before the service is looked up, so reaching the
 			// connection step proves its contents became the query.
 			name:    "SQL file read then stops before connecting",
 			tool:    toolDBQuery,
-			args:    map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": "query.sql"},
+			opts:    []runOption{inWorkDir},
 			mock:    setupGetWithStatus(api.DeployStatusREADY),
 			wantErr: noEndpointMsg,
 		},
@@ -368,15 +435,49 @@ func TestDBQueryTool(t *testing.T) {
 		},
 		{
 			// The file's contents become the query text.
-			name: "runs the query read from a file",
+			name:       "runs the query read from a file",
+			tool:       toolDBQuery,
+			args:       map[string]any{"service_id": "e6ue9697jf", "file": "query.sql"},
+			opts:       []runOption{inWorkDir, withExecuteQuery(primaryTarget, fileArgs, result, nil)},
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
+		},
+		{
+			name: "runs a file in a subdirectory of the working directory",
 			tool: toolDBQuery,
-			args: map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
-			opts: []runOption{withExecuteQuery(primaryTarget, common.ExecuteQueryArgs{
-				Query:    "SELECT * FROM users;\n",
+			args: map[string]any{"service_id": "e6ue9697jf", "file": "./migrations/001_init.sql"},
+			opts: []runOption{inWorkDir, withExecuteQuery(primaryTarget, common.ExecuteQueryArgs{
+				Query:    "CREATE TABLE users (id int);\n",
 				Role:     "tsdbadmin",
 				MaxRows:  config.DefaultMCPMaxRows,
 				MaxBytes: mcpMaxResponseBytes,
 			}, result, nil)},
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
+		},
+		{
+			name:       "runs a file given by an absolute path within the working directory",
+			tool:       toolDBQuery,
+			args:       map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
+			opts:       []runOption{inWorkDir, withExecuteQuery(primaryTarget, fileArgs, result, nil)},
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
+		},
+		{
+			// On macOS the temp directory is under /var, a symlink to
+			// /private/var, so the resolved form must be accepted too.
+			name:       "runs a file given by its symlink-resolved absolute path",
+			tool:       toolDBQuery,
+			args:       map[string]any{"service_id": "e6ue9697jf", "file": resolvedSQLFile},
+			opts:       []runOption{inWorkDir, withExecuteQuery(primaryTarget, fileArgs, result, nil)},
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
+		},
+		{
+			name:       "follows a symlink that stays within the working directory",
+			tool:       toolDBQuery,
+			args:       map[string]any{"service_id": "e6ue9697jf", "file": "link.sql"},
+			opts:       []runOption{inWorkDir, withExecuteQuery(primaryTarget, fileArgs, result, nil)},
 			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: wantResult,
 		},

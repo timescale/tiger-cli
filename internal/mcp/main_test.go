@@ -304,6 +304,14 @@ func withSetup(f func(t *testing.T)) runOption {
 	}
 }
 
+// withWorkingDir makes dir the process working directory for the case, which
+// is what bounds the files a tool may read.
+func withWorkingDir(dir string) runOption {
+	return withSetup(func(t *testing.T) {
+		t.Chdir(dir)
+	})
+}
+
 // withConfig seeds the config file the server starts with (e.g.
 // map[string]any{"read_only": "prod"}), which also decides which tools are
 // registered. Repeated withConfig options merge, later values winning per key.

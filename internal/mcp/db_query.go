@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -46,8 +47,8 @@ func (DBQueryInput) Schema(experimental, localFiles bool) *jsonschema.Schema {
 	if localFiles {
 		schema.Properties["query"].Description = "PostgreSQL query to execute. Exactly one of 'query' or 'file' must be provided."
 
-		schema.Properties["file"].Description = "Path to a SQL file on disk to execute, instead of passing its contents as 'query'. Exactly one of 'query' or 'file' must be provided."
-		schema.Properties["file"].Examples = []any{"./migrations/001_init.sql", "~/schema.sql"}
+		schema.Properties["file"].Description = "Path to a SQL file on disk to execute, instead of passing its contents as 'query'. The file must be within the MCP server's working directory, and a relative path is resolved against it. Exactly one of 'query' or 'file' must be provided."
+		schema.Properties["file"].Examples = []any{"./migrations/001_init.sql", "schema.sql"}
 	} else {
 		schema.Properties["query"].Description = "PostgreSQL query to execute."
 		schema.Required = append(schema.Required, "query")
@@ -123,7 +124,7 @@ func (DBQueryOutput) Schema() *jsonschema.Schema {
 func newDBQueryTool(experimental, localFiles bool) *mcp.Tool {
 	sqlSource := "Pass the SQL as 'query'."
 	if localFiles {
-		sqlSource = "Pass the SQL as 'query', or point 'file' at a .sql file on disk to run its contents."
+		sqlSource = "Pass the SQL as 'query', or point 'file' at a .sql file within the MCP server's working directory to run its contents."
 	}
 
 	return &mcp.Tool{
@@ -240,9 +241,9 @@ func (s *Server) resolveQueryInput(query, file string) (string, error) {
 		return query, nil
 	}
 
-	data, err := os.ReadFile(util.ExpandHome(file))
+	data, err := readWorkingDirFile(file)
 	if err != nil {
-		return "", fmt.Errorf("failed to read SQL file: %w", err)
+		return "", err
 	}
 	if len(data) == 0 {
 		return "", fmt.Errorf("SQL file %s is empty", file)
@@ -250,6 +251,57 @@ func (s *Server) resolveQueryInput(query, file string) (string, error) {
 	// Whitespace and comments go through to the database, which reports on
 	// them the way it would for any other client.
 	return string(data), nil
+}
+
+// readWorkingDirFile reads the file at path, which must be within the server's
+// working directory: the directory the client launched it in, and so the
+// project it's working on. Going through os.Root also refuses a symlink that
+// leads out of it.
+func readWorkingDirFile(path string) ([]byte, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	rel, ok := relativeToDir(wd, util.ExpandHome(path))
+	if !ok {
+		return nil, fmt.Errorf("SQL file %s is outside the working directory %s", path, wd)
+	}
+
+	root, err := os.OpenRoot(wd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open working directory: %w", err)
+	}
+	defer root.Close()
+
+	data, err := root.ReadFile(rel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read SQL file: %w", err)
+	}
+	if err := root.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close working directory: %w", err)
+	}
+	return data, nil
+}
+
+// relativeToDir returns path relative to dir, reporting whether it lies within
+// it. An absolute path is accepted under either dir as given or dir with its
+// symlinks resolved, since os.Getwd may return either form (e.g. /var or
+// /private/var on macOS) and a client may have been told the other.
+func relativeToDir(dir, path string) (string, bool) {
+	if !filepath.IsAbs(path) {
+		return path, filepath.IsLocal(path)
+	}
+	dirs := []string{dir}
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil && resolved != dir {
+		dirs = append(dirs, resolved)
+	}
+	for _, d := range dirs {
+		if rel, err := filepath.Rel(d, path); err == nil && filepath.IsLocal(rel) {
+			return rel, true
+		}
+	}
+	return "", false
 }
 
 // resolveMaxRows returns the row cap from mcp_max_rows, falling back to the

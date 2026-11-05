@@ -238,7 +238,7 @@ The MCP server exposes the following tools to AI assistants:
 - `service_metrics_series` - Fetch a metric's time series over a time window, with label filters, an aggregation function, group by and bucket size
 
 **Database Operations:**
-- `db_query` - Execute SQL queries against a database service, passed inline or as a path to a SQL file, with support for parameterized queries, custom timeouts, and connection pooling
+- `db_query` - Execute SQL queries against a database service, passed inline or as a path to a SQL file within the server's working directory, with support for parameterized queries, custom timeouts, and connection pooling
 - `db_schema` - Display a service's database schema (tables, views, materialized views, enums, functions, procedures, indexes, triggers, and TimescaleDB hypertable/continuous aggregate metadata) as readable text for an agent's context
 - `db_extensions_list` - List the PostgreSQL extensions installed in a service database, with each extension's version, schema, and description
 
