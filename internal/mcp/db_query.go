@@ -219,7 +219,7 @@ func resolveQueryInput(query, file string) (string, error) {
 		return query, nil
 	}
 
-	data, err := os.ReadFile(util.ExpandPath(file))
+	data, err := os.ReadFile(util.ExpandHome(file))
 	if err != nil {
 		return "", fmt.Errorf("failed to read SQL file: %w", err)
 	}

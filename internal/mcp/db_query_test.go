@@ -145,6 +145,17 @@ func TestDBQueryTool(t *testing.T) {
 			wantErr: "failed to read SQL file: open " + missingFile + ": no such file or directory",
 		},
 		{
+			// Expanding them would let a tool argument read any variable in the
+			// server's environment back out through the error.
+			name: "environment variables in the file path are not expanded",
+			tool: toolDBQuery,
+			args: map[string]any{"service_id": "e6ue9697jf", "file": "$SQL_DIR/query.sql"},
+			opts: []runOption{withSetup(func(t *testing.T) {
+				t.Setenv("SQL_DIR", sqlDir)
+			})},
+			wantErr: "failed to read SQL file: open $SQL_DIR/query.sql: no such file or directory",
+		},
+		{
 			name:    "empty SQL file",
 			tool:    toolDBQuery,
 			args:    map[string]any{"service_id": "e6ue9697jf", "file": emptyFile},

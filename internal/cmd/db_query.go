@@ -174,7 +174,7 @@ func readQuery(cmd *cobra.Command, command, file string) (string, error) {
 	case cmd.Flags().Changed("command"):
 		query = command
 	case cmd.Flags().Changed("file"):
-		data, err := os.ReadFile(util.ExpandPath(file))
+		data, err := os.ReadFile(util.ExpandHome(file))
 		if err != nil {
 			return "", fmt.Errorf("failed to read SQL file: %w", err)
 		}
