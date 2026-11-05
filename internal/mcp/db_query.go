@@ -226,7 +226,7 @@ func (s *Server) handleDBQuery(ctx context.Context, req *mcp.CallToolRequest, in
 // resolveQueryInput returns the SQL to run, read from file when that's what the
 // caller passed instead of inline query text.
 func (s *Server) resolveQueryInput(query, file string) (string, error) {
-	if !s.localFiles() {
+	if s.transport != TransportStdio {
 		// The schema rejects file here, and requires query, but not that it's
 		// non-empty.
 		if query == "" {
