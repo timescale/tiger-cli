@@ -19,6 +19,7 @@ Supported Clients:
   antigravity              Configure for Google Antigravity
   kiro-cli                 Configure for Kiro CLI
   copilot                  Configure for GitHub Copilot CLI
+  pi                       Configure for Pi
 
 The command will:
 - Automatically detect the appropriate configuration file location

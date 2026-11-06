@@ -180,6 +180,7 @@ tiger mcp install copilot          # GitHub Copilot CLI
 tiger mcp install cursor           # Cursor IDE
 tiger mcp install devin            # Devin
 tiger mcp install gemini           # Gemini CLI
+tiger mcp install pi               # Pi 0.99.0 or later
 tiger mcp install vscode           # VS Code
 ```
 
@@ -277,7 +278,7 @@ tiger skills install universal claude-code
 
 Skills are installed for the current user. The `universal` location,
 `~/.agents/skills`, is read by most coding agents (Cursor, Codex, Gemini CLI,
-VS Code, GitHub Copilot CLI, Devin). Claude Code, Kiro CLI, and Google
+VS Code, GitHub Copilot CLI, Devin, Pi). Claude Code, Kiro CLI, and Google
 Antigravity read their own skills directories, so they're separate locations
 (`claude-code`, `kiro-cli`, `antigravity`). Naming a client that reads
 `~/.agents/skills`, such as `cursor`, selects `universal`. Use `--skills-dir`
