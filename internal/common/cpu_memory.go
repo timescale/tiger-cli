@@ -15,25 +15,35 @@ type CPUMemoryConfig struct {
 	MemoryGBs int  // Memory in GB
 }
 
-func (c *CPUMemoryConfig) Matches(cpuMillis, memoryGBs string) bool {
+// Matches reports whether the given CPU and memory values, either of which may
+// be omitted, name this configuration. CPU is given in cores (e.g. "0.5", "2"),
+// or in millicores, which are deprecated but still accepted for backwards
+// compatibility. The two can't be confused, since the fewest millicores
+// offered exceeds the most cores (guarded by
+// TestCPUMemoryConfigs_CoresAndMillicoresDisjoint).
+func (c *CPUMemoryConfig) Matches(cpu, memoryGBs string) bool {
+	if cpu == "" && memoryGBs == "" {
+		return false
+	}
+	return (cpu == "" || c.matchesCPU(cpu)) && (memoryGBs == "" || c.matchesMemory(memoryGBs))
+}
+
+func (c *CPUMemoryConfig) matchesCPU(cpu string) bool {
 	if c.Shared {
-		if (cpuMillis == "shared" && memoryGBs == "shared") ||
-			(cpuMillis == "shared" && memoryGBs == "") ||
-			(cpuMillis == "" && memoryGBs == "shared") {
-			return true
-		}
+		return cpu == "shared"
 	}
-
-	cpuMillisStr := strconv.Itoa(c.CPUMillis)
-	memoryGBsStr := strconv.Itoa(c.MemoryGBs)
-
-	if (cpuMillis == cpuMillisStr && memoryGBs == memoryGBsStr) ||
-		(cpuMillis == cpuMillisStr && memoryGBs == "") ||
-		(cpuMillis == "" && memoryGBs == memoryGBsStr) {
-		return true
+	value, err := strconv.ParseFloat(cpu, 64)
+	if err != nil {
+		return false
 	}
+	return value == float64(c.CPUMillis)/1000 || value == float64(c.CPUMillis)
+}
 
-	return false
+func (c *CPUMemoryConfig) matchesMemory(memoryGBs string) bool {
+	if c.Shared {
+		return memoryGBs == "shared"
+	}
+	return memoryGBs == strconv.Itoa(c.MemoryGBs)
 }
 
 func (c *CPUMemoryConfig) CPUMillisString() *string {
@@ -158,15 +168,16 @@ func (c CPUMemoryConfigs) String() string {
 }
 
 // ValidateAndNormalize validates CPU/Memory values against the configurations
-// and fills in whichever one was omitted from the matching configuration.
-func (c CPUMemoryConfigs) ValidateAndNormalize(cpuMillis, memoryGBs string) (*CPUMemoryConfig, error) {
+// and fills in whichever one was omitted from the matching configuration. See
+// Matches for the accepted forms.
+func (c CPUMemoryConfigs) ValidateAndNormalize(cpu, memoryGBs string) (*CPUMemoryConfig, error) {
 	// Return nil for omitted CPU/memory so that values are omitted from the API request
-	if cpuMillis == "" && memoryGBs == "" {
+	if cpu == "" && memoryGBs == "" {
 		return nil, nil
 	}
 
 	for _, config := range c {
-		if config.Matches(cpuMillis, memoryGBs) {
+		if config.Matches(cpu, memoryGBs) {
 			return &config, nil
 		}
 	}

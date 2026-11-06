@@ -6,7 +6,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 	testCases := []struct {
 		name         string
 		configs      CPUMemoryConfigs
-		cpuMillis    string
+		cpu          string
 		memoryGbs    string
 		expectError  bool
 		expectNil    bool
@@ -17,7 +17,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		{
 			name:        "Valid combination both set (1 CPU, 4GB)",
 			configs:     StandardCPUMemoryConfigs(),
-			cpuMillis:   "1000",
+			cpu:         "1",
 			memoryGbs:   "4",
 			expectError: false,
 			expectedCPU: 1000,
@@ -26,7 +26,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		{
 			name:        "Valid combination both set (0.5 CPU, 2GB)",
 			configs:     StandardCPUMemoryConfigs(),
-			cpuMillis:   "500",
+			cpu:         "0.5",
 			memoryGbs:   "2",
 			expectError: false,
 			expectedCPU: 500,
@@ -35,7 +35,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		{
 			name:         "Valid shared/shared combination",
 			configs:      StandardCPUMemoryConfigs(),
-			cpuMillis:    "shared",
+			cpu:          "shared",
 			memoryGbs:    "shared",
 			expectError:  false,
 			expectShared: true,
@@ -43,7 +43,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		{
 			name:         "CPU shared, memory empty (auto-configure to shared)",
 			configs:      StandardCPUMemoryConfigs(),
-			cpuMillis:    "shared",
+			cpu:          "shared",
 			memoryGbs:    "",
 			expectError:  false,
 			expectShared: true,
@@ -51,7 +51,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		{
 			name:         "CPU empty, memory shared (auto-configure to shared)",
 			configs:      StandardCPUMemoryConfigs(),
-			cpuMillis:    "",
+			cpu:          "",
 			memoryGbs:    "shared",
 			expectError:  false,
 			expectShared: true,
@@ -59,14 +59,14 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		{
 			name:        "Invalid combination both set (1 CPU, 8GB)",
 			configs:     StandardCPUMemoryConfigs(),
-			cpuMillis:   "1000",
+			cpu:         "1",
 			memoryGbs:   "8",
 			expectError: true,
 		},
 		{
 			name:        "CPU only auto-configure memory (2 CPU -> 8GB)",
 			configs:     StandardCPUMemoryConfigs(),
-			cpuMillis:   "2000",
+			cpu:         "2",
 			memoryGbs:   "",
 			expectError: false,
 			expectedCPU: 2000,
@@ -75,7 +75,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		{
 			name:        "Memory only auto-configure CPU (16GB -> 4 CPU)",
 			configs:     StandardCPUMemoryConfigs(),
-			cpuMillis:   "",
+			cpu:         "",
 			memoryGbs:   "16",
 			expectError: false,
 			expectedCPU: 4000,
@@ -84,21 +84,21 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		{
 			name:        "Invalid CPU only",
 			configs:     StandardCPUMemoryConfigs(),
-			cpuMillis:   "1500",
+			cpu:         "1.5",
 			memoryGbs:   "",
 			expectError: true,
 		},
 		{
 			name:        "Invalid memory only",
 			configs:     StandardCPUMemoryConfigs(),
-			cpuMillis:   "",
+			cpu:         "",
 			memoryGbs:   "12",
 			expectError: true,
 		},
 		{
 			name:        "Fluid CPU only auto-configure memory (1 CPU -> 8GB)",
 			configs:     FluidCPUMemoryConfigs(),
-			cpuMillis:   "1000",
+			cpu:         "1",
 			expectedCPU: 1000,
 			expectedMem: 8,
 		},
@@ -119,20 +119,61 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		{
 			name:        "Fluid rejects a standard combination (1 CPU, 4GB)",
 			configs:     FluidCPUMemoryConfigs(),
-			cpuMillis:   "1000",
+			cpu:         "1",
 			memoryGbs:   "4",
 			expectError: true,
 		},
 		{
 			name:        "Fluid rejects shared",
 			configs:     FluidCPUMemoryConfigs(),
-			cpuMillis:   "shared",
+			cpu:         "shared",
+			expectError: true,
+		},
+		{
+			name:        "Cores with trailing zeros (0.50 CPU)",
+			configs:     StandardCPUMemoryConfigs(),
+			cpu:         "0.50",
+			expectedCPU: 500,
+			expectedMem: 2,
+		},
+		{
+			name:        "Fluid fractional cores (0.25 CPU)",
+			configs:     FluidCPUMemoryConfigs(),
+			cpu:         "0.25",
+			expectedCPU: 250,
+			expectedMem: 2,
+		},
+		{
+			name:        "Deprecated millicores still accepted (1000m, 4GB)",
+			configs:     StandardCPUMemoryConfigs(),
+			cpu:         "1000",
+			memoryGbs:   "4",
+			expectedCPU: 1000,
+			expectedMem: 4,
+		},
+		{
+			name:        "Deprecated millicores still accepted on fluid (250m)",
+			configs:     FluidCPUMemoryConfigs(),
+			cpu:         "250",
+			expectedCPU: 250,
+			expectedMem: 2,
+		},
+		{
+			name:        "Invalid millicores",
+			configs:     StandardCPUMemoryConfigs(),
+			cpu:         "1500",
+			expectError: true,
+		},
+		{
+			name:        "Non-numeric CPU",
+			configs:     StandardCPUMemoryConfigs(),
+			cpu:         "two",
 			expectError: true,
 		},
 		{
 			name:        "Neither flag set (returns nil)",
 			configs:     StandardCPUMemoryConfigs(),
-			cpuMillis:   "",
+			cpu:         "",
 			memoryGbs:   "",
 			expectError: false,
 			expectNil:   true,
@@ -141,7 +182,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			config, err := tc.configs.ValidateAndNormalize(tc.cpuMillis, tc.memoryGbs)
+			config, err := tc.configs.ValidateAndNormalize(tc.cpu, tc.memoryGbs)
 
 			if tc.expectError {
 				if err == nil {
@@ -182,6 +223,20 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 				t.Errorf("Expected memory %d, got %d", tc.expectedMem, config.MemoryGBs)
 			}
 		})
+	}
+}
+
+// TestCPUMemoryConfigs_CoresAndMillicoresDisjoint guards the assumption that
+// lets Matches accept CPU in either cores or millicores: no configuration's
+// core count equals any configuration's millicore count.
+func TestCPUMemoryConfigs_CoresAndMillicoresDisjoint(t *testing.T) {
+	configs := append(StandardCPUMemoryConfigs(), FluidCPUMemoryConfigs()...).WithoutShared()
+	for _, a := range configs {
+		for _, b := range configs {
+			if float64(a.CPUMillis)/1000 == float64(b.CPUMillis) {
+				t.Errorf("%s CPU is ambiguous with %dm", FormatCPUCores(a.CPUMillis), b.CPUMillis)
+			}
+		}
 	}
 }
 
