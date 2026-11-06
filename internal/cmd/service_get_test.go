@@ -328,7 +328,7 @@ status: READY
 │ Platform          │ FLUID                                                                                       │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
-│ CPU               │ 1 cores                                                                                     │
+│ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
 │ IOPS              │ 6000                                                                                        │
 │ Branches          │ 2                                                                                           │
@@ -461,7 +461,7 @@ status: READY
 │ Status            │ READY                                                                                                       │
 │ Type              │ TIMESCALEDB                                                                                                 │
 │ Region            │ us-east-1                                                                                                   │
-│ CPU               │ 1 cores                                                                                                     │
+│ CPU               │ 1 core                                                                                                      │
 │ Memory            │ 4 GB                                                                                                        │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                                     │
@@ -491,7 +491,7 @@ status: READY
 │ Status      │ READY                                                                                     │
 │ Type        │ TIMESCALEDB                                                                               │
 │ Region      │ us-east-1                                                                                 │
-│ CPU         │ 1 cores                                                                                   │
+│ CPU         │ 1 core                                                                                    │
 │ Memory      │ 4 GB                                                                                      │
 │ Created     │ 2025-01-15 10:30:00 UTC                                                                   │
 │ Console URL │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview │
@@ -518,7 +518,7 @@ status: READY
 │ Status      │ READY                                                                                     │
 │ Type        │ TIMESCALEDB                                                                               │
 │ Region      │ us-east-1                                                                                 │
-│ CPU         │ 1 cores                                                                                   │
+│ CPU         │ 1 core                                                                                    │
 │ Memory      │ 4 GB                                                                                      │
 │ Created     │ 2025-01-15 10:30:00 UTC                                                                   │
 │ Console URL │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview │

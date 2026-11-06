@@ -380,7 +380,7 @@ Connect with: tiger db psql
 │ Platform          │ FLUID                                                                                       │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
-│ CPU               │ 1 cores                                                                                     │
+│ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
 │ IOPS              │ 12000                                                                                       │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
@@ -404,7 +404,7 @@ const sampleForkedServiceTable = `┌──────────────�
 │ Status            │ READY                                                                                       │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
-│ CPU               │ 1 cores                                                                                     │
+│ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │

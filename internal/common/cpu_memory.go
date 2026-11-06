@@ -84,6 +84,15 @@ func FormatCPUCores(cpuMillis int) string {
 	return strconv.FormatFloat(float64(cpuMillis)/1000, 'f', -1, 64)
 }
 
+// FormatCPUCoresWithUnit formats millicores as a number of cores followed by
+// "core" or "cores" (e.g. "0.5 cores", "1 core").
+func FormatCPUCoresWithUnit(cpuMillis int) string {
+	if cpuMillis == 1000 {
+		return "1 core"
+	}
+	return FormatCPUCores(cpuMillis) + " cores"
+}
+
 type CPUMemoryConfigs []CPUMemoryConfig
 
 // StandardCPUMemoryConfigs returns the allowed CPU/Memory configurations for

@@ -157,7 +157,7 @@ func outputServiceTable(output io.Writer, service OutputService) error {
 		resource := service.Resources[0] // Get first resource
 		if resource.Spec != nil {
 			if resource.Spec.CPUMillis != nil {
-				table.Append("CPU", common.FormatCPUCores(*resource.Spec.CPUMillis)+" cores")
+				table.Append("CPU", common.FormatCPUCoresWithUnit(*resource.Spec.CPUMillis))
 			} else {
 				// CPU is null - this indicates a free tier service
 				table.Append("CPU", "shared")
