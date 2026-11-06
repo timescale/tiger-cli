@@ -16,11 +16,7 @@ import (
 func buildServiceDeleteCmd(app *common.App) *cobra.Command {
 	var confirm bool
 
-	cmd := &cobra.Command{
-		Use:     "delete <name-or-id>",
-		Aliases: []string{"rm"},
-		Short:   "Delete a database service",
-		Long: `Delete a database service permanently.
+	long := `Delete a database service permanently.
 
 The service can be given by ID or name, but must be given explicitly: there is
 no fallback to the default service.
@@ -28,8 +24,23 @@ no fallback to the default service.
 This operation is irreversible. By default, you will be prompted to type the
 service ID to confirm deletion — the ID, not the name — unless you use the
 --confirm flag.
+`
+	// Branches are a preview, so only the experimental help mentions them. The
+	// command lists them regardless: they're deleted either way.
+	if app.Experimental {
+		long += `
+Deleting a service also deletes all of its branches. They are listed in the
+confirmation prompt and again once the service is deleted.
+`
+	}
+	long += `
+Note for AI agents: Always confirm with the user before performing this destructive operation.`
 
-Note for AI agents: Always confirm with the user before performing this destructive operation.`,
+	cmd := &cobra.Command{
+		Use:     "delete <name-or-id>",
+		Aliases: []string{"rm"},
+		Short:   "Delete a database service",
+		Long:    long,
 		Example: `  # Delete a service (with confirmation prompt)
   tiger service delete svc-12345
 
@@ -57,10 +68,17 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				return err
 			}
 
+			if !confirm && (!util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr())) {
+				return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
+			}
+
+			branches := listBranchesToDelete(cmd, client, projectID, *service)
+
 			// Prompt for confirmation unless --confirm is used
 			if !confirm {
-				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
+				if len(branches) > 0 {
+					cmd.PrintErrf("This service has %s, which will also be deleted:\n", common.FormatBranchCount(len(branches)))
+					printBranchLabels(cmd, branches)
 				}
 				// Show both forms, but take only the ID: a name can move to a
 				// different service through a rename, so it is the wrong
@@ -92,7 +110,12 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
-			cmd.PrintErrf("Service %s deleted.\n", serviceLabel(*service))
+			if len(branches) == 0 {
+				cmd.PrintErrf("Service %s deleted.\n", serviceLabel(*service))
+				return nil
+			}
+			cmd.PrintErrf("Service %s deleted, along with its %s:\n", serviceLabel(*service), common.FormatBranchCount(len(branches)))
+			printBranchLabels(cmd, branches)
 			return nil
 		},
 	}
@@ -100,4 +123,29 @@ Note for AI agents: Always confirm with the user before performing this destruct
 	cmd.Flags().BoolVar(&confirm, "confirm", false, "Skip confirmation prompt (AI agents must confirm with user first)")
 
 	return cmd
+}
+
+// listBranchesToDelete returns the branches that deleting service takes with
+// it, so the command can show them before and after the delete. The API
+// deletes them without asking, so this isn't gated on the experimental env
+// var: whoever has branches gets told. A failed listing is a warning rather
+// than an error, so the delete can still go ahead.
+func listBranchesToDelete(cmd *cobra.Command, client api.ClientWithResponsesInterface, projectID string, service api.Service) []api.Branch {
+	if !common.CanHaveBranches(service) {
+		return nil
+	}
+	branches, err := common.ListBranches(cmd.Context(), client, projectID, service.ServiceID)
+	if err != nil {
+		cmd.PrintErrf("Warning: failed to list branches: %v\n", err)
+		cmd.PrintErrln("Any branches of this service will also be deleted.")
+		return nil
+	}
+	return branches
+}
+
+// printBranchLabels prints one indented line per branch.
+func printBranchLabels(cmd *cobra.Command, branches []api.Branch) {
+	for _, branch := range branches {
+		cmd.PrintErrf("  %s\n", branchLabel(branch))
+	}
 }

@@ -92,6 +92,20 @@ func TestServiceListCmd(t *testing.T) {
 			wantStderr: noServicesStderr,
 		},
 		{
+			// Structured output is always structured, so an empty list is
+			// still a list rather than a message.
+			name:       "empty list json",
+			args:       []string{"service", "list", "-o", "json"},
+			mock:       setupList(nil),
+			wantStdout: "[]\n",
+		},
+		{
+			name:       "empty list yaml",
+			args:       []string{"service", "list", "-o", "yaml"},
+			mock:       setupList(nil),
+			wantStdout: "[]\n",
+		},
+		{
 			name: "table output",
 			args: []string{"service", "list"},
 			mock: setupList(services),
@@ -123,7 +137,7 @@ func TestServiceListCmd(t *testing.T) {
 			args: []string{"service", "list", "-o", "yaml"},
 			mock: setupList(services),
 			wantStdout: `- connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
-  console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
+  console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview
   created: "2025-01-15T10:30:00Z"
   database: tsdb
   endpoint:
@@ -144,7 +158,7 @@ func TestServiceListCmd(t *testing.T) {
   service_type: TIMESCALEDB
   status: READY
 - connection_string: postgresql://tsdbadmin@svc-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
-  console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-67890
+  console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-67890/overview
   created: "2025-02-01T08:00:00Z"
   database: tsdb
   endpoint:
@@ -225,7 +239,7 @@ const serviceListJSON = `[
     "port": 5432,
     "database": "tsdb",
     "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
-    "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
+    "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview"
   },
   {
     "created": "2025-02-01T08:00:00Z",
@@ -253,7 +267,7 @@ const serviceListJSON = `[
     "port": 5432,
     "database": "tsdb",
     "connection_string": "postgresql://tsdbadmin@svc-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
-    "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-67890"
+    "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-67890/overview"
   }
 ]
 `

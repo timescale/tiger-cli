@@ -112,6 +112,12 @@ To get started, run:
 	cmd.AddCommand(buildProjectCmd(app))
 	cmd.AddCommand(buildServiceCmd(app))
 	cmd.AddCommand(buildDbCmd(app))
+
+	// Branches are a preview, unregistered until it graduates.
+	if app.Experimental {
+		cmd.AddCommand(buildBranchCmd(app))
+	}
+
 	cmd.AddCommand(buildMCPCmd(app))
 	cmd.AddCommand(buildSkillsCmd(app))
 	cmd.AddCommand(buildFeedbackCmd(app))

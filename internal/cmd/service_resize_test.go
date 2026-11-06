@@ -12,8 +12,43 @@ import (
 
 func TestServiceResizeCmd(t *testing.T) {
 	svc := sampleService()
+	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
+
+	// A fluid service at 1 CPU/8 GB.
+	fluidSvc := sampleService(fluidPlatform, func(s *api.Service) {
+		s.Resources[0].Spec.MemoryGbs = new(8)
+	})
 
 	runCmdTests(t, []cmdTest{
+		{
+			// The fluid platform and IOPS are a preview, so their help text is gated.
+			name:       "help omits the fluid platform and IOPS",
+			args:       []string{"service", "resize", "--help"},
+			wantStdout: matchHelp("Allowed CPU/Memory Configurations:", "fluid", "IOPS", "--iops"),
+		},
+		{
+			name: "experimental help lists the fluid platform configurations",
+			args: []string{"service", "resize", "--help"},
+			opts: []runOption{experimental},
+			wantStdout: matchHelp(`Allowed CPU/Memory Configurations (fluid platform):
+  0.25 CPU (250m) / 2GB  |  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB
+  4 CPU (4000m) / 32GB   |  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`),
+		},
+		{
+			name: "experimental help says resize changes IOPS",
+			args: []string{"service", "resize", "--help"},
+			opts: []runOption{experimental},
+			wantStdout: matchHelp(`Resize a database service by changing its CPU, memory, and provisioned IOPS
+allocation.`),
+		},
+		{
+			name: "experimental help says where to find the allowed IOPS values",
+			args: []string{"service", "resize", "--help"},
+			opts: []runOption{experimental},
+			wantStdout: matchHelp(`The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If only
+--iops is given, the service keeps its current CPU and memory.`),
+		},
 		{
 			name:    "not logged in",
 			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
@@ -39,19 +74,18 @@ func TestServiceResizeCmd(t *testing.T) {
 		},
 		{
 			name: "read-only prod allows DEV service",
-			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8", "--no-wait"},
+			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV")(m)
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
 						JSON202:      &svc,
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
-Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+The resize is in progress and may take several minutes to complete.
 `,
 		},
 		{
@@ -60,14 +94,21 @@ Use 'tiger service get' to check service status.
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
-			name:    "invalid cpu/memory combination",
-			args:    []string{"service", "resize", "svc-12345", "--cpu", "3000", "--memory", "8"},
-			wantErr: "invalid CPU/Memory combination. Allowed combinations: shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
-		},
-		{
 			name:    "missing cpu and memory",
 			args:    []string{"service", "resize", "svc-12345"},
 			wantErr: "must specify at least one of --cpu or --memory",
+		},
+		{
+			// --iops is a preview flag, so without the gate it doesn't exist.
+			name:    "iops flag rejected without experimental",
+			args:    []string{"service", "resize", "svc-12345", "--iops", "12000"},
+			wantErr: "unknown flag: --iops",
+		},
+		{
+			name:    "experimental missing cpu, memory, and iops",
+			args:    []string{"service", "resize", "svc-12345"},
+			opts:    []runOption{experimental},
+			wantErr: "must specify at least one of --cpu, --memory, or --iops",
 		},
 		{
 			name: "ambiguous name refused",
@@ -79,11 +120,38 @@ Use 'tiger service get' to check service status.
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
+			// The combination is validated against the service's platform, so
+			// the service is fetched first.
+			name: "invalid cpu/memory combination",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "3000", "--memory", "8"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+			},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
+		},
+		{
+			name: "shared rejected",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "shared"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+			},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
+		},
+		{
+			// Not gated on experimental: only a fluid service gets these.
+			name: "fluid service rejects a standard combination",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
+		},
+		{
 			name: "network error",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService())
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr:    "failed to resize service: connection refused",
@@ -94,7 +162,7 @@ Use 'tiger service get' to check service status.
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService())
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
 						JSON4XX:      &api.Error{Message: new("service not found")},
@@ -109,7 +177,7 @@ Use 'tiger service get' to check service status.
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService())
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
 					}, nil)
@@ -118,104 +186,99 @@ Use 'tiger service get' to check service status.
 			wantStderr: "Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...\nError: empty response from API\n",
 		},
 		{
-			name: "success with wait, service immediately ready",
+			name: "success",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService())
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
 						JSON202:      &svc,
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
-Resize request accepted for service 'test-service' (svc-12345).
-Waiting for resize to complete (timeout: 10m0s)...
-Service resized to 2 CPU/8 GB.
-`,
-		},
-		{
-			name: "no wait",
-			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8", "--no-wait"},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService())
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
-					Return(&api.ResizeServiceResponse{
-						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &svc,
-					}, nil)
-			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
-Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+The resize is in progress and may take several minutes to complete.
 `,
 		},
 		{
 			name: "service id from config, cpu only auto-configures memory",
-			args: []string{"service", "resize", "--cpu", "2000", "--no-wait"},
+			args: []string{"service", "resize", "--cpu", "2000"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService())
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
 						JSON202:      &svc,
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
-Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+The resize is in progress and may take several minutes to complete.
 `,
 		},
 		{
 			name: "memory only auto-configures cpu",
-			args: []string{"service", "resize", "svc-12345", "--memory", "16", "--no-wait"},
+			args: []string{"service", "resize", "svc-12345", "--memory", "16"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService())
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "4000", MemoryGbs: "16"}).
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("4000"), MemoryGbs: new("16")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
 						JSON202:      &svc,
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 4 CPU/16 GB...
-Resize request accepted for service 'test-service' (svc-12345).
-Use 'tiger service get' to check service status.
+The resize is in progress and may take several minutes to complete.
 `,
 		},
 		{
-			name:     "wait timeout",
-			synctest: true,
-			args:     []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
+			name: "fluid service cpu only auto-configures memory",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "2000"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService())
-				configuring := sampleService(func(s *api.Service) {
-					s.Status = api.DeployStatusCONFIGURING
-				})
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
+				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &configuring,
+						JSON202:      &svc,
 					}, nil)
-				// The service never reaches the target state, so the wait
-				// polls until the (virtual) deadline. The non-TTY spinner
-				// dedupes repeated messages, so those polls add no stderr lines.
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      &configuring,
-					}, nil).AnyTimes()
 			},
-			wantErr: "wait timeout reached after 10m0s - service may still be resizing",
-			// SilenceErrors is set after the wait fails, so Cobra doesn't
-			// print the usual "Error:" line.
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
-Resize request accepted for service 'test-service' (svc-12345).
-Waiting for resize to complete (timeout: 10m0s)...
-⢎  Service status: CONFIGURING
-Error: wait timeout reached after 10m0s - service may still be resizing
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB...
+The resize is in progress and may take several minutes to complete.
 `,
-			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
+		},
+		{
+			// CPU and memory are omitted, which the API leaves unchanged. The
+			// API validates the IOPS value.
+			name: "experimental iops only omits cpu and memory",
+			args: []string{"service", "resize", "svc-12345", "--iops", "12000"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", fluidSvc)
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{Iops: new(12000)}).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &fluidSvc,
+					}, nil)
+			},
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 12000 IOPS...
+The resize is in progress and may take several minutes to complete.
+`,
+		},
+		{
+			name: "experimental iops with cpu",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--iops", "16000"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", fluidSvc)
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16"), Iops: new(16000)}).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &fluidSvc,
+					}, nil)
+			},
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB, 16000 IOPS...
+The resize is in progress and may take several minutes to complete.
+`,
 		},
 	})
 }

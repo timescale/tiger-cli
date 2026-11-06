@@ -224,8 +224,10 @@ func resolveClientPath(path, pathEnv string) (string, error) {
 	return filepath.Clean(resolved), nil
 }
 
-// expandEnvStrict expands env var references in s, reporting false if any
-// referenced variable is unset or empty.
+// expandEnvStrict is os.ExpandEnv, except that it also reports whether every
+// variable s references is set and non-empty. os.ExpandEnv silently replaces
+// a missing one with "", which would turn "${KIRO_HOME}/skills" into "/skills"
+// rather than letting the caller fall back to a default.
 func expandEnvStrict(s string) (string, bool) {
 	ok := true
 	expanded := os.Expand(s, func(name string) string {

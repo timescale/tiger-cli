@@ -18,6 +18,9 @@ import (
 // default identifies a service.
 var errServiceRequired = errors.New("service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
 
+// errBranchRequired is returned when no argument identifies a branch.
+var errBranchRequired = errors.New("branch name or ID is required")
+
 // serviceRef is what the user gave to identify a service, and where it came
 // from. The two resolve differently: an argument may be an ID, a read replica
 // set ID, or a name, and the API matches all of them together, while a
@@ -68,7 +71,13 @@ func defaultServiceSource(cmd *cobra.Command) string {
 
 // resolveService resolves a ref to the service it names, through the ref
 // filter on the service list: a match is a one-item list, and no match is an
-// empty one rather than a 404.
+// empty one rather than a 404. A read replica set ID matches too, and comes
+// back as a service whose ForkedFrom links to its parent.
+//
+// TODO: move to the API's resolve endpoint, like the branch and db
+// commands, once read replica sets have their own commands. Its SERVICE type
+// doesn't match replica sets, and until those commands exist this lookup is
+// the only way to reach one.
 func resolveService(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, ref serviceRef) (*api.Service, error) {
 	resp, err := client.GetServicesWithResponse(ctx, projectID, &api.GetServicesParams{Ref: &ref.ref})
 	if err != nil {
@@ -100,23 +109,23 @@ func resolveService(ctx context.Context, client api.ClientWithResponsesInterface
 	}
 
 	service := services[0]
-	if err := checkDefaultIsID(service, ref); err != nil {
+	if err := checkDefaultIsID(service.ServiceID, ref); err != nil {
 		return nil, err
 	}
 	return &service, nil
 }
 
 // checkDefaultIsID refuses a configured default that turned out to be a name
-// (see serviceRef for why). A ref equal to the service's own ID matched by ID
-// or replica set ID; anything else matched by name. Checking after the lookup
-// rather than before is what lets the error name the ID to store instead.
-func checkDefaultIsID(service api.Service, ref serviceRef) error {
-	if ref.source == "" || service.ServiceID == ref.ref {
+// (see serviceRef for why). A ref equal to the resolved ID matched by ID;
+// anything else matched by name. Checking after the lookup rather than before
+// is what lets the error name the ID to store instead.
+func checkDefaultIsID(id string, ref serviceRef) error {
+	if ref.source == "" || id == ref.ref {
 		return nil
 	}
 	return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf(
 		"the default service must be an ID, but %s is set to the name '%s'. Set it to %s, or pass the name as an argument",
-		ref.source, ref.ref, service.ServiceID))
+		ref.source, ref.ref, id))
 }
 
 // serviceLabel identifies a service in status output by name and ID together.
@@ -153,4 +162,51 @@ func resolveServiceForWrite(ctx context.Context, cfg *config.Config, client api.
 	}
 
 	return service, nil
+}
+
+// getBranchRef returns the branch ref, an ID or a name, given as an argument.
+// There is no default branch: the service_id default only ever holds a
+// service ID.
+func getBranchRef(args []string) (string, error) {
+	if len(args) == 0 || args[0] == "" {
+		return "", errBranchRequired
+	}
+	return args[0], nil
+}
+
+// resolveBranch resolves a branch ref to the branch it names, through the
+// API's resolve endpoint restricted to branches. The branch carries its
+// parent's ID, which every other branch endpoint needs.
+func resolveBranch(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string) (*api.Branch, error) {
+	branch, err := common.ResolveBranch(ctx, client, projectID, ref)
+	if err != nil {
+		return nil, withAmbiguousRefHint(err, "Run 'tiger branch list' on the branch's service to find the ID you want")
+	}
+	return branch, nil
+}
+
+// branchLabel identifies a branch in status output by name and ID together.
+func branchLabel(branch api.Branch) string {
+	return fmt.Sprintf("'%s' (%s)", branch.Name, branch.ID)
+}
+
+// resolveBranchForWrite is resolveBranch for a command that changes the branch
+// it resolves. A branch always counts as DEV (see common.BranchEnvironmentTag),
+// so the gate needs nothing off the branch and runs before the lookup.
+func resolveBranchForWrite(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface, projectID, ref string) (*api.Branch, error) {
+	if err := common.CheckReadOnly(cfg, common.BranchEnvironmentTag); err != nil {
+		return nil, err
+	}
+	return resolveBranch(ctx, client, projectID, ref)
+}
+
+// withAmbiguousRefHint adds hint to a resolve error that refused a ref
+// matching more than one resource. The resolve endpoint's only validation
+// error is that refusal, so a 400 means it. The server's message doesn't name
+// the candidates, so the hint points at the command that lists them.
+func withAmbiguousRefHint(err error, hint string) error {
+	if exitErr, ok := errors.AsType[common.ExitCodeError](err); ok && exitErr.ExitCode() == common.ExitInvalidParameters {
+		return fmt.Errorf("%w\n%s", err, hint)
+	}
+	return err
 }

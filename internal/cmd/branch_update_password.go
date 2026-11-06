@@ -1,0 +1,94 @@
+package cmd
+
+import (
+	"errors"
+	"os"
+
+	"github.com/spf13/cobra"
+
+	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/util"
+)
+
+// buildBranchUpdatePasswordCmd creates the update-password subcommand
+func buildBranchUpdatePasswordCmd(app *common.App) *cobra.Command {
+	var newPassword string
+	var autoGenerate bool
+
+	cmd := &cobra.Command{
+		Use:   "update-password <name-or-id>",
+		Short: "Update the master password for a branch",
+		Long: `Update the master password for the 'tsdbadmin' user of a branch.
+
+Changing a branch's password doesn't change its parent service's.
+
+The branch can be given by ID or name.`,
+		Example: `  # Update a branch's password, interactively prompts
+  tiger branch update-password br-12345
+
+  # Update a specific branch's password
+  tiger branch update-password br-12345 --new-password new-secure-password
+
+  # Update password using environment variable (TIGER_NEW_PASSWORD)
+  export TIGER_NEW_PASSWORD="new-secure-password"
+  tiger branch update-password br-12345
+
+  # Auto-generate a secure password
+  tiger branch update-password br-12345 --auto-generate`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: branchRefCompletion(app),
+		SilenceUsage:      true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, client, projectID, err := app.GetAll()
+			if err != nil {
+				return err
+			}
+
+			// The password comes from the flag, falling back to the env var
+			password := newPassword
+			if password == "" {
+				password = os.Getenv("TIGER_NEW_PASSWORD")
+			}
+			if autoGenerate && password != "" {
+				return errors.New("cannot use --auto-generate and --new-password together")
+			}
+
+			branchRef, err := getBranchRef(args)
+			if err != nil {
+				return err
+			}
+
+			ctx := cmd.Context()
+
+			// Gated here, ahead of any prompt or write. The branch is needed
+			// to save the new password under it.
+			branch, err := resolveBranchForWrite(ctx, cfg, client, projectID, branchRef)
+			if err != nil {
+				return err
+			}
+
+			credentials := common.BranchCredentials(*branch)
+			if autoGenerate || password != "" {
+				// An empty password is generated.
+				if _, err := resetPassword(ctx, cmd, cfg, client, credentials, "tsdbadmin", password); err != nil {
+					return err
+				}
+			} else {
+				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
+					return errors.New("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
+				}
+				if _, err := promptAndResetPassword(ctx, cmd, cfg, client, credentials, "tsdbadmin"); err != nil {
+					return err
+				}
+			}
+
+			cmd.PrintErrf("Password updated for tsdbadmin\n")
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&newPassword, "new-password", "", "New password for the tsdbadmin user (can also be set via TIGER_NEW_PASSWORD env var)")
+	cmd.Flags().BoolVar(&autoGenerate, "auto-generate", false, "Auto-generate a secure password")
+	cmd.MarkFlagsMutuallyExclusive("new-password", "auto-generate")
+	return cmd
+}

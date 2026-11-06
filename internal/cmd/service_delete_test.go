@@ -23,6 +23,23 @@ func TestServiceDeleteCmd(t *testing.T) {
 		}
 	}
 
+	// setupFluidDelete is setupDelete for a fluid service, which can have
+	// branches, so the prompt lists them first.
+	setupFluidDelete := func(branches ...api.Branch) func(m *mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			setupDelete("svc-12345", fluidPlatform)(m)
+			m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "svc-12345", nil).
+				Return(&api.GetBranchesResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &branches,
+				}, nil)
+		}
+	}
+	otherBranch := sampleBranch(func(b *api.Branch) {
+		b.ID = "br-67890"
+		b.Name = "other-branch"
+	})
+
 	confirmPrompt := "Are you sure you want to delete service 'test-service' (svc-12345)? This operation cannot be undone.\n" +
 		"Type the service ID 'svc-12345' to confirm: "
 
@@ -120,6 +137,66 @@ func TestServiceDeleteCmd(t *testing.T) {
 			wantStderr: confirmPrompt + "Service 'test-service' (svc-12345) deleted.\n",
 		},
 		{
+			// The API deletes a service's branches along with it, so they're
+			// listed before the prompt and after the delete, even without the
+			// experimental gate.
+			name: "confirmation lists the branches deleted with the service",
+			args: []string{"service", "delete", "svc-12345"},
+			opts: []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
+			mock: setupFluidDelete(sampleBranch(), otherBranch),
+			wantStderr: "This service has 2 branches, which will also be deleted:\n" +
+				"  'test-branch' (br-12345)\n" +
+				"  'other-branch' (br-67890)\n" +
+				confirmPrompt +
+				"Service 'test-service' (svc-12345) deleted, along with its 2 branches:\n" +
+				"  'test-branch' (br-12345)\n" +
+				"  'other-branch' (br-67890)\n",
+		},
+		{
+			name: "confirmation lists a single branch",
+			args: []string{"service", "delete", "svc-12345"},
+			opts: []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
+			mock: setupFluidDelete(sampleBranch()),
+			wantStderr: "This service has 1 branch, which will also be deleted:\n" +
+				"  'test-branch' (br-12345)\n" +
+				confirmPrompt +
+				"Service 'test-service' (svc-12345) deleted, along with its 1 branch:\n" +
+				"  'test-branch' (br-12345)\n",
+		},
+		{
+			name:       "fluid service without branches lists none",
+			args:       []string{"service", "delete", "svc-12345"},
+			opts:       []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
+			mock:       setupFluidDelete(),
+			wantStderr: confirmPrompt + "Service 'test-service' (svc-12345) deleted.\n",
+		},
+		{
+			// The listing only informs the decision, so a failure still lets
+			// the user decide.
+			name: "branch listing fails",
+			args: []string{"service", "delete", "svc-12345"},
+			opts: []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				setupDelete("svc-12345", fluidPlatform)(m)
+				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "svc-12345", nil).
+					Return(nil, errors.New("connection refused"))
+			},
+			wantStderr: "Warning: failed to list branches: failed to list branches: connection refused\n" +
+				"Any branches of this service will also be deleted.\n" +
+				confirmPrompt +
+				"Service 'test-service' (svc-12345) deleted.\n",
+		},
+		{
+			// Without a prompt, the branches are still listed once the service
+			// is deleted.
+			name: "confirm flag still lists the deleted branches",
+			args: []string{"service", "delete", "svc-12345", "--confirm"},
+			mock: setupFluidDelete(sampleBranch(), otherBranch),
+			wantStderr: "Service 'test-service' (svc-12345) deleted, along with its 2 branches:\n" +
+				"  'test-branch' (br-12345)\n" +
+				"  'other-branch' (br-67890)\n",
+		},
+		{
 			name:       "confirm flag skips prompt",
 			args:       []string{"service", "delete", "svc-12345", "--confirm"},
 			mock:       setupDelete("svc-12345"),
@@ -154,6 +231,19 @@ func TestServiceDeleteCmd(t *testing.T) {
 			args:       []string{"service", "rm", "svc-12345", "--confirm"},
 			mock:       setupDelete("svc-12345"),
 			wantStderr: "Service 'test-service' (svc-12345) deleted.\n",
+		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate.
+			name:       "help mentions branches when experimental",
+			args:       []string{"service", "delete", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("Deleting a service also deletes all of its branches."),
+		},
+		{
+			name:       "help omits branches by default",
+			args:       []string{"service", "delete", "--help"},
+			wantStdout: matchHelp("Delete a database service permanently.", "branch"),
 		},
 	})
 }

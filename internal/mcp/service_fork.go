@@ -24,12 +24,13 @@ type ServiceForkInput struct {
 	TargetTime   *time.Time         `json:"target_time,omitempty"`
 	CPUMemory    string             `json:"cpu_memory,omitempty"`
 	Environment  api.EnvironmentTag `json:"environment,omitempty"`
+	IOPS         *int               `json:"iops,omitempty"`
 	Wait         bool               `json:"wait,omitempty"`
 	SetDefault   bool               `json:"set_default,omitempty"`
 	WithPassword bool               `json:"with_password,omitempty"`
 }
 
-func (ServiceForkInput) Schema() *jsonschema.Schema {
+func (ServiceForkInput) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceForkInput](nil))
 
 	setServiceIDSchemaProperties(schema)
@@ -43,12 +44,15 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 	schema.Properties["target_time"].Description = "Target timestamp for point-in-time recovery (RFC3339 format). Only used when fork_strategy is 'PITR'."
 	schema.Properties["target_time"].Examples = []any{"2025-01-15T10:30:00Z", "2024-12-01T00:00:00Z"}
 
-	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations. If not specified, inherits from source service."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
+	setCPUMemorySchemaProperties(schema, true, experimental,
+		"CPU and memory allocation combination. If not specified, inherits from source service.",
+		"The fork is always on the source service's platform (the platform field from service_get), and the valid combinations depend on it.")
 
 	schema.Properties["environment"].Description = "Environment tag for the fork, which is independent of the source service's tag. Use 'PROD' only for production workloads — under read-only mode for production services, forking a PROD source into a DEV fork is allowed but creating a PROD fork is refused, and deleting a PROD fork always requires the user's confirmation."
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
+
+	setIOPSSchemaProperties(schema, experimental, "If not specified, inherits from the source service.")
 
 	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -70,11 +74,19 @@ type ServiceForkOutput struct {
 	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
-func (ServiceForkOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceForkOutput](nil))
+func (ServiceForkOutput) Schema(experimental bool) *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceForkOutput](nil))
+	schema.Properties["service"] = ServiceDetail{}.Schema(experimental)
+	return schema
 }
 
-func newServiceForkTool() *mcp.Tool {
+func newServiceForkTool(experimental bool) *mcp.Tool {
+	// The platform and IOPS are a preview, described only behind the gate.
+	var platformHelp string
+	if experimental {
+		platformHelp = "\n\nThe fork is always created on the same platform as the source service, which determines the valid cpu_memory combinations. Provisioned IOPS (iops) are inherited from the source service unless specified."
+	}
+
 	return &mcp.Tool{
 		Name:  toolServiceFork,
 		Title: "Fork Database Service",
@@ -88,11 +100,11 @@ You must specify a fork strategy:
 By default:
 - Name will be auto-generated from the source service name
 - CPU and memory will be inherited from the source service
-- The forked service will be set as the default service
+- The forked service will be set as the default service` + platformHelp + `
 
 WARNING: Creates billable resources.`,
-		InputSchema:  ServiceForkInput{}.Schema(),
-		OutputSchema: ServiceForkOutput{}.Schema(),
+		InputSchema:  ServiceForkInput{}.Schema(experimental),
+		OutputSchema: ServiceForkOutput{}.Schema(experimental),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing
@@ -130,10 +142,17 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		}
 	}
 
-	// Parse CPU/Memory configuration if provided
+	// Parse CPU/Memory configuration if provided, against the combinations of
+	// the source's platform, which the fork inherits. Not gated on
+	// experimental: only a source already created on the fluid platform gets
+	// the fluid combinations.
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
-		cpuMillisStr, memoryGBsStr, err := common.ParseCPUMemory(input.CPUMemory)
+		source, err := common.GetService(ctx, client, projectID, input.ServiceID)
+		if err != nil {
+			return nil, ServiceForkOutput{}, err
+		}
+		cpuMillisStr, memoryGBsStr, err := common.CPUMemoryConfigsFor(util.Deref(source.Platform)).Parse(input.CPUMemory)
 		if err != nil {
 			return nil, ServiceForkOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 		}
@@ -148,6 +167,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		slog.Any("cpu", cpuMillis),
 		slog.Any("memory", memoryGBs),
 		slog.String("environment", string(input.Environment)),
+		slog.Any("iops", input.IOPS),
 	)
 
 	// Prepare service fork request
@@ -162,6 +182,9 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	// Only set name if provided
 	if input.Name != "" {
 		forkReq.Name = &input.Name
+	}
+	if s.app.Experimental {
+		forkReq.Iops = input.IOPS
 	}
 
 	// Make API call to fork service
@@ -186,7 +209,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	// This ensures the password is stored even if the wait fails or is interrupted
 	var passwordStorage *common.PasswordStorageResult
 	if service.InitialPassword != nil {
-		result, err := common.SavePasswordWithResult(cfg, api.Service(service), *service.InitialPassword, "tsdbadmin")
+		result, err := common.SavePasswordWithResult(cfg, common.ServicePasswordTarget(service), *service.InitialPassword, "tsdbadmin")
 		passwordStorage = &result
 		if err != nil {
 			s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))

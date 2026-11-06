@@ -1,11 +1,6 @@
 package common
 
 import (
-	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -14,33 +9,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
-
-// serviceTestClient builds an API client backed by an httptest server that
-// serves the getService endpoint from services keyed by service ID (404 when
-// absent).
-func serviceTestClient(t *testing.T, services map[string]api.Service) *api.ClientWithResponses {
-	t.Helper()
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-		id := parts[len(parts)-1]
-		svc, ok := services[id]
-		if !ok {
-			w.WriteHeader(http.StatusNotFound)
-			_ = json.NewEncoder(w).Encode(map[string]string{"message": "service not found"})
-			return
-		}
-		_ = json.NewEncoder(w).Encode(svc)
-	}))
-	t.Cleanup(srv.Close)
-
-	client, err := api.NewClientWithResponses(srv.URL)
-	if err != nil {
-		t.Fatalf("failed to build client: %v", err)
-	}
-	return client
-}
 
 func primaryService() api.Service {
 	host := "svcprimary.example.com"
@@ -53,48 +21,16 @@ func primaryService() api.Service {
 	}
 }
 
-func replicaService() api.Service {
+// replicaSet returns an active read replica set of primaryService.
+func replicaSet() api.ReadReplicaSet {
 	host := "replica.example.com"
 	port := 5432
-	return api.Service{
-		ServiceID: "rep1234567",
-		ProjectID: "proj1",
+	return api.ReadReplicaSet{
+		ID:        "rep1234567",
+		ServiceID: "svcprimary",
 		Name:      "reporting-replica",
+		Status:    api.ReadReplicaSetStatusActive,
 		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
-		ForkedFrom: &api.ForkSpec{
-			IsStandby: new(true),
-			ProjectID: new("proj1"),
-			ServiceID: new("svcprimary"),
-		},
-	}
-}
-
-func TestResolveConnectionTargetByID(t *testing.T) {
-	primary := primaryService()
-	replica := replicaService()
-	client := serviceTestClient(t, map[string]api.Service{"svcprimary": primary, "rep1234567": replica})
-
-	// Primary ID → primary target.
-	target, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "svcprimary")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if target.IsReplica {
-		t.Error("expected primary target for a primary ID")
-	}
-
-	// Replica ID → replica target with parent credentials.
-	target, err = ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !target.IsReplica || target.CredentialService.ServiceID != "svcprimary" {
-		t.Errorf("expected replica target with parent credentials, got %+v", target)
-	}
-
-	// Unknown ID → error.
-	if _, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "missing9999"); err == nil {
-		t.Error("expected an error for an unknown ID, got nil")
 	}
 }
 
@@ -108,15 +44,15 @@ func TestNewReplicaConnectionTarget(t *testing.T) {
 		Endpoint: &api.Endpoint{Host: &host, Port: &port},
 	}
 
-	target := NewReplicaConnectionTarget(primary, replica)
-	if !target.IsReplica {
+	target := NewReplicaConnectionTarget(replica, ServiceCredentials(primary))
+	if target.Kind != TargetReadReplica {
 		t.Error("expected a replica target")
 	}
-	if target.ConnectionService.ServiceID != "rep7654321" || util.DerefStr(target.ConnectionService.Endpoint.Host) != host {
-		t.Errorf("expected connect to carry the replica endpoint, got %+v", target.ConnectionService)
+	if target.ID != "rep7654321" || util.DerefStr(target.Endpoint.Host) != host {
+		t.Errorf("expected connect to carry the replica endpoint, got %+v", target)
 	}
-	if target.CredentialService.ServiceID != "svcprimary" {
-		t.Errorf("expected credential to be the primary, got %q", target.CredentialService.ServiceID)
+	if target.Credentials.ID != "svcprimary" || target.Credentials.Name != "my-db" {
+		t.Errorf("expected credential to be the primary, got %+v", target.Credentials)
 	}
 }
 
@@ -154,9 +90,9 @@ func TestConnectionTargetReadOnlyVerdict(t *testing.T) {
 				replica.Metadata = &api.ReplicaSetMetadata{Environment: new(tt.replicaTag)}
 			}
 
-			target := NewReplicaConnectionTarget(primary, replica)
+			target := NewReplicaConnectionTarget(replica, ServiceCredentials(primary))
 			cfg := &config.Config{ReadOnly: tt.mode}
-			got := CheckReadOnly(cfg, ServiceEnvironmentTag(target.ConnectionService)) != nil
+			got := CheckReadOnly(cfg, target.Environment) != nil
 			if got != tt.wantSession {
 				t.Errorf("CheckReadOnly(read_only=%q, primary=%q, replica=%q) != nil = %t, want %t",
 					tt.mode, tt.primaryTag, tt.replicaTag, got, tt.wantSession)
@@ -178,12 +114,12 @@ func TestConnectionTargetDetails(t *testing.T) {
 
 	// The replica supplies the endpoint, the primary the credentials — which
 	// aren't exercised here, since WithPassword is off.
-	replicaTarget := func(overrides ...func(*api.Service)) *ConnectionTarget {
-		svc := replicaService()
+	replicaTarget := func(overrides ...func(*api.ReadReplicaSet)) *ConnectionTarget {
+		replica := replicaSet()
 		for _, override := range overrides {
-			override(&svc)
+			override(&replica)
 		}
-		return &ConnectionTarget{ConnectionService: svc, CredentialService: primaryService(), IsReplica: true}
+		return NewReplicaConnectionTarget(replica, ServiceCredentials(primaryService()))
 	}
 
 	cases := []struct {
@@ -205,8 +141,8 @@ func TestConnectionTargetDetails(t *testing.T) {
 		},
 		{
 			name: "replica uses its pooler when one is available",
-			target: replicaTarget(func(s *api.Service) {
-				s.ConnectionPooler = pooler
+			target: replicaTarget(func(r *api.ReadReplicaSet) {
+				r.ConnectionPooler = pooler
 			}),
 			pooled: true,
 			want: &ConnectionDetails{
@@ -233,16 +169,16 @@ func TestConnectionTargetDetails(t *testing.T) {
 		{
 			// For a primary the same request is a hard error instead.
 			name:    "primary refuses when its pooler is missing",
-			target:  &ConnectionTarget{ConnectionService: primaryService(), CredentialService: primaryService()},
+			target:  NewServiceConnectionTarget(primaryService()),
 			pooled:  true,
 			wantErr: "connection pooler not available for this service",
 		},
 		{
 			name: "missing endpoint is reported",
-			target: replicaTarget(func(s *api.Service) {
-				s.Endpoint = nil
+			target: replicaTarget(func(r *api.ReadReplicaSet) {
+				r.Endpoint = nil
 			}),
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 	}
 
@@ -276,14 +212,14 @@ func TestConnectionTargetDetails(t *testing.T) {
 func TestReplicaPoolerWarning(t *testing.T) {
 	host := "h"
 	port := 6432
-	withPooler := api.Service{
+	withPooler := api.ReadReplicaSet{
 		Name:             "rep-a",
 		ConnectionPooler: &api.ConnectionPooler{Endpoint: &api.Endpoint{Host: &host, Port: &port}},
 	}
-	noPooler := api.Service{Name: "rep-b"}
+	noPooler := api.ReadReplicaSet{Name: "rep-b"}
 
-	replica := func(svc api.Service) *ConnectionTarget {
-		return &ConnectionTarget{ConnectionService: svc, CredentialService: primaryService(), IsReplica: true}
+	replica := func(replica api.ReadReplicaSet) *ConnectionTarget {
+		return NewReplicaConnectionTarget(replica, ServiceCredentials(primaryService()))
 	}
 
 	cases := []struct {
@@ -292,7 +228,7 @@ func TestReplicaPoolerWarning(t *testing.T) {
 		pooled      bool
 		wantWarning bool
 	}{
-		{"primary is never warned", &ConnectionTarget{ConnectionService: noPooler, CredentialService: noPooler}, true, false},
+		{"primary is never warned", NewServiceConnectionTarget(primaryService()), true, false},
 		{"replica not pooled, no pooler", replica(noPooler), false, false},
 		{"replica not pooled, has pooler", replica(withPooler), false, false},
 		{"replica pooled, has pooler", replica(withPooler), true, false},
@@ -305,33 +241,5 @@ func TestReplicaPoolerWarning(t *testing.T) {
 				t.Errorf("warning = %q, wantWarning = %v", warning, tc.wantWarning)
 			}
 		})
-	}
-}
-
-func TestResolveConnectionTargetByID_ReplicaParentFetchFails(t *testing.T) {
-	// The replica itself resolves, but its parent is absent from the server.
-	client := serviceTestClient(t, map[string]api.Service{"rep1234567": replicaService()})
-
-	if _, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567"); err == nil {
-		t.Fatal("expected an error when the parent service can't be fetched, got nil")
-	}
-}
-
-func TestResolveConnectionTargetByID_ReplicaWithoutParentID(t *testing.T) {
-	// A standby with no parent recorded has nowhere else to look for
-	// credentials, so it stands in as its own credential service.
-	replica := replicaService()
-	replica.ForkedFrom.ServiceID = nil
-	client := serviceTestClient(t, map[string]api.Service{"rep1234567": replica})
-
-	target, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !target.IsReplica {
-		t.Error("expected a replica target")
-	}
-	if target.CredentialService.ServiceID != "rep1234567" {
-		t.Errorf("expected the replica as its own credential service, got %q", target.CredentialService.ServiceID)
 	}
 }

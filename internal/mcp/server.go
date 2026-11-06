@@ -44,8 +44,19 @@ const (
 	toolServiceBackupRegionList   = "service_backup_region_list"
 	toolServiceBackupRegionAdd    = "service_backup_region_add"
 	toolServiceBackupRegionRemove = "service_backup_region_remove"
+	toolBranchCreate              = "branch_create"
+	toolBranchList                = "branch_list"
+	toolBranchGet                 = "branch_get"
+	toolBranchDelete              = "branch_delete"
+	toolBranchStart               = "branch_start"
+	toolBranchStop                = "branch_stop"
+	toolBranchResize              = "branch_resize"
+	toolBranchRename              = "branch_rename"
+	toolBranchUpdatePassword      = "branch_update_password"
+	toolBranchLogs                = "branch_logs"
 	toolDBQuery                   = "db_query"
 	toolDBSchema                  = "db_schema"
+	toolDBExtensionsList          = "db_extensions_list"
 	toolFeedback                  = "feedback"
 )
 
@@ -75,6 +86,13 @@ var readOnlyGatedTools = []string{
 	toolServiceBackupRegionAdd,
 	toolServiceBackupRegionRemove,
 	toolServiceDelete,
+	toolBranchCreate,
+	toolBranchDelete,
+	toolBranchStart,
+	toolBranchStop,
+	toolBranchResize,
+	toolBranchRename,
+	toolBranchUpdatePassword,
 }
 
 // addTool registers an MCP tool, skipping readOnlyGatedTools under read_only=all.
@@ -102,7 +120,8 @@ func buildServerInstructions(cfg *config.Config) string {
 
 		// Metrics tools are always registered and are all read-only themselves,
 		// so this folds into capabilities in every branch, regardless of mode.
-		metricsMention = " Available metrics span hardware/resource usage, PostgreSQL settings, PgBouncer stats, database activity, and TimescaleDB internals."
+		metricsMention = " Available metrics span hardware/resource usage, PostgreSQL settings, PgBouncer stats, database activity, and TimescaleDB internals." +
+			" Call service_metrics_available for valid metric names."
 	)
 
 	capabilities := capabilitiesBase + metricsMention
@@ -188,8 +207,11 @@ func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, ex
 	// Service management tools
 	s.registerServiceTools(mode, experimental)
 
+	// Branch management tools
+	s.registerBranchTools(mode, experimental)
+
 	// Database operation tools
-	s.registerDatabaseTools(mode)
+	s.registerDatabaseTools(mode, experimental)
 
 	// Submitting feedback mutates no service, so the tool is absent from
 	// readOnlyGatedTools and stays registered in every read-only mode.
@@ -203,16 +225,16 @@ func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, ex
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
 func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental bool) {
-	addTool(s, mode, newServiceListTool(), s.handleServiceList)
-	addTool(s, mode, newServiceGetTool(), s.handleServiceGet)
-	addTool(s, mode, newServiceCreateTool(), s.handleServiceCreate)
-	addTool(s, mode, newServiceForkTool(), s.handleServiceFork)
+	addTool(s, mode, newServiceListTool(experimental), s.handleServiceList)
+	addTool(s, mode, newServiceGetTool(experimental), s.handleServiceGet)
+	addTool(s, mode, newServiceCreateTool(experimental), s.handleServiceCreate)
+	addTool(s, mode, newServiceForkTool(experimental), s.handleServiceFork)
 	addTool(s, mode, newServiceUpdatePasswordTool(), s.handleServiceUpdatePassword)
 	addTool(s, mode, newServiceStartTool(), s.handleServiceStart)
 	addTool(s, mode, newServiceStopTool(), s.handleServiceStop)
-	addTool(s, mode, newServiceResizeTool(), s.handleServiceResize)
+	addTool(s, mode, newServiceResizeTool(experimental), s.handleServiceResize)
 	addTool(s, mode, newServiceRenameTool(), s.handleServiceRename)
-	addTool(s, mode, newServiceDeleteTool(), s.handleServiceDelete)
+	addTool(s, mode, newServiceDeleteTool(experimental), s.handleServiceDelete)
 	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)
 	addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
 	addTool(s, mode, newServiceMetricsDetailsTool(), s.handleServiceMetricsDetails)
@@ -228,11 +250,31 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	}
 }
 
-// registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions
-func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode) {
-	addTool(s, mode, newDBQueryTool(), s.handleDBQuery)
+// registerBranchTools registers branch management tools. Branches target
+// gateway endpoints marked `x-tigerdata-preview: true`, so the tools are
+// registered only when the experimental gate is on at server startup.
+func (s *Server) registerBranchTools(mode config.ReadOnlyMode, experimental bool) {
+	if !experimental {
+		return
+	}
+	addTool(s, mode, newBranchCreateTool(), s.handleBranchCreate)
+	addTool(s, mode, newBranchListTool(), s.handleBranchList)
+	addTool(s, mode, newBranchGetTool(), s.handleBranchGet)
+	addTool(s, mode, newBranchDeleteTool(), s.handleBranchDelete)
+	addTool(s, mode, newBranchStartTool(), s.handleBranchStart)
+	addTool(s, mode, newBranchStopTool(), s.handleBranchStop)
+	addTool(s, mode, newBranchResizeTool(), s.handleBranchResize)
+	addTool(s, mode, newBranchRenameTool(), s.handleBranchRename)
+	addTool(s, mode, newBranchUpdatePasswordTool(), s.handleBranchUpdatePassword)
+	addTool(s, mode, newBranchLogsTool(), s.handleBranchLogs)
+}
 
-	mcp.AddTool(s.mcpServer, newDBSchemaTool(), s.handleDBSchema)
+// registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions
+func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode, experimental bool) {
+	addTool(s, mode, newDBQueryTool(experimental), s.handleDBQuery)
+
+	mcp.AddTool(s.mcpServer, newDBSchemaTool(experimental), s.handleDBSchema)
+	mcp.AddTool(s.mcpServer, newDBExtensionsListTool(experimental), s.handleDBExtensionsList)
 }
 
 // analyticsMiddleware tracks analytics for all MCP requests

@@ -29,13 +29,13 @@ jobs:
         run: sudo gem install package_cloud --no-doc
 
       - name: Set Up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       - name: Set Up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log In to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -47,8 +47,14 @@ jobs:
       - name: Authenticate to MCP Registry
         run: ./mcp-publisher login github-oidc
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+        with:
+          role-to-assume: arn:aws:iam::142548018081:role/ci-tiger-cli
+          aws-region: us-east-1
+
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -59,9 +65,6 @@ jobs:
           # Cross-repo GitHub token for publishing to timescale/homebrew-tap
           # NOTE: this token will need to be rotated once per year.
           TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-          # AWS credentials for pushing to tiger-cli-releases S3 bucket
-          AWS_ACCESS_KEY_ID: ${{ secrets.TIGER_CLI_RELEASES_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.TIGER_CLI_RELEASES_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
           # PackageCloud credentials for publishing Linux packages
           PACKAGECLOUD_TOKEN: ${{ secrets.IO_PACKAGECLOUD_TOKEN }}
@@ -75,8 +78,6 @@ jobs:
 
       - name: Invalidate CloudFront Cache
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.TIGER_CLI_RELEASES_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.TIGER_CLI_RELEASES_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
         run: |
           aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/latest.txt" "/install.sh" "/install.ps1"

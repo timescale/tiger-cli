@@ -36,6 +36,8 @@ tags:
     description: Manage services and their associated actions.
   - name: Read Replica Sets
     description: Manage read replica sets and their associated actions.
+  - name: Branches
+    description: Manage branches of a Fluid Service and their associated actions.
   - name: Backups
     description: View the backups taken for a service.
   - name: Exporters
@@ -267,7 +269,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ProjectId'
       summary: Create a VPC
-      description: Creates a new Virtual Private Cloud (VPC).
+      description: Creates a new Virtual Private Cloud (VPC). This is an asynchronous operation.
       requestBody:
         required: true
         content:
@@ -275,8 +277,8 @@ paths:
             schema:
               $ref: '#/components/schemas/VPCCreate'
       responses:
-        '201':
-          description: VPC created successfully.
+        '202':
+          description: VPC creation request has been accepted.
           content:
             application/json:
               schema:
@@ -310,13 +312,13 @@ paths:
       tags:
         - VPCs
       summary: Delete a VPC
-      description: Deletes a specific VPC.
+      description: Deletes a specific VPC. This is an asynchronous operation.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/VPCId'
       responses:
-        '204':
-          description: VPC deleted successfully.
+        '202':
+          description: Deletion request has been accepted.
         '4XX':
           $ref: '#/components/responses/ClientError'
 
@@ -371,7 +373,7 @@ paths:
       tags:
         - VPCs
       summary: Create a VPC Peering
-      description: Creates a new VPC peering connection.
+      description: Creates a new VPC peering connection. This is an asynchronous operation.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/VPCId'
@@ -382,8 +384,8 @@ paths:
             schema:
               $ref: '#/components/schemas/PeeringCreate'
       responses:
-        '201':
-          description: VPC peering created successfully.
+        '202':
+          description: VPC peering creation request has been accepted.
           content:
             application/json:
               schema:
@@ -418,14 +420,14 @@ paths:
       tags:
         - VPCs
       summary: Delete a VPC Peering
-      description: Deletes a specific VPC peering connection.
+      description: Deletes a specific VPC peering connection. This is an asynchronous operation.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/VPCId'
         - $ref: '#/components/parameters/PeeringId'
       responses:
-        '204':
-          description: VPC peering deleted successfully.
+        '202':
+          description: Deletion request has been accepted.
         '4XX':
           $ref: '#/components/responses/ClientError'
 
@@ -1467,6 +1469,416 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/branches:
+    get:
+      operationId: getProjectBranches
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      x-tigerdata-internal: true
+      tags:
+        - Branches
+      summary: List All Branches in a Project
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves a list of all branches within a specific project, regardless
+        of parent service.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: A list of branches.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches:
+    get:
+      operationId: getBranches
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: List All Branches
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves a list of all branches created from a service within a project.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - name: ref
+          in: query
+          required: false
+          description: |
+            Returns only the branch this reference matches: one whose ID
+            equals it, or whose name equals it, exactly and case-sensitively,
+            with no precedence between the two. A reference matching nothing
+            returns an empty list.
+          schema:
+            type: string
+            minLength: 1
+            example: "my-production-db-pr-412"
+      responses:
+        '200':
+          description: A list of branches.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+    post:
+      operationId: createBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Create a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Creates a new branch from the service identified by `service_id`. A
+        branch shares its parent's data at the moment of creation and gets
+        its own, independently-sized compute. This is an asynchronous
+        operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BranchCreate'
+      responses:
+        '202':
+          description: Branch creation request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}:
+    get:
+      operationId: getBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Get a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves the details of a specific branch by its ID.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      responses:
+        '200':
+          description: Branch details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+    delete:
+      operationId: deleteBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Delete a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Deletes a specific branch. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      responses:
+        '202':
+          description: Deletion request has been accepted.
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/start:
+    post:
+      operationId: startBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Start a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Starts a stopped branch. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      responses:
+        '202':
+          description: Branch start request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/stop:
+    post:
+      operationId: stopBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Stop a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Stops a running branch. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      responses:
+        '202':
+          description: Branch stop request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/resize:
+    post:
+      operationId: resizeBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Resize a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Changes the compute allocation for a specific branch.
+        Storage size is shared with the parent and is not resized through
+        this operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BranchResizeInput'
+      responses:
+        '202':
+          description: Resize request has been accepted and is in progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/updatePassword:
+    post:
+      operationId: updateBranchPassword
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Update Branch Password
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Sets a new master password for the branch.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePasswordInput'
+      responses:
+        '204':
+          description: Password updated successfully. No content returned.
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/rename:
+    post:
+      operationId: renameBranch
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Rename a Branch
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Updates the name of a specific branch.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BranchRename'
+      responses:
+        '200':
+          description: Branch renamed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/branches/{branch_id}/logs:
+    get:
+      operationId: getBranchLogs
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Branches
+      summary: Get branch logs
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Fetch logs for a branch. Returns up to 500 log entries in reverse
+        chronological order. Supports cursor-based pagination via the `cursor`
+        parameter and the `last_cursor` field in the response.
+
+        Use the returned `last_cursor` value as the `cursor` parameter on
+        subsequent requests to page through all available logs.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BranchId'
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Opaque pagination cursor returned as `last_cursor` in a previous response.
+            When provided, returns the next page of logs older than the cursor position.
+        - name: until
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Upper bound timestamp — fetch logs before this time (RFC3339 format, e.g., 2024-01-15T10:00:00Z).
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: |
+            Lower bound timestamp — fetch logs after this time (RFC3339 format).
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              minLength: 1
+              pattern: "\\S"
+          style: form
+          explode: true
+          description: |
+            Full-text search terms to filter log lines. Repeat the parameter for multiple values
+            (e.g. `?search=slow+query&search=ERROR`).
+        - name: severities
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              minLength: 1
+              pattern: "\\S"
+          style: form
+          explode: true
+          description: |
+            Severity levels to filter results. Repeat the parameter for multiple values
+            (e.g. `?severities=ERROR&severities=WARNING`).
+      responses:
+        '200':
+          description: Branch logs retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchLogs'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/resolve:
+    get:
+      operationId: resolveRef
+      x-tigerdata-owner: platform
+      x-tigerdata-internal: true
+      tags:
+        - Services
+      summary: Resolve a Service, Branch, or Read Replica Set
+      description: Resolves `ref` to the service, branch, or read replica set it names.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: ref
+          in: query
+          required: true
+          description: |
+            The ID or name to resolve, exactly and case-sensitively. A ref
+            matching more than one resource is an error.
+          schema:
+            type: string
+            minLength: 1
+            example: "my-production-db"
+        - name: type
+          in: query
+          required: false
+          description: Only match resources of this kind.
+          schema:
+            $ref: '#/components/schemas/ResolveType'
+      responses:
+        '200':
+          description: The resolved service, branch, or read replica set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveResult'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/exporters:
     get:
       operationId: getExporters
@@ -1778,6 +2190,14 @@ components:
         type: string
         minLength: 3
         example: "alb8jicdpr"
+    BranchId:
+      name: branch_id
+      in: path
+      required: true
+      description: The unique identifier of the branch.
+      schema:
+        type: string
+        example: "br4nch1d9x"
     BackupRegionCode:
       name: region_code
       in: path
@@ -1955,12 +2375,19 @@ components:
         - name
         - cidr
         - region_code
+        - created
+        - status
       properties:
         id:
           type: string
           readOnly: true
           description: The unique identifier for the VPC.
           example: "1234567890"
+        provisioned_id:
+          type: string
+          readOnly: true
+          description: The provider-assigned identifier for the provisioned VPC. Absent until provisioning completes.
+          example: "vpc-0123456789abcdef0"
         name:
           type: string
           description: The name of the VPC.
@@ -1974,6 +2401,33 @@ components:
           type: string
           description: The cloud region where the VPC is hosted.
           example: "us-east-1"
+        created:
+          type: string
+          format: date-time
+          description: Creation timestamp.
+          example: "2025-01-15T09:30:00Z"
+        status:
+          allOf:
+            - $ref: '#/components/schemas/VPCStatus'
+          description: Current status of the VPC.
+    VPCStatus:
+      type: string
+      description: |
+        The current status of the VPC:
+        - CREATING: the VPC is being provisioned
+        - CREATED: the VPC is provisioned and ready
+        - DELETING: the VPC is being deleted
+        - DELETED: the VPC has been deleted
+        - ERROR: the VPC is in an error state
+        - UNKNOWN: an unrecognized state
+      enum:
+      - CREATING
+      - CREATED
+      - DELETING
+      - DELETED
+      - ERROR
+      - UNKNOWN
+      example: "CREATED"
     VPCCreate:
       type: object
       description: Parameters for creating a VPC.
@@ -2023,6 +2477,7 @@ components:
         - peer_account_id
         - peer_region_code
         - peer_vpc_id
+        - status
       properties:
         id:
           type: string
@@ -2044,15 +2499,42 @@ components:
         provisioned_id:
           type: string
           description: The provider-assigned identifier for the provisioned peering.
-          example: "1234567890"
-        status:
+          example: "pcx-0123456789abcdef0"
+        created:
           type: string
-          description: The current status of the peering connection.
-          example: "active"
+          format: date-time
+          description: Creation timestamp.
+          example: "2025-01-15T09:30:00Z"
+        status:
+          allOf:
+            - $ref: '#/components/schemas/PeeringConnectionStatus'
+          description: Current status of the peering connection.
         error_message:
           type: string
           description: A human-readable error message when the peering connection failed.
           example: "VPC not found"
+    PeeringConnectionStatus:
+      type: string
+      description: |
+        The current status of a VPC peering connection:
+        - PENDING: the peering request has been made and is awaiting action
+        - TIMEOUT: the peering request timed out before being resolved
+        - APPROVED: the peering request has been approved
+        - ACTIVE: the peering connection is active
+        - DISABLED: the peering connection has been disabled
+        - DELETING: the peering connection is being deleted
+        - INVALID: the peering request is invalid
+        - UNKNOWN: an unrecognized state
+      enum:
+      - PENDING
+      - TIMEOUT
+      - APPROVED
+      - ACTIVE
+      - DISABLED
+      - DELETING
+      - INVALID
+      - UNKNOWN
+      example: "ACTIVE"
     PeeringCreate:
       type: object
       description: Parameters for creating a VPC peering connection.
@@ -2218,6 +2700,11 @@ components:
             A newly attached log exporter only starts carrying logs once the
             service has restarted.
           example: "9b2e4d61-7a30-4c58-8f0d-6e1a3c9b4d27"
+        platform:
+          x-tigerdata-preview: true
+          allOf:
+            - $ref: '#/components/schemas/ServicePlatform'
+          description: The storage platform the service runs on.
     Resource:
       type: object
       description: A resource allocated to the service.
@@ -2240,6 +2727,11 @@ components:
           type: integer
           description: Memory allocation in gigabytes.
           example: 4
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          description: Provisioned IOPS for the storage volume.
+          example: 3000
         volume_type:
           type: string
           description: Type of storage volume.
@@ -2264,6 +2756,16 @@ components:
       - TIMESCALEDB
       - POSTGRES
       - VECTOR
+    ServicePlatform:
+      x-tigerdata-preview: true
+      type: string
+      description: |
+        The storage platform the service runs on:
+        - STANDARD: traditional cloud block storage
+        - FLUID: Tiger Data's Fluid Storage platform
+      enum:
+      - STANDARD
+      - FLUID
     EnvironmentTag:
         type: string
         enum:
@@ -2333,6 +2835,7 @@ components:
       description: A set of read replicas for a service.
       required:
         - id
+        - service_id
         - name
         - status
         - nodes
@@ -2343,6 +2846,10 @@ components:
           type: string
           description: The unique identifier for the read replica set.
           example: "alb8jicdpr"
+        service_id:
+          type: string
+          description: The ID of the parent service this read replica set was created from.
+          example: "d1k5vk7hf2"
         name:
           type: string
           description: The name of the read replica set.
@@ -2370,6 +2877,11 @@ components:
           type: integer
           description: Memory allocation in gigabytes.
           example: 1
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          description: Provisioned IOPS for the storage volume.
+          example: 3000
         metadata:
           $ref: '#/components/schemas/ReplicaSetMetadata'
         endpoint:
@@ -2384,6 +2896,201 @@ components:
           type: string
           description: Environment tag for the read replica set.
           example: "PROD"
+    Branch:
+      x-tigerdata-preview: true
+      type: object
+      description: A branch of a Fluid Service.
+      required:
+        - id
+        - project_id
+        - service_id
+        - name
+        - created
+        - status
+        - cpu_millis
+        - memory_gbs
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the branch.
+          example: "br4nch1d9x"
+        project_id:
+          type: string
+          description: The project this branch belongs to.
+          example: "rp1pz7uyae"
+        service_id:
+          type: string
+          description: The service this branch was created from.
+          example: "4rwj1h3fd0"
+        name:
+          type: string
+          description: The name of the branch.
+          example: "my-production-db-pr-412"
+        created:
+          type: string
+          format: date-time
+          description: Creation timestamp.
+          example: "2026-09-01T09:30:00Z"
+        initial_password:
+          type: string
+          description: The initial password for the branch.
+          format: password
+          example: "a-very-secure-initial-password"
+        status:
+          allOf:
+            - $ref: '#/components/schemas/DeployStatus'
+          description: Current status of the branch.
+        cpu_millis:
+          type: integer
+          description: CPU allocation in milli-cores.
+          example: 500
+        memory_gbs:
+          type: integer
+          description: Memory allocation in gigabytes.
+          example: 4
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          description: Provisioned IOPS for the storage volume.
+          example: 3000
+        endpoint:
+          $ref: '#/components/schemas/Endpoint'
+    ResolveType:
+      x-tigerdata-internal: true
+      type: string
+      description: What kind of resource a resolved ref is, or should be restricted to.
+      enum: [SERVICE, BRANCH, READ_REPLICA_SET]
+    ResolveResult:
+      x-tigerdata-internal: true
+      description: A service, branch, or read replica set resolved by ref. `type` determines which.
+      oneOf:
+        - $ref: '#/components/schemas/ResolvedService'
+        - $ref: '#/components/schemas/ResolvedBranch'
+        - $ref: '#/components/schemas/ResolvedReadReplicaSet'
+      discriminator:
+        propertyName: type
+        mapping:
+          SERVICE: '#/components/schemas/ResolvedService'
+          BRANCH: '#/components/schemas/ResolvedBranch'
+          READ_REPLICA_SET: '#/components/schemas/ResolvedReadReplicaSet'
+    ResolvedService:
+      x-tigerdata-internal: true
+      description: A Service resolved by ref.
+      allOf:
+        - $ref: '#/components/schemas/Service'
+        - type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Always "SERVICE" for a resolved Service.
+              enum: [SERVICE]
+    ResolvedBranch:
+      x-tigerdata-internal: true
+      description: A Branch resolved by ref.
+      allOf:
+        - $ref: '#/components/schemas/Branch'
+        - type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Always "BRANCH" for a resolved Branch.
+              enum: [BRANCH]
+    ResolvedReadReplicaSet:
+      x-tigerdata-internal: true
+      description: A ReadReplicaSet resolved by ref.
+      allOf:
+        - $ref: '#/components/schemas/ReadReplicaSet'
+        - type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Always "READ_REPLICA_SET" for a resolved ReadReplicaSet.
+              enum: [READ_REPLICA_SET]
+    BranchCreate:
+      x-tigerdata-preview: true
+      type: object
+      description: Parameters for creating a branch of the service identified by `service_id` in the path.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: A human-readable name for the branch. If not provided, defaults to "branch-<parent name>", with "-1", "-2", ... appended if that name is already in use in the project.
+          example: "my-production-db-pr-412"
+        cpu_millis:
+          type: integer
+          minimum: 1
+          description: The initial CPU allocation in milli-cores.
+          example: 250
+        memory_gbs:
+          type: integer
+          minimum: 1
+          description: The initial memory allocation in gigabytes.
+          example: 2
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: Requested provisioned IOPS for the branch's storage.
+          example: 4000
+    BranchRename:
+      type: object
+      description: Parameters for renaming a branch.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The new name for the branch.
+          example: "my-production-db-pr-412"
+    BranchResizeInput:
+      type: object
+      minProperties: 1
+      properties:
+        cpu_millis:
+          type: string
+          pattern: "^[0-9]+$"
+          description: The new CPU allocation in milli-cores.
+          example: "1000"
+        memory_gbs:
+          type: string
+          pattern: "^[0-9]+$"
+          description: The new memory allocation in gigabytes.
+          example: "4"
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: The new provisioned IOPS for the branch's storage.
+          example: 4000
+      description: >-
+        At least one of cpu_millis, memory_gbs, or iops must be provided.
+        cpu_millis and memory_gbs must be provided together.
+    BranchLogs:
+      type: object
+      description: The logs for a branch.
+      required:
+        - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceLogEntry'
+          description: Structured log entries, in reverse chronological order.
+        last_cursor:
+          type: string
+          description: |
+            Opaque cursor for the next page of results. Present when more log entries
+            exist older than the last entry in this response. Pass this value as the
+            `cursor` query parameter to retrieve the next page. Absent when there are
+            no further results.
+          example: "eyJ0cyI6IjIwMjUtMDEtMTVUMDk6MzA6MDBaIn0="
     ServiceCreate:
       type: object
       description: Parameters for creating a service.
@@ -2423,11 +3130,23 @@ components:
           type: string
           description: The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
           example: "4"
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: Requested provisioned IOPS for the service's storage.
+          example: 4000
         environment_tag:
           allOf:
             - $ref: '#/components/schemas/EnvironmentTag'
           description: The environment tag for the service.
           default: DEV
+        platform:
+          x-tigerdata-preview: true
+          allOf:
+            - $ref: '#/components/schemas/ServicePlatform'
+          description: The storage platform to create the service on.
+          default: STANDARD
     ForkServiceCreate:
       type: object
       required:
@@ -2447,6 +3166,12 @@ components:
           type: string
           description: The initial memory allocation in gigabytes, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
           example: "4"
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: Provisioned IOPS for the forked service's storage. If not provided, will inherit from parent service.
+          example: 4000
         fork_strategy:
           $ref: '#/components/schemas/ForkStrategy'
         target_time:
@@ -2496,6 +3221,7 @@ components:
           example: 250
     SetHAReplicaInput:
       type: object
+      minProperties: 1
       properties:
         sync_replica_count:
           type: integer
@@ -2538,12 +3264,15 @@ components:
           minimum: 1
           description: The initial memory allocation in gigabytes.
           example: 1
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: Provisioned IOPS for the replica set's storage.
+          example: 3000
     ResizeInput:
       type: object
-      description: Parameters for resizing a service.
-      required:
-        - cpu_millis
-        - memory_gbs
+      minProperties: 1
       properties:
         cpu_millis:
           type: string
@@ -2555,6 +3284,15 @@ components:
           pattern: "^[0-9]+$"
           description: The new memory allocation in gigabytes.
           example: "4"
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: The new provisioned IOPS for the storage volume.
+          example: 4000
+      description: >-
+        At least one of cpu_millis, memory_gbs, or iops must be provided.
+        cpu_millis and memory_gbs must be provided together.
     UpdatePasswordInput:
       type: object
       description: Parameters for updating a service's password.
@@ -2928,8 +3666,9 @@ components:
           description: |
             Aggregation function applied to raw/pre-aggregated samples when
             collapsing them into one value per output bucket. Optional: when
-            omitted the server picks the default for the metric (currently
-            `LAST`).
+            omitted the server uses the metric's default aggregation (the
+            `default_agg` of the metric details endpoint), or `LAST` when the
+            metric declares none.
 
             Not accepted on the following metrics — requests are rejected
             with `INVALID_REQUEST`:

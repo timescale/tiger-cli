@@ -27,6 +27,23 @@ func buildServiceCreateCmd(app *common.App) *cobra.Command {
 	var noSetDefault bool
 	var withPassword bool
 	var environment string
+	var platform string
+	var iops int
+
+	// The fluid platform and IOPS are a preview, so their help text is shown
+	// only behind the experimental gate.
+	var fluidDefaultHelp, iopsSectionHelp, experimentalExampleHelp string
+	if app.Experimental {
+		fluidDefaultHelp = "\n\nServices on the fluid platform (--platform fluid) are created with\n0.25 CPU / 2 GB memory by default."
+		iopsSectionHelp = `
+
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If --iops
+is not given, the service gets the baseline IOPS for your plan and its CPU
+allocation.`
+		experimentalExampleHelp = "\n\n  # Create a service on the fluid platform\n  tiger service create --name fluid-db --platform fluid" +
+			"\n\n  # Create a service with provisioned IOPS\n  tiger service create --name fast-db --cpu 2000 --iops 16000"
+	}
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -35,16 +52,15 @@ func buildServiceCreateCmd(app *common.App) *cobra.Command {
 
 The default type of service created depends on your plan:
 - Free plan: Creates a service with shared CPU/memory and the 'time-series' add-on
-- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
+- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on` + fluidDefaultHelp + `
 
-By default, the newly created service will be set as your default service for future
-commands. Use --no-set-default to prevent this behavior.
+By default, the newly created service will be set as your default service for
+future commands. Use --no-set-default to prevent this behavior.
 
-Allowed CPU/Memory Configurations:
-  shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
-  4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
+` + cpuMemoryHelp(true, app.Experimental) + `
 
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
+Note: You can specify both CPU and memory together, or specify only one (the
+other will be automatically configured).` + iopsSectionHelp,
 		Example: `  # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
   tiger service create
 
@@ -73,7 +89,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
   tiger service create --name quick-db --no-wait
 
   # Create service with custom wait timeout
-  tiger service create --name patient-db --wait-timeout 1h`,
+  tiger service create --name patient-db --wait-timeout 1h` + experimentalExampleHelp,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -97,8 +113,19 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return fmt.Errorf("environment must be one of: %s (got '%s')", strings.Join(validEnvironmentTags, ", "), environment)
 			}
 
+			// --platform only exists behind the experimental gate. Without it
+			// the platform is left empty, which the API defaults to STANDARD.
+			var servicePlatform api.ServicePlatform
+			if app.Experimental {
+				platform = strings.ToLower(platform)
+				if !slices.Contains(common.ValidPlatforms(), platform) {
+					return fmt.Errorf("platform must be one of: %s (got '%s')", strings.Join(common.ValidPlatforms(), ", "), platform)
+				}
+				servicePlatform = api.ServicePlatform(strings.ToUpper(platform))
+			}
+
 			// Validate and normalize CPU/Memory configuration
-			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(cpu, memory)
+			cpuMemoryCfg, err := common.CPUMemoryConfigsFor(servicePlatform).ValidateAndNormalize(cpu, memory)
 			if err != nil {
 				return err
 			}
@@ -134,6 +161,13 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				serviceCreateReq.RegionCode = &region
 			}
 
+			if app.Experimental {
+				serviceCreateReq.Platform = &servicePlatform
+				if cmd.Flags().Changed("iops") {
+					serviceCreateReq.Iops = &iops
+				}
+			}
+
 			// Make API call to create service
 			// All status messages go to stderr
 			cmd.PrintErrf("Creating service '%s'...\n", name)
@@ -157,7 +191,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Save password immediately after service creation, before any waiting
 			// This ensures users have access even if they interrupt the wait or it fails
-			passwordSaved := handlePasswordSaving(cmd, cfg, service, util.Deref(service.InitialPassword))
+			passwordSaved := handlePasswordSaving(cmd, cfg, common.ServicePasswordTarget(service), util.Deref(service.InitialPassword))
 
 			// Set as default service unless --no-set-default is specified
 			if !noSetDefault {
@@ -192,7 +226,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 			}
 
-			if err := outputService(cmd, cfg, service, cfg.Output, withPassword, false); err != nil {
+			if err := outputService(cmd, cfg, service, serviceOutputOptions{
+				Experimental: app.Experimental,
+				WithPassword: withPassword,
+			}); err != nil {
 				cmd.PrintErrf("Warning: Failed to output service details: %v\n", err)
 			}
 
@@ -210,6 +247,12 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes or 'shared'")
 	cmd.Flags().IntVar(&replicas, "replicas", 0, "Number of high-availability replicas")
 	cmd.Flags().StringVar(&environment, "environment", "DEV", "Environment tag (DEV or PROD)")
+	if app.Experimental {
+		cmd.Flags().StringVar(&platform, "platform", common.PlatformStandard, "Storage platform (standard or fluid)")
+		registerFlagCompletion(cmd, "platform", platformCompletion)
+		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
+		registerFlagCompletion(cmd, "iops", iopsCompletion)
+	}
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for operation to complete")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set this service as the default service")
@@ -219,8 +262,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	registerFlagCompletion(cmd, "addons", addonsCompletion)
 	registerFlagCompletion(cmd, "environment", environmentCompletion)
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))
-	registerFlagCompletion(cmd, "cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
-	registerFlagCompletion(cmd, "memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(true, app.Experimental))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(true, app.Experimental))
 
 	return cmd
 }

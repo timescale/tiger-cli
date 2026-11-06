@@ -59,32 +59,32 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "--", "-c", "SELECT 1;"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
+				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service ID before -- separator",
 			args: []string{"db", "psql", "svc-12345", "--", "-c", "SELECT 1;"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
+				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service not found",
 			args: []string{"db", "psql", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefNotFound(m, "svc-12345")
+				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service 'svc-12345' not found",
+			wantErr: "service or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "ambiguous name refused",
 			args: []string{"db", "psql", "my-api-db"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+				expectResolveTargetStatus(m, "my-api-db", http.StatusBadRequest, &api.ClientError{Message: new("ambiguous service name matches multiple services")})
 			},
 			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
@@ -93,7 +93,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"db", "psql", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
+				expectResolveTargetStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -101,7 +101,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			name: "parent fetch fails for read replica",
 			args: []string{"db", "psql", "rep-67890"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "rep-67890", sampleReplica())
+				expectResolveTarget(m, "rep-67890", sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -112,7 +112,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withEnv("PATH", "/nonexistent")},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService())
+				expectResolveTarget(m, "svc-12345", sampleService())
 			},
 			wantErr: "psql not found. Install the PostgreSQL client tools",
 		},
@@ -123,61 +123,61 @@ func TestDbPsqlCmd(t *testing.T) {
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(noEndpoint))
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "--no-replica-prompt skips replica prompt on a TTY",
 			args: []string{"db", "psql", "svc-12345", "--no-replica-prompt"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(noEndpoint))
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "replica target skips replica prompt",
 			args: []string{"db", "psql", "rep-67890"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "rep-67890", sampleReplica(noEndpoint))
+				expectResolveTarget(m, "rep-67890", sampleReplica(func(r *api.ReadReplicaSet) { r.Endpoint = nil }))
 				expectGetService(m, "svc-12345", sampleService())
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "replica listing failure warns and continues",
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(noEndpoint))
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr:    "failed to build connection string: service endpoint not available",
-			wantStderr: "Warning: could not list read replicas: connection refused\nError: failed to build connection string: service endpoint not available\n",
+			wantErr:    "failed to build connection string: endpoint not available",
+			wantStderr: "Warning: could not list read replicas: connection refused\nError: failed to build connection string: endpoint not available\n",
 		},
 		{
 			name: "no replicas skips prompt on a TTY",
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(noEndpoint))
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetReplicaSetsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
 						JSON200:      &[]api.ReadReplicaSet{},
 					}, nil)
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "no connectable replicas skips prompt",
 			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(noEndpoint))
+				expectResolveTarget(m, "svc-12345", sampleService(noEndpoint))
 				replicas := []api.ReadReplicaSet{
 					{
 						ID:     "rep-1",
@@ -196,14 +196,14 @@ func TestDbPsqlCmd(t *testing.T) {
 						JSON200:      &replicas,
 					}, nil)
 			},
-			wantErr: "failed to build connection string: service endpoint not available",
+			wantErr: "failed to build connection string: endpoint not available",
 		},
 		{
 			name: "--pooled without pooler",
 			args: []string{"db", "psql", "svc-12345", "--pooled"},
 			opts: []runOption{withEnv("PATH", psqlDir)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService())
+				expectResolveTarget(m, "svc-12345", sampleService())
 			},
 			wantErr: "connection pooler not available for this service",
 		},
@@ -216,7 +216,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			name: "non-auth connection error surfaces directly",
 			args: []string{"db", "psql", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
+				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
 				}))
 			},
@@ -227,6 +227,15 @@ func TestDbPsqlCmd(t *testing.T) {
 				}
 			}),
 			wantStderr: matchPrefix("Warning: could not retrieve stored password: secret not found in keyring\n"),
+		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "psql", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to connect to that branch."),
 		},
 	})
 }
@@ -279,13 +288,13 @@ func TestConnectTargetModel(t *testing.T) {
 
 	t.Run("choices", func(t *testing.T) {
 		// No replicas: primary, cancel.
-		m := newConnectTargetModel(primary, nil)
+		m := newConnectTargetModel(primary.ServiceID, nil)
 		if len(m.choices) != 2 || m.choices[0].kind != targetPrimary || m.choices[1].kind != targetCancel {
 			t.Errorf("expected [primary, cancel] with no replicas, got %+v", m.choices)
 		}
 
 		// Two replicas: primary, replica-a, replica-b, cancel.
-		m = newConnectTargetModel(primary, replicas)
+		m = newConnectTargetModel(primary.ServiceID, replicas)
 		if len(m.choices) != 4 {
 			t.Fatalf("expected 4 choices with two replicas, got %d: %+v", len(m.choices), m.choices)
 		}
@@ -322,7 +331,7 @@ func TestConnectTargetModel(t *testing.T) {
 
 	for _, tt := range keyTests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := newConnectTargetModel(primary, replicas)
+			m := newConnectTargetModel(primary.ServiceID, replicas)
 			updated, _ := m.Update(tt.key)
 			choice := updated.(connectTargetModel).chosen
 			if choice.kind != tt.wantKind {
@@ -354,7 +363,7 @@ func TestBuildPsqlCommand(t *testing.T) {
 		d := details()
 		d.Password = "explicit-pw"
 		flags := []string{"--single-transaction", "-c", "SELECT 1;"}
-		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "keyring"}, d, psqlPath, flags, api.Service{}, discardCmd())
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "keyring"}, d, psqlPath, flags, common.PasswordTarget{}, discardCmd())
 
 		wantArgs := []string{psqlPath, connString, "--single-transaction", "-c", "SELECT 1;"}
 		if !slices.Equal(psqlCmd.Args, wantArgs) {
@@ -368,11 +377,11 @@ func TestBuildPsqlCommand(t *testing.T) {
 	t.Run("keyring password becomes PGPASSWORD", func(t *testing.T) {
 		keyring.MockInit()
 		service := api.Service{ServiceID: "svc-psql", ProjectID: "proj-psql"}
-		if err := (&common.KeyringStorage{}).Save(service, "keyring-pw", "testuser"); err != nil {
+		if err := (&common.KeyringStorage{}).Save(common.ServicePasswordTarget(service), "keyring-pw", "testuser"); err != nil {
 			t.Fatalf("failed to save test password: %v", err)
 		}
 
-		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "keyring"}, details(), psqlPath, nil, service, discardCmd())
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "keyring"}, details(), psqlPath, nil, common.ServicePasswordTarget(service), discardCmd())
 		if !slices.Contains(psqlCmd.Env, "PGPASSWORD=keyring-pw") {
 			t.Errorf("expected PGPASSWORD=keyring-pw in env, got %v", psqlCmd.Env)
 		}
@@ -380,7 +389,7 @@ func TestBuildPsqlCommand(t *testing.T) {
 
 	t.Run("pgpass storage sets no PGPASSWORD", func(t *testing.T) {
 		// psql reads ~/.pgpass itself, so the env var must stay unset.
-		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, api.Service{}, discardCmd())
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
 		for _, env := range psqlCmd.Env {
 			if strings.HasPrefix(env, "PGPASSWORD=") {
 				t.Errorf("expected no PGPASSWORD for pgpass storage, got %s", env)
@@ -403,7 +412,7 @@ func TestLaunchPsql(t *testing.T) {
 		Database: "testdb",
 		Role:     "testuser",
 	}
-	err := launchPsql(&config.Config{PasswordStorage: "none"}, details, "/nonexistent/psql", []string{"--quiet"}, api.Service{}, cmd)
+	err := launchPsql(&config.Config{PasswordStorage: "none"}, details, "/nonexistent/psql", []string{"--quiet"}, common.PasswordTarget{}, cmd)
 	if err == nil {
 		t.Error("expected error for nonexistent psql path")
 	}

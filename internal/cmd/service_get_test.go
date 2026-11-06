@@ -32,6 +32,9 @@ func TestServiceGetCmd(t *testing.T) {
 		s.Resources[0].Spec.MemoryGbs = nil
 	})
 
+	fluidService := sampleService(fluidPlatform)
+	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
+
 	withInitialPassword := sampleService(func(s *api.Service) {
 		s.InitialPassword = new("super-secret-pw")
 	})
@@ -40,6 +43,18 @@ func TestServiceGetCmd(t *testing.T) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			expectResolveRef(m, "svc-12345", service)
 		}
+	}
+
+	// setupGetFluid also lists the fluid service's two branches, which only
+	// service get does, behind the experimental gate.
+	setupGetFluid := func(m *mocks.MockClientWithResponsesInterface) {
+		expectResolveRef(m, "svc-12345", fluidService)
+		branches := []api.Branch{sampleBranch(), sampleBranch()}
+		m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "svc-12345", nil).
+			Return(&api.GetBranchesResponse{
+				HTTPResponse: httpResponse(http.StatusOK),
+				JSON200:      &branches,
+			}, nil)
 	}
 
 	runCmdTests(t, []cmdTest{
@@ -161,7 +176,7 @@ func TestServiceGetCmd(t *testing.T) {
 │ Pooler Endpoint   │ svc-12345.project.pooler.tsdb.cloud.timescale.com:6432                                      │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 		},
@@ -182,7 +197,32 @@ func TestServiceGetCmd(t *testing.T) {
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
+└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+		},
+		{
+			// Fractional cores print with as many decimal places as they need.
+			name: "fractional cpu table output",
+			args: []string{"service", "get", "svc-12345"},
+			mock: setupGet(sampleService(func(s *api.Service) {
+				s.Resources[0].Spec.CPUMillis = new(250)
+				s.Resources[0].Spec.MemoryGbs = new(2)
+			})),
+			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                            VALUE                                            │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID        │ svc-12345                                                                                   │
+│ Name              │ test-service                                                                                │
+│ Status            │ READY                                                                                       │
+│ Type              │ TIMESCALEDB                                                                                 │
+│ Region            │ us-east-1                                                                                   │
+│ CPU               │ 0.25 cores (250m)                                                                           │
+│ Memory            │ 2 GB                                                                                        │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 		},
@@ -204,7 +244,7 @@ func TestServiceGetCmd(t *testing.T) {
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 		},
@@ -240,7 +280,7 @@ func TestServiceGetCmd(t *testing.T) {
   "port": 5432,
   "database": "tsdb",
   "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
-  "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview"
 }
 `,
 		},
@@ -249,7 +289,7 @@ func TestServiceGetCmd(t *testing.T) {
 			args: []string{"service", "get", "svc-12345", "-o", "yaml"},
 			mock: setupGet(sampleService()),
 			wantStdout: `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
-console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
+console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview
 created: "2025-01-15T10:30:00Z"
 database: tsdb
 endpoint:
@@ -270,6 +310,132 @@ service_id: svc-12345
 service_type: TIMESCALEDB
 status: READY
 `,
+		},
+		{
+			// The platform, IOPS, and branch count are preview fields: the
+			// output cases above carry a platform and IOPS from sampleService
+			// and drop them, while these show all three with the gate.
+			name: "experimental table output shows platform, IOPS, and branches",
+			args: []string{"service", "get", "svc-12345"},
+			mock: setupGetFluid,
+			opts: []runOption{experimental},
+			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                            VALUE                                            │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID        │ svc-12345                                                                                   │
+│ Name              │ test-service                                                                                │
+│ Status            │ READY                                                                                       │
+│ Platform          │ FLUID                                                                                       │
+│ Type              │ TIMESCALEDB                                                                                 │
+│ Region            │ us-east-1                                                                                   │
+│ CPU               │ 1 cores (1000m)                                                                             │
+│ Memory            │ 4 GB                                                                                        │
+│ IOPS              │ 6000                                                                                        │
+│ Branches          │ 2                                                                                           │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
+└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+		},
+		{
+			name: "experimental json output includes platform, IOPS, and branches",
+			args: []string{"service", "get", "svc-12345", "-o", "json"},
+			mock: setupGetFluid,
+			opts: []runOption{experimental},
+			wantStdout: `{
+  "created": "2025-01-15T10:30:00Z",
+  "endpoint": {
+    "host": "svc-12345.project.tsdb.cloud.timescale.com",
+    "port": 5432
+  },
+  "name": "test-service",
+  "platform": "FLUID",
+  "project_id": "test-project-123",
+  "region_code": "us-east-1",
+  "resources": [
+    {
+      "id": "resource-1",
+      "spec": {
+        "cpu_millis": 1000,
+        "iops": 6000,
+        "memory_gbs": 4
+      }
+    }
+  ],
+  "service_id": "svc-12345",
+  "service_type": "TIMESCALEDB",
+  "status": "READY",
+  "branch_count": 2,
+  "role": "tsdbadmin",
+  "host": "svc-12345.project.tsdb.cloud.timescale.com",
+  "port": 5432,
+  "database": "tsdb",
+  "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview"
+}
+`,
+		},
+		{
+			name: "experimental yaml output includes platform, IOPS, and branches",
+			args: []string{"service", "get", "svc-12345", "-o", "yaml"},
+			mock: setupGetFluid,
+			opts: []runOption{experimental},
+			wantStdout: `branch_count: 2
+connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
+console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview
+created: "2025-01-15T10:30:00Z"
+database: tsdb
+endpoint:
+  host: svc-12345.project.tsdb.cloud.timescale.com
+  port: 5432
+host: svc-12345.project.tsdb.cloud.timescale.com
+name: test-service
+platform: FLUID
+port: 5432
+project_id: test-project-123
+region_code: us-east-1
+resources:
+  - id: resource-1
+    spec:
+      cpu_millis: 1000
+      iops: 6000
+      memory_gbs: 4
+role: tsdbadmin
+service_id: svc-12345
+service_type: TIMESCALEDB
+status: READY
+`,
+		},
+		{
+			// Only fluid services can be branched, so a standard one isn't
+			// counted. The mock fails the test on any branch listing.
+			name:       "experimental standard service lists no branches",
+			args:       []string{"service", "get", "svc-12345", "-o", "env"},
+			mock:       setupGet(sampleService()),
+			opts:       []runOption{experimental},
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
+		},
+		{
+			name:       "fluid service lists no branches without the gate",
+			args:       []string{"service", "get", "svc-12345", "-o", "env"},
+			mock:       setupGet(fluidService),
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
+		},
+		{
+			// The count is the only thing the branch listing adds, so the
+			// service is still shown without it.
+			name: "branch count fails",
+			args: []string{"service", "get", "svc-12345", "-o", "env"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", fluidService)
+				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "svc-12345", nil).
+					Return(nil, errors.New("connection refused"))
+			},
+			opts:       []runOption{experimental},
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
+			wantStderr: "Warning: failed to count branches: failed to list branches: connection refused\n",
 		},
 		{
 			name:       "env output",
@@ -301,7 +467,7 @@ status: READY
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                                     │
 │ Password          │ super-secret-pw                                                                                             │
 │ Connection String │ postgresql://tsdbadmin:super-secret-pw@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview                   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 		},
@@ -317,21 +483,48 @@ status: READY
 			mock: setupGet(sampleService(func(s *api.Service) {
 				s.Endpoint = nil
 			})),
-			wantStdout: `┌─────────────┬──────────────────────────────────────────────────────────────────┐
-│  PROPERTY   │                              VALUE                               │
-├─────────────┼──────────────────────────────────────────────────────────────────┤
-│ Service ID  │ svc-12345                                                        │
-│ Name        │ test-service                                                     │
-│ Status      │ READY                                                            │
-│ Type        │ TIMESCALEDB                                                      │
-│ Region      │ us-east-1                                                        │
-│ CPU         │ 1 cores (1000m)                                                  │
-│ Memory      │ 4 GB                                                             │
-│ Created     │ 2025-01-15 10:30:00 UTC                                          │
-│ Console URL │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345 │
-└─────────────┴──────────────────────────────────────────────────────────────────┘
+			wantStdout: `┌─────────────┬───────────────────────────────────────────────────────────────────────────────────────────┐
+│  PROPERTY   │                                           VALUE                                           │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID  │ svc-12345                                                                                 │
+│ Name        │ test-service                                                                              │
+│ Status      │ READY                                                                                     │
+│ Type        │ TIMESCALEDB                                                                               │
+│ Region      │ us-east-1                                                                                 │
+│ CPU         │ 1 cores (1000m)                                                                           │
+│ Memory      │ 4 GB                                                                                      │
+│ Created     │ 2025-01-15 10:30:00 UTC                                                                   │
+│ Console URL │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview │
+└─────────────┴───────────────────────────────────────────────────────────────────────────────────────────┘
 `,
-			wantStderr: "Warning: Failed to get connection details: service endpoint not available\n",
+			wantStderr: "Warning: Failed to get connection details: endpoint not available\n",
+		},
+		{
+			// No port is guessed, for the direct endpoint or the pooler, so
+			// an endpoint without one isn't shown or connected to.
+			name: "endpoints without a port",
+			args: []string{"service", "get", "svc-12345"},
+			mock: setupGet(sampleService(func(s *api.Service) {
+				s.Endpoint.Port = nil
+				s.ConnectionPooler = &api.ConnectionPooler{
+					Endpoint: &api.Endpoint{Host: new("svc-12345.project.pooler.tsdb.cloud.timescale.com")},
+				}
+			})),
+			wantStdout: `┌─────────────┬───────────────────────────────────────────────────────────────────────────────────────────┐
+│  PROPERTY   │                                           VALUE                                           │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID  │ svc-12345                                                                                 │
+│ Name        │ test-service                                                                              │
+│ Status      │ READY                                                                                     │
+│ Type        │ TIMESCALEDB                                                                               │
+│ Region      │ us-east-1                                                                                 │
+│ CPU         │ 1 cores (1000m)                                                                           │
+│ Memory      │ 4 GB                                                                                      │
+│ Created     │ 2025-01-15 10:30:00 UTC                                                                   │
+│ Console URL │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview │
+└─────────────┴───────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+			wantStderr: "Warning: Failed to get connection details: endpoint port not available\n",
 		},
 		{
 			// The ref reaches the API as typed: no client-side classification

@@ -1,9 +1,11 @@
 package mcp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -56,20 +58,165 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["with_password"].Examples = []any{false, true}
 }
 
+// updatePasswordMessage returns the result message for an update that went
+// through, given the outcome of saving the new password. It warns when the
+// password was neither saved (because saving failed or password storage is
+// disabled) nor returned, since then nobody knows it.
+func updatePasswordMessage(withPassword bool, storage common.PasswordStorageResult) string {
+	if !storage.Success && !withPassword {
+		return "Password updated for tsdbadmin. Warning: the new password was not saved, and was not returned because with_password was false."
+	}
+	return "Password updated for tsdbadmin."
+}
+
+// setLogsInputSchemaProperties sets the tail, since, and until properties
+// shared by the logs tools.
+func setLogsInputSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["tail"].Description = "Number of log lines to return. Defaults to 100."
+	schema.Properties["tail"].Default = util.Must(json.Marshal(100))
+	schema.Properties["tail"].Minimum = new(1.0)
+	schema.Properties["tail"].Examples = []any{50, 100, 1000}
+
+	schema.Properties["since"].Description = "Fetch logs after this timestamp (RFC3339 format). If not provided, only the tail parameter limits how far back logs are fetched."
+	schema.Properties["since"].Examples = []any{"2024-01-15T09:00:00Z", "2025-01-16T08:00:00Z"}
+
+	schema.Properties["until"].Description = "Fetch logs before this timestamp (RFC3339 format). If not provided, fetches logs up to the current time."
+	schema.Properties["until"].Examples = []any{"2024-01-15T10:00:00Z", "2025-01-16T08:30:00Z"}
+}
+
+// setLogsOutputSchemaProperties sets the logs property shared by the logs
+// tools' outputs.
+func setLogsOutputSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["logs"].Description = "Log lines ordered from oldest to newest. Each line is the log message, prefixed with its timestamp in UTC if it has one."
+	schema.Properties["logs"].Examples = []any{[]any{
+		"2025-01-15 10:30:00 UTC LOG: database system is ready to accept connections",
+		`2025-01-15 10:30:30 UTC ERROR: relation "missing" does not exist`,
+	}}
+}
+
+// formatLogLines renders log entries as the logs tools return them: each
+// message prefixed with its timestamp in UTC, if it has one.
+func formatLogLines(entries []api.ServiceLogEntry) []string {
+	logs := make([]string, len(entries))
+	for i, e := range entries {
+		if !e.Timestamp.IsZero() {
+			logs[i] = e.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC") + " " + e.Message
+		} else {
+			logs[i] = e.Message
+		}
+	}
+	return logs
+}
+
+// setCPUMemorySchemaProperties sets a tool's cpu_memory property. shared
+// includes shared/shared, which a service can't be resized onto. Without the
+// experimental gate, only the standard platform's combinations are offered.
+// Behind it, the enum spans both platforms, so description is followed by
+// platformDescription, which says how the platform is decided, and then by
+// which combinations go with which: an enum can't express that, and every
+// tool's description must stand alone, since clients that search tools may
+// load one without the others.
+func setCPUMemorySchemaProperties(schema *jsonschema.Schema, shared, experimental bool, description, platformDescription string) {
+	property := schema.Properties["cpu_memory"]
+	property.Enum = util.AnySlice(common.AllowedCPUMemoryConfigs(shared, experimental).Strings())
+	if !experimental {
+		property.Description = description
+		return
+	}
+
+	standard := common.StandardCPUMemoryConfigs()
+	if !shared {
+		standard = standard.WithoutShared()
+	}
+	property.Description = fmt.Sprintf("%s %s Standard platform: %s. Fluid platform: %s.",
+		description, platformDescription, standard, common.FluidCPUMemoryConfigs())
+}
+
+// setPlatformSchemaProperties sets the platform property shared by the service
+// output types. The platform is a preview field, so without the experimental
+// gate the property is removed and clients aren't told about it.
+func setPlatformSchemaProperties(schema *jsonschema.Schema, experimental bool) {
+	if !experimental {
+		delete(schema.Properties, "platform")
+		return
+	}
+	schema.Properties["platform"].Description = "Storage platform the service runs on"
+	schema.Properties["platform"].Enum = []any{api.ServicePlatformSTANDARD, api.ServicePlatformFLUID}
+}
+
+// setIOPSSchemaProperties sets a tool's iops input property. IOPS are a
+// preview parameter, so without the experimental gate the property is removed,
+// and the schema rejects it as an unknown property. defaultDescription, if
+// any, says what happens when iops is omitted. The allowed values aren't
+// listed: they depend on too much to describe, and would go stale. The API
+// validates the value.
+func setIOPSSchemaProperties(schema *jsonschema.Schema, experimental bool, defaultDescription string) {
+	if !experimental {
+		delete(schema.Properties, "iops")
+		return
+	}
+	property := schema.Properties["iops"]
+	property.Description = strings.TrimSpace("Provisioned IOPS for the service's storage. " +
+		"Check the Tiger Data documentation for the allowed values, which depend on the user's plan, the service's platform, and its CPU/memory allocation. " +
+		defaultDescription)
+	property.Minimum = new(0.0)
+	property.Examples = []any{16000, 32000}
+}
+
 // ResourceInfo represents resource allocation information
 type ResourceInfo struct {
 	CPU    string `json:"cpu,omitempty"`
 	Memory string `json:"memory,omitempty"`
+	IOPS   int    `json:"iops,omitempty"`
 }
 
 // setResourceInfoSchemaProperties enhances the schema of a ResourceInfo
-// property nested inside a service output schema.
-func setResourceInfoSchemaProperties(schema *jsonschema.Schema) {
+// property nested inside a service output schema. IOPS are a preview field, so
+// without the experimental gate the property is removed.
+func setResourceInfoSchemaProperties(schema *jsonschema.Schema, experimental bool) {
 	schema.Properties["cpu"].Description = "CPU allocation"
 	schema.Properties["cpu"].Examples = []any{"0.5 cores", "1 core", "4 cores"}
 
 	schema.Properties["memory"].Description = "Memory allocation"
 	schema.Properties["memory"].Examples = []any{"2 GB", "4 GB", "16 GB"}
+
+	if experimental {
+		schema.Properties["iops"].Description = "Provisioned IOPS for the service's storage"
+		schema.Properties["iops"].Examples = []any{3000, 12000}
+	} else {
+		delete(schema.Properties, "iops")
+	}
+}
+
+// convertToResourceInfo converts a service's resource allocation to its MCP
+// output form, or nil if the API didn't return one. The IOPS are a preview
+// field, returned only if experimental is set.
+func convertToResourceInfo(service api.Service, experimental bool) *ResourceInfo {
+	if len(service.Resources) == 0 || service.Resources[0].Spec == nil {
+		return nil
+	}
+	spec := service.Resources[0].Spec
+	info := &ResourceInfo{}
+
+	if spec.CPUMillis != nil {
+		info.CPU = common.FormatCPUCores(*spec.CPUMillis) + " cores"
+	} else {
+		// CPU is null - this indicates a free tier service
+		info.CPU = "shared"
+	}
+
+	if spec.MemoryGbs != nil {
+		info.Memory = fmt.Sprintf("%d GB", *spec.MemoryGbs)
+	} else {
+		// Memory is null - this indicates a free tier service
+		info.Memory = "shared"
+	}
+
+	if experimental {
+		info.IOPS = util.Deref(spec.Iops)
+	}
+
+	return info
 }
 
 // ServiceDetail represents detailed service information
@@ -77,6 +224,7 @@ type ServiceDetail struct {
 	ServiceID        string        `json:"id"`
 	Name             string        `json:"name"`
 	Status           string        `json:"status"`
+	Platform         string        `json:"platform,omitempty"`
 	Type             string        `json:"type"`
 	Region           string        `json:"region"`
 	Created          string        `json:"created,omitempty"`
@@ -89,27 +237,33 @@ type ServiceDetail struct {
 	ConnectionString string        `json:"connection_string"`
 }
 
-func (ServiceDetail) Schema() *jsonschema.Schema {
+func (ServiceDetail) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceDetail](nil))
+	setServiceDetailSchemaProperties(schema, experimental)
+	return schema
+}
 
+// setServiceDetailSchemaProperties describes ServiceDetail's properties in
+// schema, which is ServiceDetail's or that of a type embedding it.
+func setServiceDetailSchemaProperties(schema *jsonschema.Schema, experimental bool) {
 	schema.Properties["id"].Description = "Service identifier (10-character alphanumeric string)"
 
 	schema.Properties["status"].Description = "Service status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
 
+	setPlatformSchemaProperties(schema, experimental)
+
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
 
 	schema.Properties["environment"].Description = "Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."
 
-	setResourceInfoSchemaProperties(schema.Properties["resources"])
+	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
 
 	schema.Properties["replicas"].Description = "Number of HA replicas (0=single node/no HA, 1+=HA enabled)"
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint"
 	schema.Properties["pooler_endpoint"].Description = "Connection pooler endpoint"
 	schema.Properties["password"].Description = "Password for tsdbadmin user (only included if with_password=true)"
 	schema.Properties["connection_string"].Description = "PostgreSQL connection string (password embedded only if with_password=true)"
-
-	return schema
 }
 
 // convertToServiceDetail converts an API Service to MCP ServiceDetail
@@ -125,32 +279,12 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 		Environment: string(common.ServiceEnvironmentTag(service)),
 	}
 
-	// Add resource information if available
-	if len(service.Resources) > 0 {
-		resource := service.Resources[0]
-		if resource.Spec != nil {
-			detail.Resources = &ResourceInfo{}
-
-			if resource.Spec.CPUMillis != nil {
-				cpuCores := float64(*resource.Spec.CPUMillis) / 1000
-				if cpuCores == float64(int(cpuCores)) {
-					detail.Resources.CPU = fmt.Sprintf("%.0f cores", cpuCores)
-				} else {
-					detail.Resources.CPU = fmt.Sprintf("%.1f cores", cpuCores)
-				}
-			} else {
-				// CPU is null - this indicates a free tier service
-				detail.Resources.CPU = "shared"
-			}
-
-			if resource.Spec.MemoryGbs != nil {
-				detail.Resources.Memory = fmt.Sprintf("%d GB", *resource.Spec.MemoryGbs)
-			} else {
-				// Memory is null - this indicates a free tier service
-				detail.Resources.Memory = "shared"
-			}
-		}
+	// The platform is a preview field, returned only behind the gate.
+	if s.app.Experimental {
+		detail.Platform = string(util.Deref(service.Platform))
 	}
+
+	detail.Resources = convertToResourceInfo(service, s.app.Experimental)
 
 	// Add replica information
 	if service.HaReplicas != nil && service.HaReplicas.ReplicaCount != nil {
@@ -158,21 +292,15 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	}
 
 	// Add endpoint information
-	if service.Endpoint != nil && service.Endpoint.Host != nil {
-		port := "5432"
-		if service.Endpoint.Port != nil {
-			port = fmt.Sprintf("%d", *service.Endpoint.Port)
-		}
-		detail.DirectEndpoint = fmt.Sprintf("%s:%s", *service.Endpoint.Host, port)
+	if service.Endpoint != nil && service.Endpoint.Host != nil && service.Endpoint.Port != nil {
+		detail.DirectEndpoint = fmt.Sprintf("%s:%d", *service.Endpoint.Host, *service.Endpoint.Port)
 	}
 
 	// Add connection pooler endpoint
-	if service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil && service.ConnectionPooler.Endpoint.Host != nil {
-		port := "6432"
-		if service.ConnectionPooler.Endpoint.Port != nil {
-			port = fmt.Sprintf("%d", *service.ConnectionPooler.Endpoint.Port)
+	if service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
+		if pooler := service.ConnectionPooler.Endpoint; pooler.Host != nil && pooler.Port != nil {
+			detail.PoolerEndpoint = fmt.Sprintf("%s:%d", *pooler.Host, *pooler.Port)
 		}
-		detail.PoolerEndpoint = fmt.Sprintf("%s:%s", *service.ConnectionPooler.Endpoint.Host, port)
 	}
 
 	// Include password in ServiceDetail if requested. Setting it here ensures
@@ -184,7 +312,7 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
-	if details, err := common.GetConnectionDetails(cfg, service, common.ConnectionDetailsOptions{
+	if details, err := common.GetConnectionDetails(cfg, common.NewServiceConnectionTarget(service), common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
@@ -200,4 +328,151 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	}
 
 	return detail
+}
+
+// branchIDHelp is the sentence a db tool's service_id description gains for
+// branches, saying what passing a branch ID does. Branches are a preview, so
+// it is empty without the experimental gate.
+func branchIDHelp(experimental bool, does string) string {
+	if !experimental {
+		return ""
+	}
+	return " A branch ID is also accepted — passing one " + does + " instead. Use branch_list to find branch IDs."
+}
+
+// setBranchIDSchemaProperties sets common branch_id schema properties. Like
+// service_id, branch_id is IDs-only (see setServiceIDSchemaProperties), which
+// resolveBranchByID enforces.
+func setBranchIDSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["branch_id"].Description = "Unique identifier of the branch (10-character alphanumeric string). Use branch_list to find branch IDs."
+	schema.Properties["branch_id"].Examples = []any{"br4nch1d9x", "k2m9x2sd3a"}
+	schema.Properties["branch_id"].Pattern = "^[a-z0-9]{10}$"
+}
+
+// setBranchCPUMemorySchemaProperties sets a branch tool's cpu_memory property,
+// offering only the combinations a branch can have.
+func setBranchCPUMemorySchemaProperties(schema *jsonschema.Schema, description string) {
+	schema.Properties["cpu_memory"].Description = description
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.FluidCPUMemoryConfigs().Strings())
+}
+
+// resolveBranchByID looks up the branch with the given ID, through the API's
+// resolve endpoint, which also matches names. A match by name is reported as
+// not found, keeping the tools IDs-only. The branch carries its parent's ID,
+// which every other branch endpoint needs.
+func resolveBranchByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*api.Branch, error) {
+	branch, err := common.ResolveBranch(ctx, client, projectID, id)
+	if err != nil {
+		return nil, err
+	}
+	if branch.ID != id {
+		return nil, common.ExitWithCode(common.ExitServiceNotFound, fmt.Errorf("branch '%s' not found", id))
+	}
+	return branch, nil
+}
+
+// setBranchIOPSSchemaProperties sets a branch tool's iops input property.
+// defaultDescription, if any, says what happens when iops is omitted. As for
+// services, the allowed values aren't listed: they depend on too much to
+// describe, and would go stale. The API validates the value.
+func setBranchIOPSSchemaProperties(schema *jsonschema.Schema, defaultDescription string) {
+	property := schema.Properties["iops"]
+	property.Description = strings.TrimSpace("Provisioned IOPS for the branch's storage. " +
+		"Check the Tiger Data documentation for the allowed values, which depend on the user's plan and the branch's CPU/memory allocation. " +
+		defaultDescription)
+	property.Minimum = new(0.0)
+	property.Examples = []any{16000, 32000}
+}
+
+// BranchDetail represents detailed branch information
+type BranchDetail struct {
+	BranchID         string        `json:"id"`
+	Name             string        `json:"name"`
+	ServiceID        string        `json:"service_id"`
+	ServiceName      string        `json:"service_name,omitempty"`
+	Status           string        `json:"status"`
+	Created          string        `json:"created,omitempty"`
+	Resources        *ResourceInfo `json:"resources,omitempty"`
+	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
+	Password         string        `json:"password,omitempty"`
+	ConnectionString string        `json:"connection_string,omitempty"`
+}
+
+func (BranchDetail) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[BranchDetail](nil))
+
+	schema.Properties["id"].Description = "Branch identifier (10-character alphanumeric string)"
+	schema.Properties["name"].Description = "Branch name, unique within its parent service"
+	schema.Properties["service_id"].Description = "ID of the parent service the branch was created from"
+	schema.Properties["service_name"].Description = "Name of the parent service (only returned by branch_get)"
+
+	schema.Properties["status"].Description = "Branch status"
+	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "QUEUED", "CONFIGURING"}
+
+	// The branch tools only exist behind the experimental gate, so the IOPS
+	// are always included.
+	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
+
+	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint (absent while the branch is still provisioning)"
+	schema.Properties["password"].Description = "Password for the branch's tsdbadmin user (only included if with_password=true)"
+	schema.Properties["connection_string"].Description = "PostgreSQL connection string (password embedded only if with_password=true)"
+
+	return schema
+}
+
+// convertToBranchDetail converts an API Branch to MCP BranchDetail. With
+// withPassword, the branch's stored password is included, or the create
+// response's when none is stored.
+func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, withPassword bool) BranchDetail {
+	detail := BranchDetail{
+		BranchID:  branch.ID,
+		Name:      branch.Name,
+		ServiceID: branch.ServiceID,
+		Status:    string(branch.Status),
+		Created:   branch.Created.Format("2006-01-02T15:04:05Z"),
+		Resources: &ResourceInfo{
+			CPU:    common.FormatCPUCores(branch.CPUMillis) + " cores",
+			Memory: fmt.Sprintf("%d GB", branch.MemoryGbs),
+			IOPS:   util.Deref(branch.Iops),
+		},
+	}
+
+	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
+		detail.DirectEndpoint = fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port)
+	}
+
+	// Setting the password here ensures it's set even if
+	// GetConnectionDetails returns an error.
+	if withPassword {
+		detail.Password = util.Deref(branch.InitialPassword)
+	}
+
+	if details, err := common.GetConnectionDetails(cfg, common.NewBranchConnectionTarget(branch), common.ConnectionDetailsOptions{
+		Role:            "tsdbadmin",
+		WithPassword:    withPassword,
+		InitialPassword: util.Deref(branch.InitialPassword),
+		ReadOnly:        common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
+	}); err != nil {
+		s.logger.Error("MCP: Failed to build connection string", slog.Any("error", err))
+	} else {
+		if withPassword && details.Password == "" {
+			s.logger.Error("MCP: Requested password but password not available")
+		}
+		detail.ConnectionString = details.String()
+		detail.Password = details.Password
+	}
+
+	return detail
+}
+
+// parseBranchCPUMemory returns the branch configuration a cpu_memory value
+// names. The schema's enum already rejects anything else, so an error here
+// means the two have drifted apart.
+func parseBranchCPUMemory(cpuMemory string) (common.CPUMemoryConfig, error) {
+	for _, c := range common.FluidCPUMemoryConfigs() {
+		if c.String() == cpuMemory {
+			return c, nil
+		}
+	}
+	return common.CPUMemoryConfig{}, fmt.Errorf("invalid CPU/Memory specification '%s'. Valid options: %s", cpuMemory, common.FluidCPUMemoryConfigs())
 }

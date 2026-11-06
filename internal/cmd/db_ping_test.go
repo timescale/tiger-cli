@@ -19,7 +19,7 @@ import (
 
 func TestDbPingCmd(t *testing.T) {
 	setupGet := func(m *mocks.MockClientWithResponsesInterface) {
-		expectResolveRef(m, "svc-12345", sampleService())
+		expectResolveTarget(m, "svc-12345", sampleService())
 	}
 
 	runCmdTests(t, []cmdTest{
@@ -51,9 +51,9 @@ func TestDbPingCmd(t *testing.T) {
 			args: []string{"db", "ping"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
+				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
@@ -65,25 +65,25 @@ func TestDbPingCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"db", "ping", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
+				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "service not found",
 			args: []string{"db", "ping", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefNotFound(m, "svc-12345")
+				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service 'svc-12345' not found",
+			wantErr: "service or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "ambiguous name refused",
 			args: []string{"db", "ping", "my-api-db"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+				expectResolveTargetStatus(m, "my-api-db", http.StatusBadRequest, &api.ClientError{Message: new("ambiguous service name matches multiple services")})
 			},
 			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
@@ -92,7 +92,7 @@ func TestDbPingCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"db", "ping", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
+				expectResolveTargetStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
@@ -117,7 +117,7 @@ func TestDbPingCmd(t *testing.T) {
 			name: "unreachable server",
 			args: []string{"db", "ping", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
+				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
 				}))
 			},
@@ -136,7 +136,7 @@ func TestDbPingCmd(t *testing.T) {
 			name: "connection timeout",
 			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
+				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
 				}))
 			},
@@ -147,6 +147,15 @@ func TestDbPingCmd(t *testing.T) {
 			}),
 			wantStderr: "Connection timeout after 250ms\n",
 			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
+		},
+		{
+			// Branches are a preview, so the help mentions them only behind
+			// the gate. The generated docs/cli reference covers the ungated
+			// help.
+			name:       "help mentions branches when experimental",
+			args:       []string{"db", "ping", "--help"},
+			opts:       []runOption{withExperimental()},
+			wantStdout: matchHelp("You can also pass a branch, by ID or name, to test connectivity to that branch."),
 		},
 	})
 }

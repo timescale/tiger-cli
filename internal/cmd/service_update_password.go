@@ -89,7 +89,7 @@ so update the password on the primary instead.`,
 
 			if autoGenerate {
 				// Auto-generate password using existing function
-				if _, err := resetServicePassword(ctx, cmd, cfg, client, service, "tsdbadmin", ""); err != nil {
+				if _, err := resetPassword(ctx, cmd, cfg, client, common.ServiceCredentials(service), "tsdbadmin", ""); err != nil {
 					return err
 				}
 			} else if password == "" {
@@ -97,12 +97,12 @@ so update the password on the primary instead.`,
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
 					return fmt.Errorf("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
 				}
-				_, err := promptAndResetPassword(ctx, cmd, cfg, client, service, "tsdbadmin")
+				_, err := promptAndResetPassword(ctx, cmd, cfg, client, common.ServiceCredentials(service), "tsdbadmin")
 				if err != nil {
 					return err
 				}
 			} else {
-				if _, err := resetServicePassword(ctx, cmd, cfg, client, service, "tsdbadmin", password); err != nil {
+				if _, err := resetPassword(ctx, cmd, cfg, client, common.ServiceCredentials(service), "tsdbadmin", password); err != nil {
 					return err
 				}
 			}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -436,6 +437,26 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("psql command with updated password succeeded")
 	})
 
+	t.Run("DatabaseExtensions", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		output, err := executeIntegrationCommand(t.Context(), "db", "extensions", "list", serviceID, "-o", "json")
+		if err != nil {
+			t.Fatalf("db extensions list failed: %v\nOutput: %s", err, output)
+		}
+
+		var extensions []common.Extension
+		if err := json.Unmarshal([]byte(output), &extensions); err != nil {
+			t.Fatalf("failed to parse extensions output as JSON: %v\nOutput: %s", err, output)
+		}
+		// Every Tiger Cloud service has TimescaleDB installed.
+		if !slices.ContainsFunc(extensions, func(e common.Extension) bool { return e.Name == "timescaledb" }) {
+			t.Errorf("expected timescaledb among the installed extensions, got: %s", output)
+		}
+	})
+
 	// These run against the service this test created, so the password
 	// `service create` stored is available and every assertion can be hard.
 	t.Run("DatabaseQuery", func(t *testing.T) {
@@ -472,7 +493,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to build API client: %v", err)
 		}
-		target, err := common.ResolveConnectionTargetByID(t.Context(), client, projectID, serviceID)
+		target, err := common.ResolveConnectionTargetByID(t.Context(), client, projectID, serviceID, false)
 		if err != nil {
 			t.Fatalf("failed to resolve connection target: %v", err)
 		}
@@ -1292,19 +1313,16 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"service", "resize", serviceID,
 			"--cpu", targetCPUMillis,
 			"--memory", targetMemoryGB,
-			"--wait-timeout", "10m", // Longer timeout for resize operations
 		)
 		if err != nil {
 			t.Fatalf("Service resize failed: %v\nOutput: %s", err, output)
 		}
 
-		// Verify resize success message
-		if !strings.Contains(output, "Resize completed successfully") &&
-			!strings.Contains(output, "Service resized") {
-			t.Logf("Note: Expected resize success message, got: %s", output)
+		if !strings.Contains(output, "The resize is in progress") {
+			t.Errorf("Expected resize in progress message, got: %s", output)
 		}
 
-		t.Logf("Service resize command completed successfully")
+		t.Logf("Service resize request accepted")
 	})
 
 	t.Run("VerifyServiceResized", func(t *testing.T) {

@@ -69,7 +69,7 @@ type ExecuteQueryArgs struct {
 var ExecuteQuery = func(ctx context.Context, cfg *config.Config, target *ConnectionTarget, args ExecuteQueryArgs) (*QueryResult, error) {
 	// Fail with "service is paused"/"service is not ready" rather than an
 	// opaque connection error.
-	if err := CheckServiceReady(target.ConnectionService); err != nil {
+	if err := target.CheckReady(); err != nil {
 		return nil, err
 	}
 

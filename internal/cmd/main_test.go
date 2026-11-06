@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -424,6 +425,23 @@ func withIsTerminal(isTerminal bool) runOption {
 	})
 }
 
+// withGenerateSecurePassword stubs common.GenerateSecurePassword, asserting the
+// requested length and returning password and err in place of a random
+// password, so a case can expect the exact update request and stored password.
+func withGenerateSecurePassword(wantLength int, password string, err error) runOption {
+	return withSetup(func(t *testing.T) {
+		original := common.GenerateSecurePassword
+		common.GenerateSecurePassword = func(length int) (string, error) {
+			t.Helper()
+			if length != wantLength {
+				t.Errorf("GenerateSecurePassword length = %d, want %d", length, wantLength)
+			}
+			return password, err
+		}
+		t.Cleanup(func() { common.GenerateSecurePassword = original })
+	})
+}
+
 // withReadPassword makes util.ReadPassword return the given password. The real
 // implementation needs stdin to be an *os.File, so password prompts can't be
 // driven with withStdin.
@@ -546,6 +564,32 @@ func checkDefaultService(want string) checkFunc {
 	}
 }
 
+// withStoredPassword seeds a password for target in the mock keyring before
+// the command runs.
+func withStoredPassword(target common.PasswordTarget, password string) runOption {
+	return withSetup(func(t *testing.T) {
+		if err := (&common.KeyringStorage{}).Save(target, password, "tsdbadmin"); err != nil {
+			t.Fatalf("failed to seed password: %v", err)
+		}
+	})
+}
+
+// checkStoredPassword returns a check asserting the password stored in the
+// (mock) keyring for the given service.
+func checkStoredPassword(serviceID, want string) checkFunc {
+	return func(t *testing.T, result cmdResult) {
+		t.Helper()
+		target := common.PasswordTarget{ID: serviceID, ProjectID: testProjectID}
+		got, err := (&common.KeyringStorage{}).Get(target, "tsdbadmin")
+		if err != nil {
+			t.Fatalf("failed to read stored password: %v", err)
+		}
+		if got != want {
+			t.Errorf("stored password = %q, want %q", got, want)
+		}
+	}
+}
+
 // writeConfigFile writes exactly the given keys to the config file in
 // configDir, creating the directory if needed. Only these keys are written, so
 // unspecified ones still resolve from the environment or their defaults —
@@ -605,6 +649,61 @@ func httpResponse(statusCode int) *http.Response {
 	return &http.Response{StatusCode: statusCode}
 }
 
+// expectResolve registers resolving ref through the resolve endpoint,
+// restricted to resolveType (nil for none), answered with v: an api.Service,
+// api.Branch, or api.ReadReplicaSet, whose Go type picks the discriminator.
+func expectResolve(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, v any) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(&api.ResolveRefResponse{
+			HTTPResponse: httpResponse(http.StatusOK),
+			JSON200:      resolveResult(v),
+		}, nil)
+}
+
+// expectResolveStatus registers a resolve answered with status. A nil apiErr
+// stands in for a response with no body.
+func expectResolveStatus(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, status int, apiErr *api.ClientError) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(&api.ResolveRefResponse{
+			HTTPResponse: httpResponse(status),
+			JSON4XX:      apiErr,
+		}, nil)
+}
+
+// expectResolveError registers a resolve that never reaches the API.
+func expectResolveError(m *mocks.MockClientWithResponsesInterface, ref string, resolveType *api.ResolveType, err error) {
+	m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: ref, Type: resolveType}).
+		Return(nil, err)
+}
+
+// resolveResult encodes v as the resolve endpoint's union, discriminated by
+// v's Go type. Each member is its plain type plus the discriminator.
+func resolveResult(v any) *api.ResolveResult {
+	var resolveType api.ResolveType
+	switch v.(type) {
+	case api.Service:
+		resolveType = api.ResolveTypeSERVICE
+	case api.Branch:
+		resolveType = api.ResolveTypeBRANCH
+	case api.ReadReplicaSet:
+		resolveType = api.ResolveTypeREADREPLICASET
+	default:
+		panic(fmt.Sprintf("resolveResult: unsupported type %T", v))
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(util.Must(json.Marshal(v)), &body); err != nil {
+		panic(err)
+	}
+	body["type"] = resolveType
+
+	var result api.ResolveResult
+	if err := result.UnmarshalJSON(util.Must(json.Marshal(body))); err != nil {
+		panic(err)
+	}
+	return &result
+}
+
 // expectResolveRef registers the resolve call a command makes for its service
 // ref — the ref filter on the service list — answered with svc as the one
 // match.
@@ -648,7 +747,9 @@ func expectResolveRefStatus(m *mocks.MockClientWithResponsesInterface, ref strin
 		}, nil)
 }
 
-// sampleService returns an api.Service with reasonable defaults.
+// sampleService returns an api.Service with reasonable defaults. It carries a
+// platform and IOPS, as the API returns them, so every case without the
+// experimental gate also proves the preview fields are dropped from output.
 // Use overrides to customize specific fields.
 func sampleService(overrides ...func(*api.Service)) api.Service {
 	svc := api.Service{
@@ -658,6 +759,7 @@ func sampleService(overrides ...func(*api.Service)) api.Service {
 		ServiceType: api.ServiceTypeTIMESCALEDB,
 		RegionCode:  "us-east-1",
 		Status:      api.DeployStatusREADY,
+		Platform:    new(api.ServicePlatformSTANDARD),
 		Created:     time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC),
 		Endpoint: &api.Endpoint{
 			Host: new("svc-12345.project.tsdb.cloud.timescale.com"),
@@ -668,6 +770,7 @@ func sampleService(overrides ...func(*api.Service)) api.Service {
 			Spec: &api.ResourceSpec{
 				CPUMillis: new(1000),
 				MemoryGbs: new(4),
+				Iops:      new(6000),
 			},
 		}},
 	}

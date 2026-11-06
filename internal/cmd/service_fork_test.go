@@ -43,6 +43,27 @@ Service is being forked. Use 'tiger service list' to check status.
 
 	runCmdTests(t, []cmdTest{
 		{
+			// The platform and IOPS are a preview, so their help text is gated.
+			name:       "help omits the platform and IOPS",
+			args:       []string{"service", "fork", "--help"},
+			wantStdout: matchHelp("You can override any of these defaults", "platform", "IOPS", "--iops"),
+		},
+		{
+			name: "experimental help says the fork keeps the source's platform",
+			args: []string{"service", "fork", "--help"},
+			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: matchHelp(`The fork is always created on the same platform as the source service, so custom
+--cpu and --memory values must be valid for that platform.`),
+		},
+		{
+			name: "experimental help says the fork inherits the source's IOPS",
+			args: []string{"service", "fork", "--help"},
+			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: matchHelp(`The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If --iops
+is not given, the fork inherits the source service's IOPS.`),
+		},
+		{
 			name:    "multiple timing flags",
 			args:    []string{"service", "fork", "svc-12345", "--last-snapshot", "--to-timestamp", "2025-01-15T10:30:00Z"},
 			wantErr: "if any flags in the group [now last-snapshot to-timestamp] are set none of the others can be; [last-snapshot to-timestamp] were all set",
@@ -56,6 +77,12 @@ Service is being forked. Use 'tiger service list' to check status.
 			name:    "unparseable timestamp",
 			args:    []string{"service", "fork", "svc-12345", "--to-timestamp", "not-a-timestamp"},
 			wantErr: "invalid argument \"not-a-timestamp\" for \"--to-timestamp\" flag: invalid time format `not-a-timestamp` must be one of: `2006-01-02T15:04:05Z07:00`",
+		},
+		{
+			// --iops is a preview flag, so without the gate it doesn't exist.
+			name:    "iops flag rejected without experimental",
+			args:    []string{"service", "fork", "svc-12345", "--iops", "12000"},
+			wantErr: "unknown flag: --iops",
 		},
 		{
 			name:    "invalid environment",
@@ -104,11 +131,6 @@ Service is being forked. Use 'tiger service list' to check status.
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
-			name:    "invalid cpu/memory combination",
-			args:    []string{"service", "fork", "svc-12345", "--cpu", "999", "--memory", "1"},
-			wantErr: "invalid CPU/Memory combination. Allowed combinations: shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
-		},
-		{
 			name: "ambiguous name refused",
 			args: []string{"service", "fork", "my-api-db"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -116,6 +138,25 @@ Service is being forked. Use 'tiger service list' to check status.
 			},
 			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
+			// The combination is validated against the source's platform, which
+			// the fork inherits, so the source is fetched first.
+			name: "invalid cpu/memory combination",
+			args: []string{"service", "fork", "svc-12345", "--cpu", "999", "--memory", "1"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+			},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
+		},
+		{
+			// Not gated on experimental: only a fluid source gets these.
+			name: "fluid source rejects a standard combination",
+			args: []string{"service", "fork", "svc-12345", "--cpu", "2000", "--memory", "8"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name: "network error",
@@ -273,6 +314,63 @@ Connect with: tiger db psql
 			wantStdout: forkedEnv,
 			wantStderr: noWaitStderr("Forking service 'test-service' (svc-12345) to 'my-fork' at current state..."),
 		},
+		{
+			name: "fluid source cpu only auto-configures memory",
+			args: []string{"service", "fork", "svc-12345", "--cpu", "2000", "--no-wait", "--no-set-default", "-o", "env"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
+				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
+					ForkStrategy:   api.ForkStrategyNOW,
+					CPUMillis:      new("2000"),
+					MemoryGbs:      new("16"),
+					EnvironmentTag: new(api.EnvironmentTagDEV),
+				}).Return(&api.ForkServiceResponse{
+					HTTPResponse: httpResponse(http.StatusAccepted),
+					JSON202:      &forked,
+				}, nil)
+			},
+			wantStdout: forkedEnv,
+			wantStderr: noWaitStderr("Forking service 'test-service' (svc-12345) at current state..."),
+		},
+		{
+			// The API validates the IOPS value, so it's sent as given.
+			name: "experimental iops mapped to request and shown in output",
+			args: []string{"service", "fork", "svc-12345", "--iops", "12000", "--no-wait", "--no-set-default"},
+			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
+				req := baseReq
+				req.Iops = new(12000)
+				forkedFluid := sampleService(fluidPlatform, withIOPS(12000), func(s *api.Service) {
+					s.ServiceID = "svc-67890"
+					s.Name = "test-service-fork"
+				})
+				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", req).
+					Return(&api.ForkServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &forkedFluid,
+					}, nil)
+			},
+			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                            VALUE                                            │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID        │ svc-67890                                                                                   │
+│ Name              │ test-service-fork                                                                           │
+│ Status            │ READY                                                                                       │
+│ Platform          │ FLUID                                                                                       │
+│ Type              │ TIMESCALEDB                                                                                 │
+│ Region            │ us-east-1                                                                                   │
+│ CPU               │ 1 cores (1000m)                                                                             │
+│ Memory            │ 4 GB                                                                                        │
+│ IOPS              │ 12000                                                                                       │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-67890/overview   │
+└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+			wantStderr: noWaitStderr("Forking service 'test-service' (svc-12345) at current state..."),
+		},
 	})
 }
 
@@ -291,6 +389,6 @@ const sampleForkedServiceTable = `┌──────────────�
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-67890                            │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-67890/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `

@@ -404,6 +404,29 @@ func skillsDownloadError(resp *http.Response) error {
 // at, since skills share files that way and an installed skill must stand
 // alone; anything else in the repo is ignored.
 func extractSkills(r io.Reader) ([]skill, error) {
+	a, err := readRepoArchive(r)
+	if err != nil {
+		return nil, err
+	}
+	return a.skills(), nil
+}
+
+// repoArchive indexes the regular files and symlinks under skillsRepoDir in
+// the repo's tarball by their slash-separated path within the repo.
+type repoArchive struct {
+	files map[string]archiveFile
+	links map[string]string // symlink path -> target path
+}
+
+// archiveFile is a regular file in the repo's tarball.
+type archiveFile struct {
+	executable bool
+	data       []byte
+}
+
+// readRepoArchive reads the regular files and symlinks under skillsRepoDir
+// from a gzipped tarball of the skills repo.
+func readRepoArchive(r io.Reader) (*repoArchive, error) {
 	gz, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, err
@@ -454,7 +477,13 @@ func extractSkills(r io.Reader) ([]skill, error) {
 	if err := gz.Close(); err != nil {
 		return nil, err
 	}
+	return a, nil
+}
 
+// skills returns the skills in the archive, sorted by name: each
+// subdirectory of skillsRepoDir that holds a SKILL.md, with its symlinks
+// resolved.
+func (a *repoArchive) skills() []skill {
 	var skills []skill
 	for _, name := range a.children(skillsRepoDir) {
 		s := skill{name: name}
@@ -466,20 +495,7 @@ func extractSkills(r io.Reader) ([]skill, error) {
 		}
 		skills = append(skills, s)
 	}
-	return skills, nil
-}
-
-// repoArchive indexes the regular files and symlinks under skillsRepoDir in
-// the repo's tarball by their slash-separated path within the repo.
-type repoArchive struct {
-	files map[string]archiveFile
-	links map[string]string // symlink path -> target path
-}
-
-// archiveFile is a regular file in the repo's tarball.
-type archiveFile struct {
-	executable bool
-	data       []byte
+	return skills
 }
 
 // walk emits every regular file reachable at src, which may be a file, a

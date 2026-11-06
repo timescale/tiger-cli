@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/timescale/tiger-cli/internal/api"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // GenerateServiceName matches the front-end logic for generating a random
@@ -26,11 +25,7 @@ func ServiceEnvironmentTag(service api.Service) api.EnvironmentTag {
 	if service.Metadata == nil {
 		return api.EnvironmentTagDEV
 	}
-
-	if strings.EqualFold(util.DerefStr(service.Metadata.Environment), string(api.EnvironmentTagPROD)) {
-		return api.EnvironmentTagPROD
-	}
-	return api.EnvironmentTagDEV
+	return environmentTag(service.Metadata.Environment)
 }
 
 // GetService fetches a single service by ID. The API resolves both primary
@@ -61,6 +56,21 @@ const (
 func ValidAddons() []string {
 	return []string{
 		AddonTimeSeries,
+	}
+}
+
+// Platform constants - the API's ServicePlatform values, lowercased to match
+// the other flag and parameter values users type
+const (
+	PlatformStandard = "standard"
+	PlatformFluid    = "fluid"
+)
+
+// ValidPlatforms returns a slice of all valid platform values
+func ValidPlatforms() []string {
+	return []string{
+		PlatformStandard,
+		PlatformFluid,
 	}
 }
 

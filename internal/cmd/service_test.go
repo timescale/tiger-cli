@@ -7,7 +7,6 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
-	"github.com/timescale/tiger-cli/internal/common"
 )
 
 func TestServiceCommandAliases(t *testing.T) {
@@ -49,21 +48,6 @@ func TestServiceCommandAliases(t *testing.T) {
 // (containment) rather than exactly, so the gate test doesn't break every time
 // an unrelated subcommand's help text changes.
 func TestServiceExperimentalGate(t *testing.T) {
-	// matchHelp asserts the output is a help text that mentions want and none
-	// of the gated names in absent.
-	matchHelp := func(want string, absent ...string) matcher {
-		return matchFunc(func(t *testing.T, got string) {
-			if !strings.Contains(got, want) {
-				t.Errorf("expected help output containing %q, got:\n%s", want, got)
-			}
-			for _, name := range absent {
-				if strings.Contains(got, name) {
-					t.Errorf("help must not mention %s when experimental is off, got:\n%s", name, got)
-				}
-			}
-		})
-	}
-
 	runCmdTests(t, []cmdTest{
 		{
 			// Cobra only reports "unknown command" at the root level; for a
@@ -88,20 +72,20 @@ func TestServiceExperimentalGate(t *testing.T) {
 	})
 }
 
-// checkStoredPassword returns a check asserting the password stored in the
-// (mock) keyring for the given service.
-func checkStoredPassword(serviceID, want string) checkFunc {
-	return func(t *testing.T, result cmdResult) {
-		t.Helper()
-		svc := api.Service{ServiceID: serviceID, ProjectID: testProjectID}
-		got, err := (&common.KeyringStorage{}).Get(svc, "tsdbadmin")
-		if err != nil {
-			t.Fatalf("failed to read stored password: %v", err)
+// matchHelp asserts the output is a help text that mentions want and none of
+// the gated names in absent. Help is asserted loosely (containment) so a gate
+// test doesn't break every time unrelated help text changes.
+func matchHelp(want string, absent ...string) matcher {
+	return matchFunc(func(t *testing.T, got string) {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected help output containing %q, got:\n%s", want, got)
 		}
-		if got != want {
-			t.Errorf("stored password = %q, want %q", got, want)
+		for _, name := range absent {
+			if strings.Contains(got, name) {
+				t.Errorf("help must not mention %s when experimental is off, got:\n%s", name, got)
+			}
 		}
-	}
+	})
 }
 
 // envTag returns a sampleService override setting the service's environment
@@ -109,6 +93,20 @@ func checkStoredPassword(serviceID, want string) checkFunc {
 func envTag(tag string) func(*api.Service) {
 	return func(s *api.Service) {
 		s.Metadata = &api.ServiceMetadata{Environment: &tag}
+	}
+}
+
+// fluidPlatform is a sampleService override putting the service on the fluid
+// platform, whose CPU/Memory combinations differ from standard's.
+func fluidPlatform(s *api.Service) {
+	s.Platform = new(api.ServicePlatformFLUID)
+}
+
+// withIOPS is a sampleService override setting the provisioned IOPS of the
+// service's resource.
+func withIOPS(iops int) func(*api.Service) {
+	return func(s *api.Service) {
+		s.Resources[0].Spec.Iops = new(iops)
 	}
 }
 

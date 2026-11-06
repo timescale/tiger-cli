@@ -21,11 +21,12 @@ func TestServiceGetTool(t *testing.T) {
 	}
 
 	// A fully populated service, so one success case covers every optional
-	// field: resources, HA replicas, and both endpoints.
+	// field: resources, HA replicas, and both endpoints. Its IOPS are a
+	// preview field, dropped without the experimental gate.
 	fullService := sampleService(func(s *api.Service) {
 		s.Created = created
 		s.Metadata = &api.ServiceMetadata{Environment: new("PROD")}
-		s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(8)}}}
+		s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(8), Iops: new(6000)}}}
 		s.HaReplicas = &api.HAReplica{ReplicaCount: new(2)}
 		s.Endpoint = endpoint
 		s.ConnectionPooler = &api.ConnectionPooler{
@@ -45,6 +46,11 @@ func TestServiceGetTool(t *testing.T) {
 	noPasswordService := sampleService(func(s *api.Service) {
 		s.Created = created
 		s.Endpoint = endpoint
+	})
+	fluidService := sampleService(func(s *api.Service) {
+		s.Created = created
+		s.Endpoint = endpoint
+		s.Platform = new(api.ServicePlatformFLUID)
 	})
 
 	setupGet := func(svc api.Service) func(m *mocks.MockClientWithResponsesInterface) {
@@ -140,6 +146,125 @@ func TestServiceGetTool(t *testing.T) {
 			args:       args,
 			mock:       setupGet(fullService),
 			wantOutput: full,
+		},
+		{
+			// No port is guessed, for the direct endpoint or the pooler, so
+			// an endpoint without one isn't returned or connected to.
+			name: "endpoints without a port",
+			tool: toolServiceGet,
+			args: args,
+			mock: setupGet(sampleService(func(s *api.Service) {
+				s.Created = created
+				s.Endpoint = &api.Endpoint{Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com")}
+				s.ConnectionPooler = &api.ConnectionPooler{
+					Endpoint: &api.Endpoint{Host: new("e6ue9697jf.project.pooler.tsdb.cloud.timescale.com")},
+				}
+			})),
+			wantOutput: map[string]any{
+				"service": map[string]any{
+					"id":                "e6ue9697jf",
+					"name":              "test-service",
+					"status":            "READY",
+					"type":              "TIMESCALEDB",
+					"region":            "us-east-1",
+					"created":           "2025-01-15T09:30:00Z",
+					"environment":       "DEV",
+					"replicas":          float64(0),
+					"connection_string": "",
+				},
+			},
+		},
+		{
+			// The platform, IOPS, and branch count are preview fields: the case
+			// above carries a platform and IOPS and drops them, while this one
+			// returns all three.
+			name: "experimental returns the platform, IOPS, and branch count",
+			tool: toolServiceGet,
+			args: args,
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				setupGet(sampleService(func(s *api.Service) {
+					s.Created = created
+					s.Endpoint = endpoint
+					s.Platform = new(api.ServicePlatformFLUID)
+					s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(16), Iops: new(12000)}}}
+				}))(m)
+				branches := []api.Branch{sampleBranch(), sampleBranch()}
+				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
+					Return(&api.GetBranchesResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &branches,
+					}, nil)
+			},
+			wantOutput: map[string]any{
+				"service": map[string]any{
+					"id":                "e6ue9697jf",
+					"name":              "test-service",
+					"status":            "READY",
+					"platform":          "FLUID",
+					"type":              "TIMESCALEDB",
+					"region":            "us-east-1",
+					"created":           "2025-01-15T09:30:00Z",
+					"environment":       "DEV",
+					"resources":         map[string]any{"cpu": "2 cores", "memory": "16 GB", "iops": float64(12000)},
+					"replicas":          float64(0),
+					"branch_count":      float64(2),
+					"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
+					"connection_string": "postgresql://tsdbadmin@e6ue9697jf.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+				},
+			},
+		},
+		{
+			// Only fluid services can be branched, so a standard one isn't
+			// counted. The mock fails the test on any branch listing.
+			name: "experimental standard service lists no branches",
+			tool: toolServiceGet,
+			args: args,
+			opts: []runOption{withExperimental()},
+			mock: setupGet(noPasswordService),
+			wantOutput: map[string]any{
+				"service": map[string]any{
+					"id":                "e6ue9697jf",
+					"name":              "test-service",
+					"status":            "READY",
+					"platform":          "STANDARD",
+					"type":              "TIMESCALEDB",
+					"region":            "us-east-1",
+					"created":           "2025-01-15T09:30:00Z",
+					"environment":       "DEV",
+					"replicas":          float64(0),
+					"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
+					"connection_string": "postgresql://tsdbadmin@e6ue9697jf.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+				},
+			},
+		},
+		{
+			// The count is the only thing the branch listing adds, so the
+			// service is still returned without it.
+			name: "branch count fails",
+			tool: toolServiceGet,
+			args: args,
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				setupGet(fluidService)(m)
+				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
+					Return(nil, errors.New("connection refused"))
+			},
+			wantOutput: map[string]any{
+				"service": map[string]any{
+					"id":                "e6ue9697jf",
+					"name":              "test-service",
+					"status":            "READY",
+					"platform":          "FLUID",
+					"type":              "TIMESCALEDB",
+					"region":            "us-east-1",
+					"created":           "2025-01-15T09:30:00Z",
+					"environment":       "DEV",
+					"replicas":          float64(0),
+					"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
+					"connection_string": "postgresql://tsdbadmin@e6ue9697jf.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+				},
+			},
 		},
 		{
 			name:       "gets service with password",

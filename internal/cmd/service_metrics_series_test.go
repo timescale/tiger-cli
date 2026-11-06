@@ -49,7 +49,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 			name:       "key=value filter builds an EQUAL request",
 			args:       args("ordinal=0"),
 			mock:       expectSeries([]api.MetricLabelFilter{{Key: "ordinal", Value: "0"}}),
-			wantStdout: noDataMsg,
+			wantStderr: noDataMsg,
 		},
 		{
 			name: "key!=value filter builds a NOT_EQUAL request",
@@ -57,7 +57,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 			mock: expectSeries([]api.MetricLabelFilter{
 				{Key: "role", Value: "replica", MatchType: new(api.MetricMatchTypeNOTEQUAL)},
 			}),
-			wantStdout: noDataMsg,
+			wantStderr: noDataMsg,
 		},
 		{
 			name:    "malformed filter",
@@ -102,7 +102,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 					JSON200:      &empty,
 				}, nil)
 			},
-			wantStdout: noDataMsg,
+			wantStderr: noDataMsg,
 		},
 		{
 			// synctest's bubble clock always starts at 2000-01-01 UTC, so the
@@ -124,7 +124,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 					JSON200:      &empty,
 				}, nil)
 			},
-			wantStdout: noDataMsg,
+			wantStderr: noDataMsg,
 		},
 		{
 			// Defaulting only applies when both --from and --to are omitted —
@@ -153,7 +153,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 					JSON200:      &empty,
 				}, nil)
 			},
-			wantStdout: noDataMsg,
+			wantStderr: noDataMsg,
 		},
 	})
 }

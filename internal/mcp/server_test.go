@@ -39,7 +39,8 @@ func registeredToolNames(t *testing.T, readOnly config.ReadOnlyMode) []string {
 		logger: ensureLogger(nil),
 	}
 	s.registerServiceTools(readOnly, true)
-	s.registerDatabaseTools(readOnly)
+	s.registerBranchTools(readOnly, true)
+	s.registerDatabaseTools(readOnly, true)
 
 	clientTransport, serverTransport := mcp.NewInMemoryTransports()
 
@@ -134,10 +135,11 @@ func TestBuildServerInstructions(t *testing.T) {
 	}
 
 	// Metrics tools are always registered, so the metrics blurb is always present.
-	const metricsMarker = "Available metrics span"
-	for _, got := range []string{readWrite, readOnly, prodOnly} {
-		if !strings.Contains(got, metricsMarker) {
-			t.Errorf("instructions should always mention metrics tools: %q", got)
+	for _, marker := range []string{"Available metrics span", toolServiceMetricsAvailable} {
+		for _, got := range []string{readWrite, readOnly, prodOnly} {
+			if !strings.Contains(got, marker) {
+				t.Errorf("instructions should always mention %q: %q", marker, got)
+			}
 		}
 	}
 }
