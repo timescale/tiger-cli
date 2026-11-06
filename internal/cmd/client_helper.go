@@ -187,6 +187,7 @@ var supportedClients = []clientConfig{
 		EditorNames: []string{"pi"},
 		MCPConfig: mcpConfigFile{
 			Path:       "~/.pi/agent/mcp.json",
+			PathEnv:    "${PI_CODING_AGENT_DIR}/mcp.json",
 			ServersKey: "mcpServers",
 		},
 	},

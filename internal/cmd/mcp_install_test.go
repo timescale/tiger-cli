@@ -30,7 +30,7 @@ func stubTigerExecutablePath(t *testing.T, path string) {
 func withMCPHome(home string) runOption {
 	return withSetup(func(t *testing.T) {
 		t.Setenv("HOME", home)
-		for _, v := range []string{"APPDATA", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "GEMINI_CLI_HOME", "KIRO_HOME", "XDG_CONFIG_HOME"} {
+		for _, v := range []string{"APPDATA", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "GEMINI_CLI_HOME", "KIRO_HOME", "PI_CODING_AGENT_DIR", "XDG_CONFIG_HOME"} {
 			t.Setenv(v, "")
 		}
 		original := goos
@@ -569,7 +569,7 @@ model = "gpt-5-mini"
 		},
 		{
 			name: "respects env vars that relocate configs",
-			args: []string{"mcp", "install", "claude-code", "devin", "codex", "gemini", "vscode", "kiro-cli", "copilot"},
+			args: []string{"mcp", "install", "claude-code", "devin", "codex", "gemini", "vscode", "kiro-cli", "copilot", "pi"},
 			opts: []runOption{
 				withMCPHome(envHome),
 				withEnv("CLAUDE_CONFIG_DIR", filepath.Join(envHome, "claude")),
@@ -577,6 +577,7 @@ model = "gpt-5-mini"
 				withEnv("COPILOT_HOME", filepath.Join(envHome, "copilot")),
 				withEnv("GEMINI_CLI_HOME", filepath.Join(envHome, "gemini")),
 				withEnv("KIRO_HOME", filepath.Join(envHome, "kiro")),
+				withEnv("PI_CODING_AGENT_DIR", filepath.Join(envHome, "pi")),
 				withEnv("XDG_CONFIG_HOME", filepath.Join(envHome, "xdg")),
 			},
 			wantStdout: mcpInstallOutput(
@@ -587,15 +588,16 @@ model = "gpt-5-mini"
 				installedFor{"VS Code", filepath.Join(envHome, "xdg", "Code", "User", "mcp.json")},
 				installedFor{"Kiro CLI", filepath.Join(envHome, "kiro", "settings", "mcp.json")},
 				installedFor{"GitHub Copilot CLI", filepath.Join(envHome, "copilot", "mcp-config.json")},
+				installedFor{"Pi", filepath.Join(envHome, "pi", "mcp.json")},
 			),
 			checks: []checkFunc{checkTree(envHome, freshTree(func(p string) string {
-				for from, to := range map[string]string{".config/": "xdg/", ".codex/": "codex/", ".copilot/": "copilot/", ".kiro/": "kiro/", ".gemini/": "gemini/.gemini/"} {
+				for from, to := range map[string]string{".config/": "xdg/", ".codex/": "codex/", ".copilot/": "copilot/", ".kiro/": "kiro/", ".gemini/": "gemini/.gemini/", ".pi/agent/": "pi/"} {
 					if rest, ok := strings.CutPrefix(p, from); ok {
 						return to + rest
 					}
 				}
 				return "claude/" + p
-			}, ClaudeCode, Devin, Codex, Gemini, VSCode, KiroCLI, Copilot))},
+			}, ClaudeCode, Devin, Codex, Gemini, VSCode, KiroCLI, Copilot, Pi))},
 		},
 		{
 			name: "relative env var is ignored",
