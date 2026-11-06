@@ -296,19 +296,19 @@ func outputCompletion(extra ...string) cobra.CompletionFunc {
 // service can't be resized onto, and experimental includes the fluid platform's
 // configurations, which are a preview.
 func cpuCompletion(shared, experimental bool) cobra.CompletionFunc {
-	return sizeCompletion(serviceConfigs(shared, experimental), cpuMillis)
+	return sizeCompletion(serviceConfigs(shared, experimental), cpuMillis, common.FormatCPUCores)
 }
 
 func memoryCompletion(shared, experimental bool) cobra.CompletionFunc {
-	return sizeCompletion(serviceConfigs(shared, experimental), memoryGBs)
+	return sizeCompletion(serviceConfigs(shared, experimental), memoryGBs, strconv.Itoa)
 }
 
 // branchCPUCompletion and branchMemoryCompletion complete the --cpu and
 // --memory flags of the branch commands, which take the fluid platform's
 // configurations, since only fluid services can be branched.
 var (
-	branchCPUCompletion    = sizeCompletion(fluidConfigs, cpuMillis)
-	branchMemoryCompletion = sizeCompletion(fluidConfigs, memoryGBs)
+	branchCPUCompletion    = sizeCompletion(fluidConfigs, cpuMillis, common.FormatCPUCores)
+	branchMemoryCompletion = sizeCompletion(fluidConfigs, memoryGBs, strconv.Itoa)
 )
 
 func cpuMillis(c common.CPUMemoryConfig) int { return c.CPUMillis }
@@ -327,11 +327,12 @@ func fluidConfigs(*cobra.Command) common.CPUMemoryConfigs {
 }
 
 // sizeCompletion completes the sizes size reads off the allowed
-// configurations, each once, in ascending numeric order with "shared" last.
+// configurations, rendered by format, each once, in ascending numeric order
+// with "shared" last.
 // The configurations can come from more than one platform, so the order is
 // imposed here, and the shell is told to keep it rather than sort the values
 // as strings.
-func sizeCompletion(configsFor func(*cobra.Command) common.CPUMemoryConfigs, size func(common.CPUMemoryConfig) int) cobra.CompletionFunc {
+func sizeCompletion(configsFor func(*cobra.Command) common.CPUMemoryConfigs, size func(common.CPUMemoryConfig) int, format func(int) string) cobra.CompletionFunc {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		configs := configsFor(cmd)
 
@@ -349,7 +350,7 @@ func sizeCompletion(configsFor func(*cobra.Command) common.CPUMemoryConfigs, siz
 
 		values := make([]string, 0, len(sizes)+1)
 		for _, s := range sizes {
-			values = append(values, strconv.Itoa(s))
+			values = append(values, format(s))
 		}
 		if hasShared {
 			values = append(values, "shared")

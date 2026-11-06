@@ -16,8 +16,8 @@ temporarily unavailable during the resize operation. Note that changing
 resources will affect your billing - increasing resources will increase costs.
 
 Allowed CPU/Memory Configurations:
-  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
-  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
+  0.5 CPU / 2GB  |  1 CPU / 4GB    |  2 CPU / 8GB     |  4 CPU / 16GB
+  8 CPU / 32GB   |  16 CPU / 64GB  |  32 CPU / 128GB
 
 Note: You can specify both CPU and memory together, or specify only one (the
 other will be automatically configured).
@@ -30,22 +30,22 @@ tiger service resize [name-or-id] [flags]
 
 ```
   # Resize default service to 2 CPU cores and 8GB memory
-  tiger service resize --cpu 2000 --memory 8
+  tiger service resize --cpu 2 --memory 8
 
   # Resize specific service to 4 CPU cores and 16GB memory
-  tiger service resize svc-12345 --cpu 4000 --memory 16
+  tiger service resize svc-12345 --cpu 4 --memory 16
 
   # Resize service using only CPU (memory will be auto-configured to 8GB)
-  tiger service resize --cpu 2000
+  tiger service resize --cpu 2
 
-  # Resize service using only memory (CPU will be auto-configured to 4000m)
+  # Resize service using only memory (CPU will be auto-configured to 4 cores)
   tiger service resize --memory 16
 ```
 
 ### Options
 
 ```
-      --cpu string      CPU allocation in millicores
+      --cpu string      CPU allocation in cores
   -h, --help            help for resize
       --memory string   Memory allocation in gigabytes
 ```

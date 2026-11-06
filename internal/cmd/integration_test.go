@@ -1302,16 +1302,15 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Current resources: CPU=%s, Memory=%s", currentCPU, currentMemory)
 
 		// Resize to 1 CPU / 4 GB (larger than default 0.5 CPU / 2 GB)
-		// Note: --cpu expects millicores (1000 = 1 CPU), --memory expects GB as integer
-		targetCPUMillis := "1000" // 1 CPU = 1000 millicores
-		targetMemoryGB := "4"     // 4 GB
+		targetCPU := "1"
+		targetMemoryGB := "4"
 
-		t.Logf("Resizing to: CPU=%s millicores (1 CPU), Memory=%s GB", targetCPUMillis, targetMemoryGB)
+		t.Logf("Resizing to: CPU=%s, Memory=%s GB", targetCPU, targetMemoryGB)
 
 		output, err = executeIntegrationCommand(
 			t.Context(),
 			"service", "resize", serviceID,
-			"--cpu", targetCPUMillis,
+			"--cpu", targetCPU,
 			"--memory", targetMemoryGB,
 		)
 		if err != nil {

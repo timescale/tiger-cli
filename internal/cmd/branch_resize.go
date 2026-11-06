@@ -37,10 +37,10 @@ allocation. See the Tiger Data documentation for details. If only --iops is
 given, the branch keeps its current CPU and memory. If --cpu or --memory is
 given without --iops, the IOPS is set to the baseline for the new size.`,
 		Example: `  # Resize a branch to 2 CPU cores and 16GB memory
-  tiger branch resize br-12345 --cpu 2000 --memory 16
+  tiger branch resize br-12345 --cpu 2 --memory 16
 
   # Resize a branch using only CPU (memory will be auto-configured)
-  tiger branch resize br-12345 --cpu 2000
+  tiger branch resize br-12345 --cpu 2
 
   # Change only the provisioned IOPS
   tiger branch resize br-12345 --iops 16000`,
@@ -106,7 +106,7 @@ given without --iops, the IOPS is set to the baseline for the new size.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
+	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in cores")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
 	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 
