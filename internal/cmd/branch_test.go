@@ -126,7 +126,7 @@ const (
 │ Name              │ test-branch                                                                                                 │
 │ Parent Service    │ test-service (svc-12345)                                                                                    │
 │ Status            │ READY                                                                                                       │
-│ CPU               │ 0.25 cores (250m)                                                                                           │
+│ CPU               │ 0.25 cores                                                                                                  │
 │ Memory            │ 2 GB                                                                                                        │
 │ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
 │ Created           │ 2025-01-16 09:00:00 UTC                                                                                     │

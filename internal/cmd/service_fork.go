@@ -72,7 +72,7 @@ default service from your configuration.`,
   tiger service fork svc-12345 --name my-forked-db
 
   # Fork with custom resources
-  tiger service fork svc-12345 --cpu 2000 --memory 8
+  tiger service fork svc-12345 --cpu 2 --memory 8
 
   # Fork without setting as default service
   tiger service fork svc-12345 --no-set-default
@@ -253,7 +253,7 @@ default service from your configuration.`,
 	cmd.MarkFlagsMutuallyExclusive("now", "last-snapshot", "to-timestamp")
 
 	// Resource customization flags
-	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (inherits from source if not specified)")
+	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in cores (inherits from source if not specified)")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes (inherits from source if not specified)")
 	if app.Experimental {
 		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS (inherits from source if not specified)")

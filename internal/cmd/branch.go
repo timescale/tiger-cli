@@ -115,7 +115,7 @@ func outputBranchTable(output io.Writer, branch OutputBranch) error {
 		table.Append("Parent Service", branch.ServiceID)
 	}
 	table.Append("Status", string(branch.Status))
-	table.Append("CPU", fmt.Sprintf("%s cores (%dm)", common.FormatCPUCores(branch.CPUMillis), branch.CPUMillis))
+	table.Append("CPU", common.FormatCPUCores(branch.CPUMillis)+" cores")
 	table.Append("Memory", fmt.Sprintf("%d GB", branch.MemoryGbs))
 	if branch.Iops != nil {
 		table.Append("IOPS", fmt.Sprintf("%d", *branch.Iops))

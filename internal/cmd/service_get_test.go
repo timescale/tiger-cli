@@ -169,7 +169,7 @@ func TestServiceGetCmd(t *testing.T) {
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
 │ Environment       │ PROD                                                                                        │
-│ CPU               │ 2 cores (2000m)                                                                             │
+│ CPU               │ 2 cores                                                                                     │
 │ Memory            │ 8 GB                                                                                        │
 │ Replicas          │ 2                                                                                           │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
@@ -217,7 +217,7 @@ func TestServiceGetCmd(t *testing.T) {
 │ Status            │ READY                                                                                       │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
-│ CPU               │ 0.25 cores (250m)                                                                           │
+│ CPU               │ 0.25 cores                                                                                  │
 │ Memory            │ 2 GB                                                                                        │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
@@ -328,7 +328,7 @@ status: READY
 │ Platform          │ FLUID                                                                                       │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
-│ CPU               │ 1 cores (1000m)                                                                             │
+│ CPU               │ 1 cores                                                                                     │
 │ Memory            │ 4 GB                                                                                        │
 │ IOPS              │ 6000                                                                                        │
 │ Branches          │ 2                                                                                           │
@@ -461,7 +461,7 @@ status: READY
 │ Status            │ READY                                                                                                       │
 │ Type              │ TIMESCALEDB                                                                                                 │
 │ Region            │ us-east-1                                                                                                   │
-│ CPU               │ 1 cores (1000m)                                                                                             │
+│ CPU               │ 1 cores                                                                                                     │
 │ Memory            │ 4 GB                                                                                                        │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                                     │
@@ -491,7 +491,7 @@ status: READY
 │ Status      │ READY                                                                                     │
 │ Type        │ TIMESCALEDB                                                                               │
 │ Region      │ us-east-1                                                                                 │
-│ CPU         │ 1 cores (1000m)                                                                           │
+│ CPU         │ 1 cores                                                                                   │
 │ Memory      │ 4 GB                                                                                      │
 │ Created     │ 2025-01-15 10:30:00 UTC                                                                   │
 │ Console URL │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview │
@@ -518,7 +518,7 @@ status: READY
 │ Status      │ READY                                                                                     │
 │ Type        │ TIMESCALEDB                                                                               │
 │ Region      │ us-east-1                                                                                 │
-│ CPU         │ 1 cores (1000m)                                                                           │
+│ CPU         │ 1 cores                                                                                   │
 │ Memory      │ 4 GB                                                                                      │
 │ Created     │ 2025-01-15 10:30:00 UTC                                                                   │
 │ Console URL │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview │

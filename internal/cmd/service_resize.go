@@ -55,15 +55,15 @@ resources will affect your billing - increasing resources will increase costs.
 Note: You can specify both CPU and memory together, or specify only one (the
 other will be automatically configured).` + iopsSectionHelp,
 		Example: `  # Resize default service to 2 CPU cores and 8GB memory
-  tiger service resize --cpu 2000 --memory 8
+  tiger service resize --cpu 2 --memory 8
 
   # Resize specific service to 4 CPU cores and 16GB memory
-  tiger service resize svc-12345 --cpu 4000 --memory 16
+  tiger service resize svc-12345 --cpu 4 --memory 16
 
   # Resize service using only CPU (memory will be auto-configured to 8GB)
-  tiger service resize --cpu 2000
+  tiger service resize --cpu 2
 
-  # Resize service using only memory (CPU will be auto-configured to 4000m)
+  # Resize service using only memory (CPU will be auto-configured to 4 cores)
   tiger service resize --memory 16` + iopsExampleHelp,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceRefCompletion(app),
@@ -143,7 +143,7 @@ other will be automatically configured).` + iopsSectionHelp,
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
+	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in cores")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
 	if app.Experimental {
 		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")

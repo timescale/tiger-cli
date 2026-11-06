@@ -58,10 +58,10 @@ is given, in which case it gets the baseline for its size.`,
   %[1]s svc-12345 --name ci-4821
 
   # Branch a service with custom compute
-  %[1]s svc-12345 --cpu 2000 --memory 16
+  %[1]s svc-12345 --cpu 2 --memory 16
 
   # Branch a service with provisioned IOPS
-  %[1]s svc-12345 --cpu 2000 --iops 16000
+  %[1]s svc-12345 --cpu 2 --iops 16000
 
   # Branch for a script
   %[1]s svc-12345 --name ci-4821 -o json`, commandPath),
@@ -174,7 +174,7 @@ is given, in which case it gets the baseline for its size.`,
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Name for the branch (auto-generated if not provided)")
-	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
+	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in cores")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
 	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the branch to be ready")

@@ -14,8 +14,8 @@ By default, the newly created service will be set as your default service for
 future commands. Use --no-set-default to prevent this behavior.
 
 Allowed CPU/Memory Configurations:
-  shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
-  4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
+  shared / shared  |  0.5 CPU / 2GB  |  1 CPU / 4GB    |  2 CPU / 8GB
+  4 CPU / 16GB     |  8 CPU / 32GB   |  16 CPU / 64GB  |  32 CPU / 128GB
 
 Note: You can specify both CPU and memory together, or specify only one (the
 other will be automatically configured).
@@ -37,7 +37,7 @@ tiger service create [flags]
   tiger service create --name postgres-db --addons none
 
   # Create a service with more resources (waits for ready by default)
-  tiger service create --name resources-db --cpu 2000 --memory 8 --replicas 2
+  tiger service create --name resources-db --cpu 2 --memory 8 --replicas 2
 
   # Create service in a different region
   tiger service create --name eu-db --region eu-central-1
@@ -46,9 +46,9 @@ tiger service create [flags]
   tiger service create --name temp-db --no-set-default
 
   # Create service specifying only CPU (memory will be auto-configured to 8GB)
-  tiger service create --name auto-memory --cpu 2000
+  tiger service create --name auto-memory --cpu 2
 
-  # Create service specifying only memory (CPU will be auto-configured to 4000m)
+  # Create service specifying only memory (CPU will be auto-configured to 4 cores)
   tiger service create --name auto-cpu --memory 16
 
   # Create service without waiting for completion
@@ -62,7 +62,7 @@ tiger service create [flags]
 
 ```
       --addons strings          Addons to enable (time-series, or 'none' for PostgreSQL-only)
-      --cpu string              CPU allocation in millicores or 'shared'
+      --cpu string              CPU allocation in cores or 'shared'
       --environment string      Environment tag (DEV or PROD) (default "DEV")
   -h, --help                    help for create
       --memory string           Memory allocation in gigabytes or 'shared'
