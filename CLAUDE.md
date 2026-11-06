@@ -88,6 +88,11 @@ The CLI has **zero global command state**: `buildRootCmd(ctx)` builds the entire
 
 Every command gets its own file in `internal/cmd/`, named to match the command in snake_case: `tiger service create` → `service_create.go`. Group commands with no `RunE` of their own still get a file (`tiger service` → `service.go`). Within a file, package-level constants and variables that other code may reference come first, then the `build*Cmd()` function, then helpers used only by that command. Constants and variables used by just one helper sit directly above it (`colorizeLogEntry`'s styles in `logs_helper.go`). Tests mirror this layout (`service_create.go` → `service_create_test.go`), with package-wide test scaffolding in `main_test.go` and `integration_test.go` as a single cross-command suite.
 
+### Client Installation
+
+The MCP and skills installers share the client registry in `client_helper.go`.
+A client entry also supplies help, completion, the client picker, and `pkg/mcpinstall` support.
+
 ### Where Helpers Go
 
 Place a helper by who calls it, working down this list until one matches:

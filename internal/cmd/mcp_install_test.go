@@ -98,6 +98,7 @@ func mcpPickerItems(selected ...string) []pickerItem {
 		{label: "Google Antigravity", detail: "~/.gemini/config/mcp_config.json"},
 		{label: "Kiro CLI", detail: "~/.kiro/settings/mcp.json"},
 		{label: "GitHub Copilot CLI", detail: "~/.copilot/mcp-config.json"},
+		{label: "Pi", detail: "~/.pi/agent/mcp.json"},
 	}
 	for i := range items {
 		items[i].selected = slices.Contains(selected, items[i].label)
@@ -134,6 +135,7 @@ var freshConfigs = map[MCPClient]struct {
 	VSCode:      {".config/Code/User/mcp.json", freshJSONConfig("servers", tigerEntryLines)},
 	Antigravity: {".gemini/config/mcp_config.json", freshJSONConfig("mcpServers", tigerEntryLines)},
 	KiroCLI:     {".kiro/settings/mcp.json", freshJSONConfig("mcpServers", tigerEntryLines)},
+	Pi:          {".pi/agent/mcp.json", freshJSONConfig("mcpServers", tigerEntryLines)},
 	Copilot:     {".copilot/mcp-config.json", freshJSONConfig("mcpServers", "      \"type\": \"local\",\n"+tigerEntryLines+",\n      \"tools\": [\n        \"*\"\n      ]")},
 }
 
@@ -341,7 +343,7 @@ model = "gpt-5-mini"
 		{
 			name:    "unsupported client",
 			args:    []string{"mcp", "install", "cursor", "bogus"},
-			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
+			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli, pi",
 		},
 		{
 			name:    "no arguments and no TTY",
@@ -355,7 +357,7 @@ model = "gpt-5-mini"
 			opts: []runOption{
 				withMCPHome(home(nil)),
 				withIsTerminal(true),
-				withRunPicker(mcpPickerItems(), make([]bool, 9)),
+				withRunPicker(mcpPickerItems(), make([]bool, 10)),
 			},
 			wantErr: "no clients selected",
 		},
@@ -368,7 +370,7 @@ model = "gpt-5-mini"
 			opts: []runOption{
 				withMCPHome(pickerHome),
 				withIsTerminal(true),
-				withRunPicker(mcpPickerItems("Claude Code", "Codex"), []bool{true, true, false, false, false, false, false, false, false}),
+				withRunPicker(mcpPickerItems("Claude Code", "Codex"), []bool{true, true, false, false, false, false, false, false, false, false}),
 			},
 			wantStdout: mcpInstallOutput(
 				installedFor{"Claude Code", filepath.Join(pickerHome, ".claude.json")},
@@ -447,7 +449,7 @@ model = "gpt-5-mini"
 		},
 		{
 			name: "installs for every client",
-			args: []string{"mcp", "install", "claude-code", "cursor", "devin", "codex", "gemini", "vscode", "antigravity", "kiro-cli", "copilot"},
+			args: []string{"mcp", "install", "claude-code", "cursor", "devin", "codex", "gemini", "vscode", "antigravity", "kiro-cli", "copilot", "pi"},
 			opts: []runOption{withMCPHome(freshHome)},
 			wantStdout: mcpInstallOutput(
 				installedFor{"Claude Code", filepath.Join(freshHome, ".claude.json")},
@@ -459,9 +461,10 @@ model = "gpt-5-mini"
 				installedFor{"Google Antigravity", filepath.Join(freshHome, ".gemini", "config", "mcp_config.json")},
 				installedFor{"Kiro CLI", filepath.Join(freshHome, ".kiro", "settings", "mcp.json")},
 				installedFor{"GitHub Copilot CLI", filepath.Join(freshHome, ".copilot", "mcp-config.json")},
+				installedFor{"Pi", filepath.Join(freshHome, ".pi", "agent", "mcp.json")},
 			),
 			checks: []checkFunc{
-				checkTree(freshHome, freshTree(nil, ClaudeCode, Cursor, Devin, Codex, Gemini, VSCode, Antigravity, KiroCLI, Copilot)),
+				checkTree(freshHome, freshTree(nil, ClaudeCode, Cursor, Devin, Codex, Gemini, VSCode, Antigravity, KiroCLI, Copilot, Pi)),
 				checkMode(filepath.Join(freshHome, ".claude.json"), 0o600),
 			},
 		},
@@ -716,7 +719,7 @@ func TestInstallMCPForClient(t *testing.T) {
 		{"missing server name", func(o *InstallOptions) { o.ServerName = "" }, "missing required option: ServerName"},
 		{"missing command", func(o *InstallOptions) { o.Command = "" }, "missing required option: Command"},
 		{"missing args", func(o *InstallOptions) { o.Args = nil }, "missing required option: Args"},
-		{"unsupported client", func(o *InstallOptions) { o.ClientName = "bogus" }, "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli"},
+		{"unsupported client", func(o *InstallOptions) { o.ClientName = "bogus" }, "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli, pi"},
 		{"installs", func(*InstallOptions) {}, ""},
 	}
 	for _, tc := range cases {

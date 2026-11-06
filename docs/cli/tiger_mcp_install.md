@@ -20,6 +20,7 @@ Supported Clients:
   antigravity              Configure for Google Antigravity
   kiro-cli                 Configure for Kiro CLI
   copilot                  Configure for GitHub Copilot CLI
+  pi                       Configure for Pi
 
 With no arguments, you're prompted to select clients interactively, starting
 from the clients the server is already installed for.

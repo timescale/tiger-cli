@@ -179,8 +179,8 @@ tiger mcp install claude-code cursor
 
 Supported clients are `claude-code` (Claude Code), `codex` (Codex), `copilot`
 (GitHub Copilot CLI), `cursor` (Cursor), `devin` (Devin), `gemini` (Gemini
-CLI), `vscode` (VS Code), `antigravity` (Google Antigravity), and `kiro-cli`
-(Kiro CLI).
+CLI), `vscode` (VS Code), `antigravity` (Google Antigravity), `kiro-cli` (Kiro
+CLI), and `pi` (Pi 0.99.0 or later).
 
 The server is added to each client's user-level MCP configuration file, leaving
 the rest of the file as it is, and the file is backed up first unless you pass
@@ -282,7 +282,7 @@ tiger skills install universal claude-code
 
 Skills are installed for the current user. The `universal` location,
 `~/.agents/skills`, is read by most coding agents (Cursor, Codex, Gemini CLI,
-VS Code, GitHub Copilot CLI, Devin). Claude Code, Kiro CLI, and Google
+VS Code, GitHub Copilot CLI, Devin, Pi). Claude Code, Kiro CLI, and Google
 Antigravity read their own skills directories, so they're separate locations
 (`claude-code`, `kiro-cli`, `antigravity`). Naming a client that reads
 `~/.agents/skills`, such as `cursor`, selects `universal`. Use `--skills-dir`
