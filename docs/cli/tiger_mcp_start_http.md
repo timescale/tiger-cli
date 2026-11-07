@@ -8,6 +8,9 @@ Start the MCP server using HTTP transport.
 
 The server listens on the given port and fails if that port is already in use.
 
+Because clients may connect from another machine, the db_query tool doesn't
+accept a SQL file path over HTTP, only inline SQL.
+
 ```
 tiger mcp start http [flags]
 ```

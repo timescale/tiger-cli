@@ -49,7 +49,7 @@ func startStdioServer(cmd *cobra.Command, app *common.App) error {
 	logger := newLogger(cmd.ErrOrStderr())
 
 	// Create MCP server
-	server, err := mcp.NewServer(ctx, app, logger)
+	server, err := mcp.NewServer(ctx, app, logger, mcp.TransportStdio)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}
