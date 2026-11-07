@@ -176,6 +176,24 @@ func TestServiceBackupListCmd(t *testing.T) {
 			wantStdout: "[]\n",
 		},
 		{
+			name: "yaml preserves large backup size",
+			args: []string{"service", "backup", "list", "svc-12345", "-o", "yaml"},
+			opts: []runOption{experimental},
+			mock: setupList([]api.Backup{{
+				Label:     "large-backup",
+				Type:      api.BackupTypeFULL,
+				StartedAt: started,
+				SizeBytes: new(int64(9007199254740993)),
+				Regions:   []api.BackupRegionState{},
+			}}),
+			wantStdout: `- label: large-backup
+  regions: []
+  size_bytes: 9007199254740993
+  started_at: "2026-01-15T09:30:00Z"
+  type: FULL
+`,
+		},
+		{
 			// The label is omitted from the table: it repeats STARTED and TYPE,
 			// and no command takes it as input.
 			name:       "table output",
@@ -251,7 +269,7 @@ func TestServiceBackupListCmd(t *testing.T) {
       status: FINISHED
     - region_code: eu-central-1
       status: FAILED
-  size_bytes: 4.831838208e+09
+  size_bytes: 4831838208
   started_at: "2026-01-15T09:30:00Z"
   type: FULL
 - label: 20260115-093000F_20260116-100000I

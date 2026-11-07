@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Convert to JSON to respect omitempty tags, then unmarshal
+// Convert to JSON to respect its tags, then decode with YAML to preserve integer precision.
 func toJSON(v any) (any, error) {
 	jsonBytes, err := json.Marshal(v)
 	if err != nil {
@@ -15,7 +15,7 @@ func toJSON(v any) (any, error) {
 	}
 
 	var jsonOut any
-	if err := json.Unmarshal(jsonBytes, &jsonOut); err != nil {
+	if err := yaml.Unmarshal(jsonBytes, &jsonOut); err != nil {
 		return nil, err
 	}
 	return jsonOut, nil
