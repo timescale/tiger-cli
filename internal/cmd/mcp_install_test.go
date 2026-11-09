@@ -125,6 +125,8 @@ func TestMCPInstallCmd(t *testing.T) {
 	backupPath := seed("backup", backupInitial, 0o644)
 	permsPath := seed("perms", `{"test": "data"}`, 0o600)
 	badPath := seed("bad", `{invalid json`, 0o644)
+	piInitial := `{"mcpServers":{"existing":{"command":"other","args":[]}},"settings":{"timeout":30}}`
+	piPath := seed("pi", piInitial, 0o600)
 
 	// For "backup fails when config is unreadable": the directory is made
 	// unreadable by that case's setup hook, so the paths are just declared here.
@@ -145,7 +147,7 @@ func TestMCPInstallCmd(t *testing.T) {
 		{
 			name:    "unsupported client",
 			args:    []string{"mcp", "install", "bogus"},
-			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
+			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli, pi",
 		},
 		{
 			name:    "invalid existing config",
@@ -322,6 +324,40 @@ func TestMCPInstallCmd(t *testing.T) {
 				assertJSONFile(t, filepath.Join(home, ".cursor", "mcp.json"), map[string]any{
 					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
 				})
+			}},
+		},
+		{
+			name:       "installs Pi at the default config path",
+			args:       []string{"mcp", "install", "pi"},
+			opts:       []runOption{withEnv("HOME", home)},
+			wantStdout: installSuccessOutput("pi", filepath.Join(home, ".pi", "agent", "mcp.json")),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				assertJSONFile(t, filepath.Join(home, ".pi", "agent", "mcp.json"), map[string]any{
+					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
+				})
+			}},
+		},
+		{
+			name:       "installs Pi into a custom config with a backup",
+			args:       []string{"mcp", "install", "PI", "--config-path", piPath},
+			wantStdout: installSuccessOutput("PI", piPath),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				assertJSONFile(t, piPath, map[string]any{
+					"mcpServers": map[string]any{
+						"existing": map[string]any{"command": "other", "args": []any{}},
+						"tiger":    tigerServerEntry(),
+					},
+					"settings": map[string]any{"timeout": float64(30)},
+				})
+				backups := backupFiles(t, piPath)
+				if len(backups) != 1 {
+					t.Fatalf("expected 1 backup file, got %v", backups)
+				}
+				content, err := os.ReadFile(backups[0])
+				if err != nil {
+					t.Fatalf("failed to read backup: %v", err)
+				}
+				assertOutput(t, string(content), piInitial)
 			}},
 		},
 		{

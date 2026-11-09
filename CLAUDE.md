@@ -59,7 +59,7 @@ To upgrade dependencies, run `go get -u -t ./... tool` followed by `go mod tidy`
 
 ### Renovate
 
-Renovate (the hosted Mend app, configured in `renovate.json`) opens dependency update PRs every Monday morning, Eastern time, for releases at least three days old. Non-major updates are grouped into one PR each for Go modules, the build-time tools in `go.mod`'s `tool` block, the Go version (`go.mod`'s `go` directive together with the Dockerfile's `GO_VERSION`, which carries a `# renovate:` comment for this), and GitHub Actions. Major updates get their own PRs. The tools group lists its modules by name, so adding or removing a tool in `go.mod` means updating that list in `renovate.json` too — otherwise the tool's updates silently join the Go modules group. Security fixes, from GitHub's Dependabot alerts and OSV, skip the schedule and the release age and always get their own PRs. The Dependency Dashboard issue lists pending updates and can trigger one early.
+Renovate (the hosted Mend app, configured in `renovate.json`) opens dependency update PRs every Monday morning, Eastern time, for releases at least three days old. Non-major updates are grouped into one PR each for Go modules, the build-time tools in `go.mod`'s `tool` block, the Go version (`go.mod`'s `go` directive together with the Dockerfile's `GO_VERSION`), and GitHub Actions. Major updates get their own PRs. The tools group lists its modules by name, so adding or removing a tool in `go.mod` means updating that list in `renovate.json` too — otherwise the tool's updates silently join the Go modules group. Security fixes, from GitHub's Dependabot alerts and OSV, skip the schedule and the release age and always get their own PRs. The Dependency Dashboard issue lists pending updates and can trigger one early.
 
 Renovate runs `go mod tidy` but can't run `go generate`, so a PR that changes generated output (typically the tools group, or a cobra update that changes `docs/cli/`) fails CI. Check out its branch, run `go generate ./...` and the pre-commit checks, fix what they report, and push to the branch. Renovate stops rebasing a branch once someone else has pushed to it.
 
@@ -87,6 +87,11 @@ The CLI has **zero global command state**: `buildRootCmd(ctx)` builds the entire
 ### One File Per Command
 
 Every command gets its own file in `internal/cmd/`, named to match the command in snake_case: `tiger service create` → `service_create.go`. Group commands with no `RunE` of their own still get a file (`tiger service` → `service.go`). Within a file, package-level constants and variables that other code may reference come first, then the `build*Cmd()` function, then helpers used only by that command. Constants and variables used by just one helper sit directly above it (`colorizeLogEntry`'s styles in `logs_helper.go`). Tests mirror this layout (`service_create.go` → `service_create_test.go`), with package-wide test scaffolding in `main_test.go` and `integration_test.go` as a single cross-command suite.
+
+### Client Installation
+
+The MCP and skills installers share the client registry in `client_helper.go`.
+A client entry also supplies help, completion, the client picker, and `pkg/mcpinstall` support.
 
 ### Where Helpers Go
 
@@ -138,7 +143,7 @@ Further conventions:
 - Flags use kebab-case, prefer clarity over brevity, and avoid abbreviations (`--no-wait`, not `--nowait`).
 - **Boolean flags** follow the GitHub CLI pattern: the positive behavior is the default (no flag needed), and an explicit `--no-<feature>` flag disables it. Don't create mutually exclusive `--enable-X`/`--disable-X` pairs.
 - **Destructive operations** (delete, password rotation) require an explicit service ID with no default fallback, prompt the user to type the resource ID to confirm, and offer a `--confirm` flag to skip the prompt for automation. The prompt must be TTY-gated (see [Reading Stdin](#reading-stdin)), and the help text should include a "Note for AI agents: always confirm with the user before performing this destructive operation" warning.
-- **Long-running operations** wait for completion by default, with `--no-wait` to return immediately and `--wait-timeout` (a duration) to bound the wait; a timeout exits with code 2 (`common.ExitTimeout`). Use `common.WaitForService`, which shows a spinner on a TTY and plain progress lines otherwise, writing progress to stderr.
+- **Long-running operations** wait for completion by default, with `--no-wait` to return immediately and `--wait-timeout` (a duration) to bound the wait; a timeout exits with code 2 (`common.ExitTimeout`). Use `common.WaitForService`, which shows a spinner on a TTY and plain progress lines otherwise, writing progress to stderr. Resizes are the exception: the API can report a service as `READY` before a resize has started, so `service resize`, `branch resize`, and their MCP tools return once the request is accepted and say the resize is in progress rather than that it has finished.
 - **Help text** should document the default behavior and explain how to override it, with examples of common usage in the command's `Example` field rather than in `Long`.
 
 ### Service Refs

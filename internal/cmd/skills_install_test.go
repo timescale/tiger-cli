@@ -405,7 +405,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 		{
 			name:    "unsupported client",
 			args:    []string{"skills", "install", "claude-code", "bogus"},
-			wantErr: "unsupported client: bogus. Supported clients: universal, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, copilot, copilot-cli, claude-code, antigravity, agy, kiro-cli",
+			wantErr: "unsupported client: bogus. Supported clients: universal, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, copilot, copilot-cli, pi, claude-code, antigravity, agy, kiro-cli",
 		},
 		{
 			name:    "no arguments and no TTY",

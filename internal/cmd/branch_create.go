@@ -40,7 +40,7 @@ A branch is a lightweight, ephemeral copy of a service. It starts with a copy
 of the service's data as of the moment it is created, and gets its own compute.
 The tsdbadmin user gets a new password, which is saved the same way as a new
 service's. Unless --cpu or --memory is given, the branch gets the same CPU and
-memory as the service, up to a limit.
+memory as the service.
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. Branching from a branch isn't supported.
@@ -49,8 +49,8 @@ service from your configuration. Branching from a branch isn't supported.
 
 The allowed --iops values depend on your plan and the branch's CPU/memory
 allocation. See the Tiger Data documentation for details. If --iops is not
-given, the branch gets the same IOPS as the service where it can, and otherwise
-the baseline for its size.`,
+given, the branch gets the same IOPS as the service, unless --cpu or --memory
+is given, in which case it gets the baseline for its size.`,
 		Example: fmt.Sprintf(`  # Branch a service
   %[1]s svc-12345
 
