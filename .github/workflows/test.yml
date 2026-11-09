@@ -9,6 +9,12 @@ on:
     - cron: '0 8 * * *'
   workflow_dispatch: # still allow manual triggering
 
+# A new push to a PR cancels its earlier runs. A run on main is never cancelled
+# once started, though a newer one still replaces any run still waiting.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     name: Test
