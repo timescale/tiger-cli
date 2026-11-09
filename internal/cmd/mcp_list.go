@@ -35,7 +35,7 @@ The output can be formatted as a table, JSON, or YAML.`,
 			cfg := app.GetConfig()
 
 			// Create MCP server
-			server, err := mcp.NewServer(cmd.Context(), app, nil)
+			server, err := mcp.NewServer(cmd.Context(), app, nil, mcp.TransportStdio)
 			if err != nil {
 				return fmt.Errorf("failed to create MCP server: %w", err)
 			}
