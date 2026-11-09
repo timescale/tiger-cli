@@ -16,10 +16,11 @@ type CPUMemoryConfig struct {
 }
 
 // Matches reports whether the given CPU and memory values, either of which may
-// be omitted, name this configuration. CPU is given in cores (e.g. "0.5", "2"),
-// or in millicores, which are deprecated but still accepted for backwards
-// compatibility. The two can't be confused, since the fewest millicores
-// offered exceeds the most cores (guarded by
+// be omitted, name this configuration. Both are numbers in any form
+// strconv.ParseFloat accepts, as with pflag's numeric flags. CPU is given in
+// cores (e.g. "0.5", "2"), or in millicores, which are deprecated but still
+// accepted for backwards compatibility. The two can't be confused, since the
+// fewest millicores offered exceeds the most cores (guarded by
 // TestCPUMemoryConfigs_CoresAndMillicoresDisjoint).
 func (c *CPUMemoryConfig) Matches(cpu, memoryGBs string) bool {
 	if cpu == "" && memoryGBs == "" {
@@ -33,17 +34,15 @@ func (c *CPUMemoryConfig) matchesCPU(cpu string) bool {
 		return cpu == "shared"
 	}
 	value, err := strconv.ParseFloat(cpu, 64)
-	if err != nil {
-		return false
-	}
-	return value == float64(c.CPUMillis)/1000 || value == float64(c.CPUMillis)
+	return err == nil && (value == float64(c.CPUMillis)/1000 || value == float64(c.CPUMillis))
 }
 
 func (c *CPUMemoryConfig) matchesMemory(memoryGBs string) bool {
 	if c.Shared {
 		return memoryGBs == "shared"
 	}
-	return memoryGBs == strconv.Itoa(c.MemoryGBs)
+	value, err := strconv.ParseFloat(memoryGBs, 64)
+	return err == nil && value == float64(c.MemoryGBs)
 }
 
 func (c *CPUMemoryConfig) CPUMillisString() *string {

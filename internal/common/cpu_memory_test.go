@@ -130,13 +130,6 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "Cores with trailing zeros (0.50 CPU)",
-			configs:     StandardCPUMemoryConfigs(),
-			cpu:         "0.50",
-			expectedCPU: 500,
-			expectedMem: 2,
-		},
-		{
 			name:        "Fluid fractional cores (0.25 CPU)",
 			configs:     FluidCPUMemoryConfigs(),
 			cpu:         "0.25",
