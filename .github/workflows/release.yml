@@ -44,9 +44,6 @@ jobs:
       - name: Install MCP Publisher
         run: curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
-      - name: Authenticate to MCP Registry
-        run: ./mcp-publisher login github-oidc
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
@@ -69,15 +66,18 @@ jobs:
           # PackageCloud credentials for publishing Linux packages
           PACKAGECLOUD_TOKEN: ${{ secrets.IO_PACKAGECLOUD_TOKEN }}
 
-      - name: Publish to MCP Registry
-        if: "!contains(github.ref_name, '-')" # Skip pre-releases
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          sed "s/{{ Version }}/$VERSION/g" server-template.json > server.json
-          ./mcp-publisher publish
-
       - name: Invalidate CloudFront Cache
         env:
           AWS_REGION: us-east-1
         run: |
           aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/latest.txt" "/install.sh" "/install.ps1"
+
+      - name: Publish to MCP Registry
+        if: "!contains(github.ref_name, '-')" # Skip pre-releases
+        # Logs in right before publishing because the registry token expires
+        # after a few minutes.
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed "s/{{ Version }}/$VERSION/g" server-template.json > server.json
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
