@@ -44,6 +44,12 @@ jobs:
       - name: Install MCP Publisher
         run: curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+        with:
+          role-to-assume: arn:aws:iam::142548018081:role/ci-tiger-cli
+          aws-region: us-east-1
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
@@ -56,17 +62,12 @@ jobs:
           # Cross-repo GitHub token for publishing to timescale/homebrew-tap
           # NOTE: this token will need to be rotated once per year.
           TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-          # AWS credentials for pushing to tiger-cli-releases S3 bucket
-          AWS_ACCESS_KEY_ID: ${{ secrets.TIGER_CLI_RELEASES_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.TIGER_CLI_RELEASES_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
           # PackageCloud credentials for publishing Linux packages
           PACKAGECLOUD_TOKEN: ${{ secrets.IO_PACKAGECLOUD_TOKEN }}
 
       - name: Invalidate CloudFront Cache
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.TIGER_CLI_RELEASES_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.TIGER_CLI_RELEASES_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
         run: |
           aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/latest.txt" "/install.sh" "/install.ps1"

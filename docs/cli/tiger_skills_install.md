@@ -12,7 +12,7 @@ the skills directories of clients that don't read it. Each argument selects a
 location, either by name or by the name of a client that reads it.
 
 Install locations:
-  universal                ~/.agents/skills (Cursor, Devin, Codex, Gemini CLI, VS Code, GitHub Copilot CLI)
+  universal                ~/.agents/skills (Cursor, Devin, Codex, Gemini CLI, VS Code, GitHub Copilot CLI, Pi)
   claude-code              ~/.claude/skills (Claude Code)
   antigravity              ~/.gemini/config/skills (Google Antigravity)
   kiro-cli                 ~/.kiro/skills (Kiro CLI)
