@@ -333,6 +333,24 @@ Connect with: tiger db psql
 			wantStderr: noWaitStderr("Forking service 'test-service' (svc-12345) at current state..."),
 		},
 		{
+			name: "fractional cores",
+			args: []string{"service", "fork", "svc-12345", "--cpu", "0.5", "--no-wait", "--no-set-default", "-o", "env"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
+					ForkStrategy:   api.ForkStrategyNOW,
+					CPUMillis:      new("500"),
+					MemoryGbs:      new("2"),
+					EnvironmentTag: new(api.EnvironmentTagDEV),
+				}).Return(&api.ForkServiceResponse{
+					HTTPResponse: httpResponse(http.StatusAccepted),
+					JSON202:      &forked,
+				}, nil)
+			},
+			wantStdout: forkedEnv,
+			wantStderr: noWaitStderr("Forking service 'test-service' (svc-12345) at current state..."),
+		},
+		{
 			// Millicores are deprecated but still accepted for backwards
 			// compatibility.
 			name: "deprecated millicores",

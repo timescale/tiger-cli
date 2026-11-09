@@ -232,6 +232,17 @@ Branch is ready.
 			wantStderr: noWaitStderr("Creating branch 'ci-4821' from service 'test-service' (svc-12345)..."),
 		},
 		{
+			name: "fractional cores",
+			args: []string{"branch", "create", "svc-12345", "--cpu", "0.25", "--no-wait", "-o", "env"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(api.BranchCreate{
+				CPUMillis: new(250),
+				MemoryGbs: new(2),
+			}, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
 			// Millicores are deprecated but still accepted for backwards
 			// compatibility.
 			name: "deprecated millicores",
