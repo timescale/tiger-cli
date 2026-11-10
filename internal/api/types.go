@@ -1331,6 +1331,9 @@ type Branch struct {
 	// Example: 4
 	MemoryGbs int `json:"memory_gbs"`
 
+	// Metrics Resource usage metrics for the branch.
+	Metrics *BranchMetrics `json:"metrics,omitempty"`
+
 	// Name The name of the branch.
 	//
 	// Example: my-production-db-pr-412
@@ -1386,6 +1389,24 @@ type BranchLogs struct {
 	//
 	// Example: eyJ0cyI6IjIwMjUtMDEtMTVUMDk6MzA6MDBaIn0=
 	LastCursor *string `json:"last_cursor,omitempty"`
+}
+
+// BranchMetrics Resource usage metrics for the branch.
+type BranchMetrics struct {
+	// CPUMillicores CPU usage in millicores.
+	//
+	// Example: 250
+	CPUMillicores *int `json:"cpu_millicores,omitempty"`
+
+	// MemoryMb Memory usage in megabytes.
+	//
+	// Example: 512
+	MemoryMb *int `json:"memory_mb,omitempty"`
+
+	// StorageMb Storage usage in megabytes.
+	//
+	// Example: 1024
+	StorageMb *int `json:"storage_mb,omitempty"`
 }
 
 // BranchRename Parameters for renaming a branch.
@@ -2710,6 +2731,9 @@ type ResolvedBranch struct {
 	// Example: 4
 	MemoryGbs int `json:"memory_gbs"`
 
+	// Metrics Resource usage metrics for the branch.
+	Metrics *BranchMetrics `json:"metrics,omitempty"`
+
 	// Name The name of the branch.
 	//
 	// Example: my-production-db-pr-412
@@ -3163,14 +3187,20 @@ type ServiceMetadata struct {
 
 // ServiceMetrics Resource usage metrics for the service.
 type ServiceMetrics struct {
+	// CPUMillicores CPU usage in millicores.
+	//
+	// Example: 250
+	CPUMillicores *int `json:"cpu_millicores,omitempty"`
+
 	// MemoryMb Memory usage in megabytes.
 	//
 	// Example: 512
 	MemoryMb *int `json:"memory_mb,omitempty"`
 
-	// MilliCPU CPU usage in millicores.
+	// MilliCPU Deprecated. Use `cpu_millicores` instead.
 	//
 	// Example: 250
+	// Deprecated: Use `cpu_millicores` instead.
 	MilliCPU *int `json:"milli_cpu,omitempty"`
 
 	// StorageMb Storage usage in megabytes.
