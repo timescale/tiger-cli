@@ -124,6 +124,13 @@ To get started, run:
 
 	wrapCommands(cmd, app, stdoutWriter, stderrWriter)
 
+	// Add cobra's built-in help and completion commands now rather than at
+	// Execute, so hideBoolFlagSyntax reaches their flags too. They're added after
+	// wrapCommands, so they stay unwrapped.
+	cmd.InitDefaultHelpCmd()
+	cmd.InitDefaultCompletionCmd() // binds the shell subcommands to cmd's current out writer
+	hideBoolFlagSyntax(cmd)
+
 	return cmd, app, nil
 }
 
@@ -133,7 +140,7 @@ To get started, run:
 // analytics.
 //
 // Commands added to the tree after this runs (cobra's built-in help, completion,
-// and __complete commands) are not wrapped and so skip the load entirely, which
+// and __complete commands, which buildRootCmd and Execute add) are not wrapped and so skip the load entirely, which
 // keeps `tiger --help` and tab completion away from the config file, the system
 // keyring, and the network. Completion functions that do need the config or
 // client load on demand via withAppLoad. Group commands (`tiger service`) have no

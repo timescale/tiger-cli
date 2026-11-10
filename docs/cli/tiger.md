@@ -28,6 +28,7 @@ To get started, run:
 ### SEE ALSO
 
 * [tiger auth](tiger_auth.md)	 - Manage authentication and credentials
+* [tiger completion](tiger_completion.md)	 - Generate the autocompletion script for the specified shell
 * [tiger config](tiger_config.md)	 - Manage CLI configuration
 * [tiger db](tiger_db.md)	 - Database operations and management
 * [tiger feedback](tiger_feedback.md)	 - Submit feedback or a bug report

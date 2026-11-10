@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/timescale/tiger-cli/internal/config"
 )
@@ -38,6 +39,37 @@ func registerFlagCompletion(cmd *cobra.Command, flag string, f cobra.CompletionF
 	if err := cmd.RegisterFlagCompletionFunc(flag, f); err != nil {
 		panic(fmt.Sprintf("%s: %v", cmd.CommandPath(), err))
 	}
+}
+
+// hideBoolFlagSyntax keeps bool flags rendering as `--flag` in help output and
+// the generated docs, rather than the `--flag[=true|false]` pflag prints since
+// v1.1.0, which has no option to turn it off
+// (https://github.com/spf13/pflag/issues/454). It wraps the value of every bool
+// flag in the tree rooted at cmd in a boolFlagValue. The help flag is added
+// first, since cobra otherwise adds it only once the command runs.
+//
+// It visits each command's LocalFlags — the flags declared on that command,
+// persistent or not — so every flag is wrapped exactly once, by the command
+// that owns it, however many subcommands inherit it.
+func hideBoolFlagSyntax(cmd *cobra.Command) {
+	cmd.InitDefaultHelpFlag()
+	cmd.LocalFlags().VisitAll(func(f *pflag.Flag) {
+		if f.Value.Type() == "bool" {
+			f.Value = boolFlagValue{f.Value}
+		}
+	})
+	for _, child := range cmd.Commands() {
+		hideBoolFlagSyntax(child)
+	}
+}
+
+// boolFlagValue hides a bool flag value's IsBoolFlag method, which is what
+// makes pflag print `[=true|false]`: embedding pflag.Value promotes only String,
+// Set, and Type. Parsing is unaffected, because pflag already set the flag's
+// NoOptDefVal to "true" when it was added, and that's what lets a bare `--flag`
+// mean true.
+type boolFlagValue struct {
+	pflag.Value
 }
 
 // outputFlag implements the [github.com/spf13/pflag.Value] interface. These
