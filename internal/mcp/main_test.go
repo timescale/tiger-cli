@@ -165,6 +165,9 @@ type runConfig struct {
 	clientErr    error // if set, the client factory returns this error (nil client)
 	experimental bool  // turns on the App's experimental gate, so the gated tools are registered
 
+	// Server
+	transport Transport // the transport the server is built for; stdio unless withTransport sets it
+
 	// MCP client
 	clientCaps *mcp.ClientCapabilities // overrides the client's advertised capabilities
 	answer     *mcp.ElicitResult       // if set, the client supports elicitation and answers every prompt with this
@@ -217,10 +220,13 @@ func runTool(
 	}
 
 	// Create mock
-	ctrl := gomock.NewController(t)
+	ctrl := gomock.NewController(mockReporter{t})
 	mockClient := mocks.NewMockClientWithResponsesInterface(ctrl)
 	if setupMock != nil {
-		setupMock(mockClient)
+		func() {
+			defer failOnMockPanic(t)
+			setupMock(mockClient)
+		}()
 	}
 
 	// Analytics is always off and the docs proxy disabled, so a case neither
@@ -243,10 +249,13 @@ func runTool(
 		t.Fatalf("load app: %v", err)
 	}
 
-	server, err := NewServer(ctx, app, nil)
+	// The session itself always runs over an in-memory transport; rc.transport
+	// only decides what the server exposes.
+	server, err := NewServer(ctx, app, nil, rc.transport)
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
+	server.mcpServer.AddReceivingMiddleware(recoverMockFailure)
 
 	// Registration has happened by now, so this rewrite reaches only the
 	// per-request reload.
@@ -289,6 +298,61 @@ func runTool(
 	return result
 }
 
+// mockReporter is the mock controller's reporter. gomock reports an
+// unexpected call with Fatalf, and *testing.T's Fatalf ends the calling
+// goroutine with runtime.Goexit. A tool handler runs on a server goroutine,
+// so that would leave the client's CallTool waiting until the test timeout.
+// This Fatalf marks the test failed and panics with a mockFailure instead,
+// which recoverMockFailure returns as the call's error, so the call returns
+// right away and gomock's message shows up in the failure that ends the test.
+type mockReporter struct {
+	*testing.T
+}
+
+func (r mockReporter) Fatalf(format string, args ...any) {
+	r.Fail()
+	panic(mockFailure{msg: fmt.Sprintf(format, args...)})
+}
+
+// mockFailure is what mockReporter panics with, carrying gomock's message.
+type mockFailure struct {
+	msg string
+}
+
+func (f mockFailure) Error() string {
+	return f.msg
+}
+
+// recoverMockFailure is a receiving middleware that turns a mockReporter
+// panic in a handler into an error result for the request. The SDK doesn't
+// recover handler panics, so without it the panic would crash the test binary.
+func recoverMockFailure(next mcp.MethodHandler) mcp.MethodHandler {
+	return func(ctx context.Context, method string, req mcp.Request) (res mcp.Result, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				f, ok := r.(mockFailure)
+				if !ok {
+					panic(r)
+				}
+				err = f
+			}
+		}()
+		return next(ctx, method, req)
+	}
+}
+
+// failOnMockPanic, deferred on the test goroutine, turns a mockReporter panic
+// (e.g. from a malformed Return while setting up expectations) into Fatal.
+func failOnMockPanic(t *testing.T) {
+	if r := recover(); r != nil {
+		f, ok := r.(mockFailure)
+		if !ok {
+			panic(r)
+		}
+		t.Fatal(f)
+	}
+}
+
 // withSetup runs f with the subtest's *testing.T just before the server is
 // built. Use it from options that stub package-level vars, so their t.Cleanup
 // restores at the end of the case that ran them rather than at the end of an
@@ -297,6 +361,14 @@ func withSetup(f func(t *testing.T)) runOption {
 	return func(rc *runConfig) {
 		rc.setup = append(rc.setup, f)
 	}
+}
+
+// withWorkingDir makes dir the process working directory for the case, which
+// is what bounds the files a tool may read.
+func withWorkingDir(dir string) runOption {
+	return withSetup(func(t *testing.T) {
+		t.Chdir(dir)
+	})
 }
 
 // withConfig seeds the config file the server starts with (e.g.
@@ -343,6 +415,14 @@ func withNotLoggedIn() runOption {
 func withExperimental() runOption {
 	return func(rc *runConfig) {
 		rc.experimental = true
+	}
+}
+
+// withTransport builds the server for the given transport instead of stdio,
+// which decides whether its tools may read local files.
+func withTransport(transport Transport) runOption {
+	return func(rc *runConfig) {
+		rc.transport = transport
 	}
 }
 

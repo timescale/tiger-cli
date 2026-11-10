@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -34,17 +35,25 @@ type DBQueryInput struct {
 	Pooled         bool     `json:"pooled,omitempty"`
 }
 
-func (DBQueryInput) Schema(experimental bool) *jsonschema.Schema {
+// Schema returns the input schema. Over any transport but stdio the file
+// property is left out, so the schema rejects it.
+func (DBQueryInput) Schema(experimental bool, transport Transport) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBQueryInput](nil))
 
 	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service." + branchIDHelp(experimental, "runs the query against that branch")
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
-	schema.Properties["query"].Description = "PostgreSQL query to execute. Exactly one of 'query' or 'file' must be provided."
+	if transport == TransportStdio {
+		schema.Properties["query"].Description = "PostgreSQL query to execute. Exactly one of 'query' or 'file' must be provided."
 
-	schema.Properties["file"].Description = "Path to a SQL file on disk to execute, instead of passing its contents as 'query'. Exactly one of 'query' or 'file' must be provided."
-	schema.Properties["file"].Examples = []any{"./migrations/001_init.sql", "~/schema.sql"}
+		schema.Properties["file"].Description = "Path to a SQL file on disk to execute, instead of passing its contents as 'query'. The file must be within the MCP server's working directory, and a relative path is resolved against it. Exactly one of 'query' or 'file' must be provided."
+		schema.Properties["file"].Examples = []any{"./migrations/001_init.sql", "schema.sql"}
+	} else {
+		schema.Properties["query"].Description = "PostgreSQL query to execute."
+		schema.Required = append(schema.Required, "query")
+		delete(schema.Properties, "file")
+	}
 
 	schema.Properties["parameters"].Description = "Query parameters. Values are substituted for $1, $2, etc. placeholders in the query. Only supported for single-statement queries."
 	schema.Properties["parameters"].Examples = []any{[]string{"1", "alice"}, []string{"2024-01-01", "100"}}
@@ -112,20 +121,25 @@ func (DBQueryOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newDBQueryTool(experimental bool) *mcp.Tool {
+func newDBQueryTool(experimental bool, transport Transport) *mcp.Tool {
+	sqlSource := "Pass the SQL as 'query'."
+	if transport == TransportStdio {
+		sqlSource = "Pass the SQL as 'query', or point 'file' at a .sql file within the MCP server's working directory to run its contents."
+	}
+
 	return &mcp.Tool{
 		Name:  toolDBQuery,
 		Title: "Execute SQL Query",
 		Description: `Execute SQL queries against a service database.
 
-Connects to a PostgreSQL database service in Tiger Cloud and executes the provided SQL query, returning the results with column information, row data, and execution metadata. Pass the SQL as 'query', or point 'file' at a .sql file on disk to run its contents.
+Connects to a PostgreSQL database service in Tiger Cloud and executes the provided SQL query, returning the results with column information, row data, and execution metadata. ` + sqlSource + `
 
 Multi-statement queries (semicolon-separated) are supported when no parameters are provided. All result sets are returned. By default, statements execute in an implicit transaction that automatically commits on success or rolls back on error. Explicit transactions (opened with BEGIN) must be explicitly committed with COMMIT, or they roll back when the connection closes.
 
 Process data in the database, not in your context: aggregate, filter, sort/limit, and join in SQL rather than fetching raw rows.
 
 WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
-		InputSchema:  DBQueryInput{}.Schema(experimental),
+		InputSchema:  DBQueryInput{}.Schema(experimental, transport),
 		OutputSchema: DBQueryOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
@@ -144,7 +158,7 @@ func (s *Server) handleDBQuery(ctx context.Context, req *mcp.CallToolRequest, in
 		return nil, DBQueryOutput{}, err
 	}
 
-	query, err := resolveQueryInput(input.Query, input.File)
+	query, err := s.resolveQueryInput(input.Query, input.File)
 	if err != nil {
 		return nil, DBQueryOutput{}, err
 	}
@@ -211,7 +225,15 @@ func (s *Server) handleDBQuery(ctx context.Context, req *mcp.CallToolRequest, in
 
 // resolveQueryInput returns the SQL to run, read from file when that's what the
 // caller passed instead of inline query text.
-func resolveQueryInput(query, file string) (string, error) {
+func (s *Server) resolveQueryInput(query, file string) (string, error) {
+	if s.transport != TransportStdio {
+		// The schema rejects file here, and requires query, but not that it's
+		// non-empty.
+		if query == "" {
+			return "", errors.New("'query' must be provided")
+		}
+		return query, nil
+	}
 	if (query == "") == (file == "") {
 		return "", errors.New("exactly one of 'query' or 'file' must be provided")
 	}
@@ -219,9 +241,9 @@ func resolveQueryInput(query, file string) (string, error) {
 		return query, nil
 	}
 
-	data, err := os.ReadFile(util.ExpandPath(file))
+	data, err := readWorkingDirFile(file)
 	if err != nil {
-		return "", fmt.Errorf("failed to read SQL file: %w", err)
+		return "", err
 	}
 	if len(data) == 0 {
 		return "", fmt.Errorf("SQL file %s is empty", file)
@@ -229,6 +251,59 @@ func resolveQueryInput(query, file string) (string, error) {
 	// Whitespace and comments go through to the database, which reports on
 	// them the way it would for any other client.
 	return string(data), nil
+}
+
+// readWorkingDirFile reads the file at path, which must be within the server's
+// working directory: the directory the client launched it in, and so the
+// project it's working on. Going through os.Root also refuses a symlink that
+// leads out of it.
+//
+// Unlike tiger db query --file, the path doesn't have environment variables
+// expanded: it comes from the model, and expanding them would let it read the
+// server's environment back out through the error.
+func readWorkingDirFile(path string) ([]byte, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	rel, ok := relativeToDir(wd, util.ExpandHome(path))
+	if !ok {
+		return nil, fmt.Errorf("SQL file %s is outside the working directory %s", path, wd)
+	}
+
+	root, err := os.OpenRoot(wd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open working directory: %w", err)
+	}
+	defer root.Close()
+
+	data, err := root.ReadFile(rel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read SQL file: %w", err)
+	}
+	if err := root.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close working directory: %w", err)
+	}
+	return data, nil
+}
+
+// relativeToDir returns path relative to dir, reporting whether it lies within
+// it. An absolute path and dir may name the same place through different
+// symlinks (e.g. /tmp and /private/tmp on macOS), so both are resolved before
+// comparing. A path that can't be resolved, such as a missing file, is compared
+// as given instead, so the result doesn't depend on what exists outside dir.
+func relativeToDir(dir, path string) (string, bool) {
+	if !filepath.IsAbs(path) {
+		return path, filepath.IsLocal(path)
+	}
+	if resolvedPath, err := filepath.EvalSymlinks(path); err == nil {
+		if resolvedDir, err := filepath.EvalSymlinks(dir); err == nil {
+			dir, path = resolvedDir, resolvedPath
+		}
+	}
+	rel, err := filepath.Rel(dir, path)
+	return rel, err == nil && filepath.IsLocal(rel)
 }
 
 // resolveMaxRows returns the row cap from mcp_max_rows, falling back to the

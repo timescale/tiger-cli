@@ -59,7 +59,7 @@ func TestDbPingCmd(t *testing.T) {
 		{
 			name:    "invalid timeout duration",
 			args:    []string{"db", "ping", "svc-12345", "--timeout", "invalid"},
-			wantErr: "invalid argument \"invalid\" for \"-t, --timeout\" flag: time: invalid duration \"invalid\"",
+			wantErr: "invalid argument \"invalid\" for \"-t, --timeout\" flag: must be a duration like \"30s\" or \"5m\"",
 		},
 		{
 			name: "network error",

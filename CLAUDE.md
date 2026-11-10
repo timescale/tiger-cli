@@ -81,12 +81,17 @@ The CLI has **zero global command state**: `buildRootCmd(ctx)` builds the entire
 
 - `buildRootCmd` creates the per-invocation `*common.App` and passes it to a `build*Cmd(app)` builder function for each command; group builders add their own subcommand builders in turn. Any command body can reach the config and API client through the App without loading them itself.
 - `wrapCommands` wraps the `RunE` of every command in the tree with the shared per-invocation lifecycle: `app.SetFlags(cmd.Flags())` followed by `app.Load(ctx)` (the single config + API client load), disabling color on the output writers when `cfg.Color` is off, starting a background version check (whose output is deferred until after the command's own), and deferred analytics tracking. There are no `PersistentPreRunE`/`PersistentPostRunE` hooks.
-- Always use `RunE`, never `Run` — a `Run` command would silently skip the lifecycle. Cobra's built-in `help`, `completion`, and `__complete` commands are added after `wrapCommands` runs and are deliberately left unwrapped, so they never touch the config file, the system keyring, or the network. Completion functions that do need the config or client wrap themselves with `withAppLoad` (`completion_helper.go`).
+- Always use `RunE`, never `Run` — a `Run` command would silently skip the lifecycle. Cobra's built-in `help`, `completion`, and `__complete` commands are added after `wrapCommands` runs (`help` and `completion` by `buildRootCmd`, so their flags get the same help formatting as the rest) and are deliberately left unwrapped, so they never touch the config file, the system keyring, or the network. Completion functions that do need the config or client wrap themselves with `withAppLoad` (`completion_helper.go`).
 - Declare flags as local variables inside the builder function. Flags that override config values are the exception — see [Configuration](#configuration).
 
 ### One File Per Command
 
 Every command gets its own file in `internal/cmd/`, named to match the command in snake_case: `tiger service create` → `service_create.go`. Group commands with no `RunE` of their own still get a file (`tiger service` → `service.go`). Within a file, package-level constants and variables that other code may reference come first, then the `build*Cmd()` function, then helpers used only by that command. Constants and variables used by just one helper sit directly above it (`colorizeLogEntry`'s styles in `logs_helper.go`). Tests mirror this layout (`service_create.go` → `service_create_test.go`), with package-wide test scaffolding in `main_test.go` and `integration_test.go` as a single cross-command suite.
+
+### Client Installation
+
+The MCP and skills installers share the client registry in `client_helper.go`.
+A client entry also supplies help, completion, the client picker, and `pkg/mcpinstall` support.
 
 ### Where Helpers Go
 
@@ -223,7 +228,7 @@ The server exposes two kinds of tools: native Tiger tools for service management
 
 ### Server State
 
-`NewServer(ctx, app, logger)` takes the already-loaded `*common.App` and keeps it on the `Server` along with the logger. The experimental gate and the docs-proxy settings are read once here at startup (a client must restart the server to pick up changes to those), as are read-only mode's startup decisions — which write tools get registered, and the warning in the server instructions. The analytics middleware, though, reloads the App on every request, so handlers see current config and credentials — including the live `read_only` value in the per-call gates (see [Read-Only Mode](#read-only-mode)). Handlers therefore never load anything themselves — they read `s.app.GetAll()`/`GetClient()`/`GetConfig()` and log via `s.logger`.
+`NewServer(ctx, app, logger, transport)` takes the already-loaded `*common.App` and keeps it on the `Server` along with the logger and the transport it will be started with (see [Local Files](#local-files)). The experimental gate and the docs-proxy settings are read once here at startup (a client must restart the server to pick up changes to those), as are read-only mode's startup decisions — which write tools get registered, and the warning in the server instructions. The analytics middleware, though, reloads the App on every request, so handlers see current config and credentials — including the live `read_only` value in the per-call gates (see [Read-Only Mode](#read-only-mode)). Handlers therefore never load anything themselves — they read `s.app.GetAll()`/`GetClient()`/`GetConfig()` and log via `s.logger`.
 
 ### One File Per Tool
 
@@ -264,6 +269,12 @@ A destructive tool that needs a human in the loop asks through MCP elicitation, 
 - The tool description should say that the tool prompts the user itself, so agents don't ask for confirmation first and the user isn't asked twice.
 
 The CLI can be used to get around the MCP server's safeguards: `tiger config set read_only off` disables read-only mode, and `--confirm` skips the confirmation prompts that PROD elicitation stands in for. Text the server sends to agents should therefore never tell an agent to run a CLI command itself. Where the CLI is the way forward, it should tell the agent to ask the user to run the command.
+
+### Local Files
+
+A tool parameter that reads a file on the server's machine (`db_query`'s `file`) depends on the transport. Only a stdio server is known to share a machine with its client, so under any other transport the tool leaves the parameter out of its schema, which then rejects it. `mcp list`, `mcp get`, and completion describe the stdio server, since that's what a default `tiger mcp start` runs.
+
+Over stdio, reads are confined to the server's working directory — the directory the client launched it in — by going through `os.Root`, which also refuses symlinks that lead out of it. Unlike the CLI's path flags, such a path never has environment variables expanded: it comes from the model, and expansion would let it read the server's environment back out. `readWorkingDirFile` in `db_query.go` is the model.
 
 ## Read-Only Mode
 
@@ -322,10 +333,10 @@ MCP tool tests live in `internal/mcp`, one test file per tool file, table-driven
 
 - `runTool(t, tool, args, setupMock, opts...)` builds a real server with `NewServer` over the generated mock API client and an isolated `t.TempDir()` config directory (analytics off, docs proxy disabled), connects an in-memory MCP client, and calls the tool through the SDK's actual request path, so schema validation, middleware, and elicitation round trips are all exercised. It returns the `CallToolResult`, the transport error if the call itself broke, and the prompt the tool raised, if any.
 - Test cases use the `toolTest` struct and run through `runToolTests` — one inline table per test function, as with `cmdTest`, and with the same field names: `mock` registers mock expectations, `opts` configures the run, `checks` holds extra assertions. `wantErr` holds the exact text of the error result and `wantOutput` the exact structured content; left unset, they assert success and no structured content respectively. A case that calls a gated tool without the experimental gate never reaches a handler, so instead of a result it asserts the SDK's transport error with `wantCallErr` (exact text).
-- Options configure the run, the counterparts of the command tests' `with*` options: `withConfig` seeds the config file the server starts with, which also decides which tools are registered; `withConfigAfterStart` rewrites it once the server is running, for behavior driven by a config change the per-request reload picks up; `withClientError`/`withNotLoggedIn` make the client factory fail; `withExperimental` turns on the experimental gate so the gated tools are registered; `withClientCapabilities` overrides what the MCP client advertises; and `withKeyringError` makes password storage fail. As in the command tests, a stub of package-level state is a `with*` option built on `withSetup`, written under the stub rule above (`withFetchServiceSchema` in `db_schema_test.go` is the model), never a bare hook in one case.
+- Options configure the run, the counterparts of the command tests' `with*` options: `withConfig` seeds the config file the server starts with, which also decides which tools are registered; `withConfigAfterStart` rewrites it once the server is running, for behavior driven by a config change the per-request reload picks up; `withClientError`/`withNotLoggedIn` make the client factory fail; `withExperimental` turns on the experimental gate so the gated tools are registered; `withTransport` builds the server for HTTP instead of stdio; `withClientCapabilities` overrides what the MCP client advertises; and `withKeyringError` makes password storage fail. As in the command tests, a stub of package-level state is a `with*` option built on `withSetup`, written under the stub rule above (`withFetchServiceSchema` in `db_schema_test.go` is the model), never a bare hook in one case.
 - A case that expects the tool to prompt sets `wantPrompt` (the `ElicitParams` as the client receives them) and answers it with `withElicitation` (the user's `ElicitResult`). That option is also what gives the client elicitation support, so a case without it proves the tool copes with a client that can't prompt.
 - `synctest: true` works as in the command tests, both for a case that reaches `common.WaitForService`'s poll loop via a tool's `wait` parameter and for one whose request depends on `time.Now()`.
-- Mock expectations follow the same rules as the command tests (`validCtx`, exact request structs, `httpResponse`, `sampleService`, `sampleReplica`, `expectGetService`); a tool that prompts runs its handler twice per call, so it expects its lookups with an explicit `Times`. As with `runCommand`, every case starts with a fresh in-memory keyring.
+- Mock expectations follow the same rules as the command tests (`validCtx`, exact request structs, `httpResponse`, `sampleService`, `sampleReplica`, `expectGetService`); a tool that prompts runs its handler twice per call, so it expects its lookups with an explicit `Times`. As with `runCommand`, every case starts with a fresh in-memory keyring. The mock controller reports through `mockReporter`, so an unexpected call inside a handler, which runs on a server goroutine, fails the call at once with gomock's message rather than hanging it.
 
 ## Documentation
 

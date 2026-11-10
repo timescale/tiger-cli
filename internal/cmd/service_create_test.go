@@ -110,7 +110,7 @@ allocation.`),
 		{
 			name:    "unparseable wait timeout",
 			args:    []string{"service", "create", "--name", "test-service", "--wait-timeout", "invalid"},
-			wantErr: `invalid argument "invalid" for "--wait-timeout" flag: time: invalid duration "invalid"`,
+			wantErr: `invalid argument "invalid" for "--wait-timeout" flag: must be a duration like "30s" or "5m"`,
 		},
 		{
 			name:    "zero wait timeout",

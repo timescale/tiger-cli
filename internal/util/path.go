@@ -6,36 +6,31 @@ import (
 	"strings"
 )
 
-// ExpandPath expands environment variables and tilde in file paths.
-// It handles:
-// - Empty paths (returns empty string)
-// - Environment variable expansion (e.g., $HOME/config)
-// - Home directory expansion (e.g., ~/config or ~)
-// - Path normalization for cross-platform compatibility
+// ExpandPath expands environment variables and a leading tilde in a path, and
+// cleans the result. An empty path stays empty.
 func ExpandPath(path string) string {
+	return ExpandHome(os.ExpandEnv(path))
+}
+
+// ExpandHome expands a leading tilde (~ or ~/...) to the home directory and
+// cleans the result, leaving environment variables untouched. An empty path
+// stays empty, and the tilde is left in place if the home directory is unknown.
+func ExpandHome(path string) string {
 	if path == "" {
 		return ""
 	}
 
-	// Expand environment variables
-	expanded := os.ExpandEnv(path)
-
-	// Expand home directory
-	if expanded == "~" {
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
+	if path == "~" {
+		if homeDir, err := os.UserHomeDir(); err == nil {
 			return homeDir
 		}
-		// If UserHomeDir fails, fall through to return original
 	}
 
-	if strings.HasPrefix(expanded, "~/") {
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
-			expanded = filepath.Join(homeDir, expanded[2:])
+	if strings.HasPrefix(path, "~/") {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			path = filepath.Join(homeDir, path[2:])
 		}
-		// If UserHomeDir fails, leave expanded as-is (with ~/ prefix)
 	}
 
-	return filepath.Clean(expanded)
+	return filepath.Clean(path)
 }

@@ -180,6 +180,7 @@ tiger mcp install copilot          # GitHub Copilot CLI
 tiger mcp install cursor           # Cursor IDE
 tiger mcp install devin            # Devin
 tiger mcp install gemini           # Gemini CLI
+tiger mcp install pi               # Pi 0.99.0 or later
 tiger mcp install vscode           # VS Code
 ```
 
@@ -212,7 +213,8 @@ following:
 The above instructions install the MCP server using the stdio transport. If you
 need to use the Streamable HTTP transport instead, you can start the server with
 `tiger mcp start http --port 8080` and install it into your client using
-`http://localhost:8080` as the URL.
+`http://localhost:8080` as the URL. Over HTTP the client may be on a different
+machine, so `db_query` doesn't accept a SQL file path, only inline SQL.
 
 ### Available MCP Tools
 
@@ -237,7 +239,7 @@ The MCP server exposes the following tools to AI assistants:
 - `service_metrics_series` - Fetch a metric's time series over a time window, with label filters, an aggregation function, group by and bucket size
 
 **Database Operations:**
-- `db_query` - Execute SQL queries against a database service, passed inline or as a path to a SQL file, with support for parameterized queries, custom timeouts, and connection pooling
+- `db_query` - Execute SQL queries against a database service, passed inline or as a path to a SQL file within the server's working directory, with support for parameterized queries, custom timeouts, and connection pooling
 - `db_schema` - Display a service's database schema (tables, views, materialized views, enums, functions, procedures, indexes, triggers, and TimescaleDB hypertable/continuous aggregate metadata) as readable text for an agent's context
 - `db_extensions_list` - List the PostgreSQL extensions installed in a service database, with each extension's version, schema, and description
 
@@ -277,7 +279,7 @@ tiger skills install universal claude-code
 
 Skills are installed for the current user. The `universal` location,
 `~/.agents/skills`, is read by most coding agents (Cursor, Codex, Gemini CLI,
-VS Code, GitHub Copilot CLI, Devin). Claude Code, Kiro CLI, and Google
+VS Code, GitHub Copilot CLI, Devin, Pi). Claude Code, Kiro CLI, and Google
 Antigravity read their own skills directories, so they're separate locations
 (`claude-code`, `kiro-cli`, `antigravity`). Naming a client that reads
 `~/.agents/skills`, such as `cursor`, selects `universal`. Use `--skills-dir`

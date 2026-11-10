@@ -19,6 +19,7 @@ const (
 	Antigravity MCPClient = "antigravity"
 	KiroCLI     MCPClient = "kiro-cli"
 	Copilot     MCPClient = "copilot" // Both the IDE and the CLI
+	Pi          MCPClient = "pi"
 )
 
 // clientConfig represents a supported client, for both MCP server and skills
@@ -164,6 +165,15 @@ var supportedClients = []clientConfig{
 		},
 		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return append([]string{"copilot", "mcp", "add", serverName, "--", command}, args...), nil
+		},
+	},
+	{
+		ClientType:           Pi,
+		Name:                 "Pi",
+		EditorNames:          []string{"pi"},
+		MCPServersPathPrefix: "/mcpServers",
+		MCPConfigPaths: []string{
+			"~/.pi/agent/mcp.json",
 		},
 	},
 }

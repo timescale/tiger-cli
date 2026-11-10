@@ -35,7 +35,7 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log In to GitHub Container Registry
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -44,11 +44,8 @@ jobs:
       - name: Install MCP Publisher
         run: curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
-      - name: Authenticate to MCP Registry
-        run: ./mcp-publisher login github-oidc
-
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: arn:aws:iam::142548018081:role/ci-tiger-cli
           aws-region: us-east-1
@@ -69,15 +66,18 @@ jobs:
           # PackageCloud credentials for publishing Linux packages
           PACKAGECLOUD_TOKEN: ${{ secrets.IO_PACKAGECLOUD_TOKEN }}
 
-      - name: Publish to MCP Registry
-        if: "!contains(github.ref_name, '-')" # Skip pre-releases
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          sed "s/{{ Version }}/$VERSION/g" server-template.json > server.json
-          ./mcp-publisher publish
-
       - name: Invalidate CloudFront Cache
         env:
           AWS_REGION: us-east-1
         run: |
           aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/latest.txt" "/install.sh" "/install.ps1"
+
+      - name: Publish to MCP Registry
+        if: "!contains(github.ref_name, '-')" # Skip pre-releases
+        # Logs in right before publishing because the registry token expires
+        # after a few minutes.
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed "s/{{ Version }}/$VERSION/g" server-template.json > server.json
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

@@ -25,7 +25,10 @@ func buildMCPHTTPCmd(app *common.App) *cobra.Command {
 		Short: "Start MCP server with HTTP transport",
 		Long: `Start the MCP server using HTTP transport.
 
-The server listens on the given port and fails if that port is already in use.`,
+The server listens on the given port and fails if that port is already in use.
+
+Because clients may connect from another machine, the db_query tool doesn't
+accept a SQL file path over HTTP, only inline SQL.`,
 		Example: `  # Start HTTP server on default port 8080
   tiger mcp start http
 
@@ -58,7 +61,7 @@ func startHTTPServer(cmd *cobra.Command, app *common.App, host string, port int)
 	logger := newLogger(cmd.ErrOrStderr())
 
 	// Create MCP server
-	server, err := mcp.NewServer(ctx, app, logger)
+	server, err := mcp.NewServer(ctx, app, logger, mcp.TransportHTTP)
 	if err != nil {
 		logger.Error("Failed to create MCP server", slog.Any("error", err))
 		return fmt.Errorf("failed to create MCP server: %w", err)
