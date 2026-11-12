@@ -230,6 +230,7 @@ type ServiceDetail struct {
 	Created          string        `json:"created,omitempty"`
 	Environment      string        `json:"environment"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
+	Storage          string        `json:"storage,omitempty"`
 	Replicas         int           `json:"replicas"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
 	PoolerEndpoint   string        `json:"pooler_endpoint,omitempty"`
@@ -259,6 +260,9 @@ func setServiceDetailSchemaProperties(schema *jsonschema.Schema, experimental bo
 
 	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
 
+	schema.Properties["storage"].Description = "Storage the service is using"
+	schema.Properties["storage"].Examples = []any{"512 MB", "843.5 GB"}
+
 	schema.Properties["replicas"].Description = "Number of HA replicas (0=single node/no HA, 1+=HA enabled)"
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint"
 	schema.Properties["pooler_endpoint"].Description = "Connection pooler endpoint"
@@ -285,6 +289,10 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	}
 
 	detail.Resources = convertToResourceInfo(service, s.app.Experimental)
+
+	if service.Metrics != nil && service.Metrics.StorageMb != nil {
+		detail.Storage = util.FormatStorageMB(*service.Metrics.StorageMb)
+	}
 
 	// Add replica information
 	if service.HaReplicas != nil && service.HaReplicas.ReplicaCount != nil {

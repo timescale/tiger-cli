@@ -21,12 +21,13 @@ func TestServiceGetTool(t *testing.T) {
 	}
 
 	// A fully populated service, so one success case covers every optional
-	// field: resources, HA replicas, and both endpoints. Its IOPS are a
+	// field: resources, storage, HA replicas, and both endpoints. Its IOPS are a
 	// preview field, dropped without the experimental gate.
 	fullService := sampleService(func(s *api.Service) {
 		s.Created = created
 		s.Metadata = &api.ServiceMetadata{Environment: new("PROD")}
 		s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(8), Iops: new(6000)}}}
+		s.Metrics = &api.ServiceMetrics{CPUMillicores: new(1200), MemoryMb: new(3072), StorageMb: new(863744)}
 		s.HaReplicas = &api.HAReplica{ReplicaCount: new(2)}
 		s.Endpoint = endpoint
 		s.ConnectionPooler = &api.ConnectionPooler{
@@ -69,6 +70,7 @@ func TestServiceGetTool(t *testing.T) {
 			"created":           "2025-01-15T09:30:00Z",
 			"environment":       "PROD",
 			"resources":         map[string]any{"cpu": "2 cores", "memory": "8 GB"},
+			"storage":           "843.5 GB",
 			"replicas":          float64(2),
 			"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
 			"pooler_endpoint":   "e6ue9697jf.project.pooler.tsdb.cloud.timescale.com:6432",

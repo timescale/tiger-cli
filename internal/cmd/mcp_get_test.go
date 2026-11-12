@@ -34,6 +34,7 @@ Output:
       • cpu: string - CPU allocation
       • memory: string - Memory allocation
     • status (required): string - Service status
+    • storage: string - Storage the service is using
     • type (required): string
 
 `
