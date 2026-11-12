@@ -219,6 +219,22 @@ func convertToResourceInfo(service api.Service, experimental bool) *ResourceInfo
 	return info
 }
 
+// setServiceStorageSchemaProperties sets the storage property shared by the
+// service output types.
+func setServiceStorageSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["storage"].Description = "Storage the service is using"
+	schema.Properties["storage"].Examples = []any{"512 MB", "843.5 GB"}
+}
+
+// convertToServiceStorage returns the storage a service is using in its MCP
+// output form, or "" if the API didn't report it.
+func convertToServiceStorage(service api.Service) string {
+	if service.Metrics == nil || service.Metrics.StorageMb == nil {
+		return ""
+	}
+	return util.FormatStorageMB(*service.Metrics.StorageMb)
+}
+
 // ServiceDetail represents detailed service information
 type ServiceDetail struct {
 	ServiceID        string        `json:"id"`
@@ -260,8 +276,7 @@ func setServiceDetailSchemaProperties(schema *jsonschema.Schema, experimental bo
 
 	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
 
-	schema.Properties["storage"].Description = "Storage the service is using"
-	schema.Properties["storage"].Examples = []any{"512 MB", "843.5 GB"}
+	setServiceStorageSchemaProperties(schema)
 
 	schema.Properties["replicas"].Description = "Number of HA replicas (0=single node/no HA, 1+=HA enabled)"
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint"
@@ -289,10 +304,7 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	}
 
 	detail.Resources = convertToResourceInfo(service, s.app.Experimental)
-
-	if service.Metrics != nil && service.Metrics.StorageMb != nil {
-		detail.Storage = util.FormatStorageMB(*service.Metrics.StorageMb)
-	}
+	detail.Storage = convertToServiceStorage(service)
 
 	// Add replica information
 	if service.HaReplicas != nil && service.HaReplicas.ReplicaCount != nil {
