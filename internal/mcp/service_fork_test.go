@@ -291,7 +291,7 @@ func TestServiceForkTool(t *testing.T) {
 				"service": detail(map[string]any{
 					"name":        "my-forked-db",
 					"environment": "PROD",
-					"resources":   map[string]any{"cpu": "1 cores", "memory": "4 GB"},
+					"resources":   map[string]any{"cpu": "1 core", "memory": "4 GB"},
 				}),
 				"message": acceptedMsg,
 			},

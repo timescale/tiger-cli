@@ -41,7 +41,7 @@ tiger service fork [name-or-id] [flags]
   tiger service fork svc-12345 --name my-forked-db
 
   # Fork with custom resources
-  tiger service fork svc-12345 --cpu 2000 --memory 8
+  tiger service fork svc-12345 --cpu 2 --memory 8
 
   # Fork without setting as default service
   tiger service fork svc-12345 --no-set-default
@@ -56,7 +56,7 @@ tiger service fork [name-or-id] [flags]
 ### Options
 
 ```
-      --cpu string              CPU allocation in millicores (inherits from source if not specified)
+      --cpu string              CPU allocation in cores (inherits from source if not specified)
       --environment string      Environment tag (DEV or PROD) (default "DEV")
   -h, --help                    help for fork
       --last-snapshot           Fork at the last existing snapshot (faster)
