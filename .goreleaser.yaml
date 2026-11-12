@@ -150,6 +150,12 @@ homebrew_casks:
       owner: timescale
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: timescale
+          name: homebrew-tap
+          branch: main
     homepage: https://github.com/timescale/tiger-cli
     description: |-
       Tiger CLI - Tiger Cloud Platform CLI
