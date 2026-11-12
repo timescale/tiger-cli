@@ -393,6 +393,7 @@ type BranchDetail struct {
 	Status           string        `json:"status"`
 	Created          string        `json:"created,omitempty"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
+	Storage          string        `json:"storage,omitempty"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
 	Password         string        `json:"password,omitempty"`
 	ConnectionString string        `json:"connection_string,omitempty"`
@@ -412,6 +413,9 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 	// The branch tools only exist behind the experimental gate, so the IOPS
 	// are always included.
 	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
+
+	schema.Properties["storage"].Description = "Storage the branch has changed since it was created, which is billed. Storage still shared with the parent service isn't billed to the branch."
+	schema.Properties["storage"].Examples = []any{"512 MB", "1.2 GB"}
 
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint (absent while the branch is still provisioning)"
 	schema.Properties["password"].Description = "Password for the branch's tsdbadmin user (only included if with_password=true)"
@@ -435,6 +439,10 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, wi
 			Memory: fmt.Sprintf("%d GB", branch.MemoryGbs),
 			IOPS:   util.Deref(branch.Iops),
 		},
+	}
+
+	if branch.Metrics != nil && branch.Metrics.StorageMb != nil {
+		detail.Storage = util.FormatStorageMB(*branch.Metrics.StorageMb)
 	}
 
 	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
