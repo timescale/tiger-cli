@@ -142,7 +142,7 @@ status: READY
 │ Name              │ test-branch                                                                                                 │
 │ Parent Service    │ test-service (svc-12345)                                                                                    │
 │ Status            │ READY                                                                                                       │
-│ CPU               │ 0.25 cores (250m)                                                                                           │
+│ CPU               │ 0.25 cores                                                                                                  │
 │ Memory            │ 2 GB                                                                                                        │
 │ IOPS              │ 16000                                                                                                       │
 │ Storage           │ 1.2 GB changed on this branch (billed)                                                                      │
