@@ -434,7 +434,7 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 	// are always included.
 	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
 
-	schema.Properties["storage"].Description = "Storage the branch has changed since it was created, which is billed. Storage still shared with the parent service isn't billed to the branch."
+	schema.Properties["storage"].Description = "Storage the branch has changed since it was created. The branch is billed only for this storage, not for the storage it still shares with its parent service."
 	schema.Properties["storage"].Examples = []any{"512 MB", "1.2 GB"}
 
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint (absent while the branch is still provisioning)"
