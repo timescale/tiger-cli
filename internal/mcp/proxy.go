@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -12,40 +11,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 )
-
-// isMethodNotFoundError checks if the error is a JSON-RPC "Method not found" error.
-//
-// This implementation uses string matching as a pragmatic workaround for several limitations:
-//
-//  1. The actual error type is github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2.WireError,
-//     which is in an internal package that we cannot import.
-//
-//  2. The WireError type has an Is() method that only matches against other WireError instances
-//     with the same code, so we can't create our own type that will match via errors.Is().
-//
-//  3. The MCP SDK doesn't export ErrMethodNotFound or provide a way to create WireError
-//     instances with arbitrary codes. It only exports specific constructors like
-//     ResourceNotFoundError() and a few error codes, but not the -32601 code we need.
-//
-//  4. Using errors.As() with a local struct that has the same shape as WireError doesn't work
-//     because errors.As requires type identity, not structural compatibility.
-//
-// 5. Using reflection to access the Code field would work but adds complexity and runtime overhead.
-//
-// Therefore, we use string matching on the error message. This is brittle but works for our
-// specific use case where we're checking for unsupported resources/resource_templates methods.
-// The error chain looks like:
-//   - "failed to list resources from remote server: calling \"resources/list\": Method not found"
-//   - "failed to list resource templates from remote server: calling \"resources/templates/list\": Method not found"
-func isMethodNotFoundError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	errStr := err.Error()
-	// Check for the specific "Method not found" JSON-RPC error
-	return strings.Contains(errStr, "Method not found")
-}
 
 // registerDocsProxy establishes a connection to the remote docs MCP server and
 // registers all tools, resources, resource templates, and prompts exposed by
@@ -73,30 +38,39 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 	}
 	s.docsProxyClient = proxyClient
 
-	// A "Method not found" error is expected from remote servers that don't
-	// expose the corresponding capability at all.
-	if err := proxyClient.RegisterTools(ctx, s.mcpServer); err != nil && !isMethodNotFoundError(err) {
-		s.logger.Error("Failed to register tools from docs MCP server",
-			slog.Any("error", err),
-		)
+	// Only list what the remote server advertises. Servers on newer protocol
+	// versions reject unsupported list methods at the HTTP level, which would
+	// otherwise surface as errors.
+	caps := proxyClient.capabilities()
+
+	if caps.Tools != nil {
+		if err := proxyClient.RegisterTools(ctx, s.mcpServer); err != nil {
+			s.logger.Error("Failed to register tools from docs MCP server",
+				slog.Any("error", err),
+			)
+		}
 	}
 
-	if err := proxyClient.RegisterResources(ctx, s.mcpServer); err != nil && !isMethodNotFoundError(err) {
-		s.logger.Error("Failed to register resources from docs MCP server",
-			slog.Any("error", err),
-		)
+	if caps.Resources != nil {
+		if err := proxyClient.RegisterResources(ctx, s.mcpServer); err != nil {
+			s.logger.Error("Failed to register resources from docs MCP server",
+				slog.Any("error", err),
+			)
+		}
+
+		if err := proxyClient.RegisterResourceTemplates(ctx, s.mcpServer); err != nil {
+			s.logger.Error("Failed to register resource templates from docs MCP server",
+				slog.Any("error", err),
+			)
+		}
 	}
 
-	if err := proxyClient.RegisterResourceTemplates(ctx, s.mcpServer); err != nil && !isMethodNotFoundError(err) {
-		s.logger.Error("Failed to register resource templates from docs MCP server",
-			slog.Any("error", err),
-		)
-	}
-
-	if err := proxyClient.RegisterPrompts(ctx, s.mcpServer); err != nil && !isMethodNotFoundError(err) {
-		s.logger.Error("Failed to register prompts from docs MCP server",
-			slog.Any("error", err),
-		)
+	if caps.Prompts != nil {
+		if err := proxyClient.RegisterPrompts(ctx, s.mcpServer); err != nil {
+			s.logger.Error("Failed to register prompts from docs MCP server",
+				slog.Any("error", err),
+			)
+		}
 	}
 }
 
@@ -132,6 +106,15 @@ func NewProxyClient(ctx context.Context, url string, logger *slog.Logger) (*Prox
 		client:  client,
 		session: session,
 	}, nil
+}
+
+// capabilities returns the capabilities the remote server advertised when the
+// session was established, or empty capabilities if it advertised none.
+func (p *ProxyClient) capabilities() *mcp.ServerCapabilities {
+	if res := p.session.InitializeResult(); res != nil && res.Capabilities != nil {
+		return res.Capabilities
+	}
+	return &mcp.ServerCapabilities{}
 }
 
 // RegisterTools discovers tools from remote server and registers them as proxy tools
