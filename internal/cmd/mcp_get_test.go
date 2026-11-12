@@ -34,7 +34,7 @@ Output:
       • cpu: string - CPU allocation
       • memory: string - Memory allocation
     • status (required): string - Service status
-    • storage: string - Storage the service is using
+    • storage: string - Amount of storage the service is using
     • type (required): string
 
 `
@@ -59,7 +59,7 @@ Output:
       • cpu: string - CPU allocation
       • memory: string - Memory allocation
     • status (required): string - Service status
-    • storage: string - Storage the service is using
+    • storage: string - Amount of storage the service is using
     • type (required): string
 
 `
@@ -139,7 +139,7 @@ Output:
               "type": "string"
             },
             "storage": {
-              "description": "Storage the service is using",
+              "description": "Amount of storage the service is using",
               "examples": [
                 "512 MB",
                 "843.5 GB"
@@ -238,7 +238,7 @@ outputSchema:
               - UPGRADING
             type: string
           storage:
-            description: Storage the service is using
+            description: Amount of storage the service is using
             examples:
               - 512 MB
               - 843.5 GB

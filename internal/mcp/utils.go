@@ -222,7 +222,7 @@ func convertToResourceInfo(service api.Service, experimental bool) *ResourceInfo
 // setServiceStorageSchemaProperties sets the storage property shared by the
 // service output types.
 func setServiceStorageSchemaProperties(schema *jsonschema.Schema) {
-	schema.Properties["storage"].Description = "Storage the service is using"
+	schema.Properties["storage"].Description = "Amount of storage the service is using"
 	schema.Properties["storage"].Examples = []any{"512 MB", "843.5 GB"}
 }
 
@@ -434,7 +434,7 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 	// are always included.
 	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
 
-	schema.Properties["storage"].Description = "Storage the branch has changed since it was created. The branch is billed only for this storage, not for the storage it still shares with its parent service."
+	schema.Properties["storage"].Description = "Amount of storage the branch has changed since it was created. The branch is billed only for this storage, not for the storage it still shares with its parent service."
 	schema.Properties["storage"].Examples = []any{"512 MB", "1.2 GB"}
 
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint (absent while the branch is still provisioning)"
