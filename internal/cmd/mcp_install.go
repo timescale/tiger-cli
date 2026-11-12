@@ -1,19 +1,20 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"sort"
-	"strconv"
+	"reflect"
+	"slices"
 	"strings"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/pelletier/go-toml/v2/unstable/edit"
 	"github.com/spf13/cobra"
 	"github.com/tailscale/hujson"
 
@@ -22,81 +23,107 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
+// mcpStartArgs are the arguments clients run the Tiger executable with to
+// start the MCP server.
+var mcpStartArgs = []string{"mcp", "start"}
+
 // buildMCPInstallCmd creates the install subcommand for configuring editors
-func buildMCPInstallCmd(app *common.App) *cobra.Command {
+func buildMCPInstallCmd(_ *common.App) *cobra.Command {
 	var noBackup bool
 	var configPath string
 
 	cmd := &cobra.Command{
-		Use:     "install [client]",
+		Use:     "install [client...]",
 		Aliases: []string{"add"},
-		Short:   "Install and configure Tiger MCP server for a client",
-		Long: fmt.Sprintf(`Install and configure the Tiger MCP server for a specific MCP client or AI assistant.
+		Short:   "Install and configure Tiger MCP server for clients",
+		Long: fmt.Sprintf(`Install and configure the Tiger MCP server for one or more MCP clients or AI
+assistants.
 
-This command automates the configuration process by modifying the appropriate
-configuration files for the specified client.
+The server is added to each client's user-level MCP configuration file, so it's
+available in all projects. Other servers configured there are left alone.
 
 %s
-The command will:
-- Automatically detect the appropriate configuration file location
-- Create the configuration directory if it doesn't exist
-- Create a backup of existing configuration by default
-- Merge with existing MCP server configurations (doesn't overwrite other servers)
-- Validate the configuration after installation
+With no arguments, you're prompted to select clients interactively, starting
+from the clients the server is already installed for.
 
-If no client is specified, you'll be prompted to select one interactively.`, generateSupportedEditorsHelp()),
+Re-running the command replaces an existing Tiger MCP server entry with the
+current one. Each configuration file is backed up before it's changed, unless
+--no-backup is given.`, generateSupportedEditorsHelp()),
 		Example: `  # Interactive client selection
   tiger mcp install
 
-  # Install for Claude Code (User scope - available in all projects)
-  tiger mcp install claude-code
+  # Install for Claude Code and Cursor
+  tiger mcp install claude-code cursor
 
-  # Install for Cursor IDE
-  tiger mcp install cursor
-
-  # Install without creating backup
+  # Install without creating a backup
   tiger mcp install claude-code --no-backup
 
-  # Use custom configuration file path
+  # Use a custom configuration file path
   tiger mcp install claude-code --config-path ~/custom/config.json`,
-		Args:         cobra.MaximumNArgs(1),
 		ValidArgs:    getValidEditorNames(),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var clientName string
-			if len(args) == 0 {
-				// No client specified, prompt user to select one
-				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return fmt.Errorf("TTY not detected - specify a client as an argument (e.g. 'tiger mcp install claude-code')")
-				}
-				var err error
-				clientName, err = selectClientInteractively(cmd)
-				if err != nil {
-					return fmt.Errorf("failed to select client: %w", err)
-				}
-				if clientName == "" {
-					return fmt.Errorf("no client selected")
-				}
-			} else {
-				clientName = args[0]
+			if configPath != "" && len(args) != 1 {
+				return errors.New("--config-path requires exactly one client argument")
 			}
 
-			return installTigerMCPForClient(cmd, clientName, !noBackup, configPath)
+			var clients []*clientConfig
+			var err error
+			if len(args) > 0 {
+				clients, err = mcpClientsFromArgs(args)
+			} else {
+				clients, err = mcpClientsFromPicker(cmd)
+			}
+			if err != nil {
+				return err
+			}
+
+			command, err := getTigerExecutablePath()
+			if err != nil {
+				return err
+			}
+
+			// Prepare every install before writing anything, so a config file
+			// that can't be read or parsed stops them all.
+			installs := make([]mcpInstall, len(clients))
+			for i, client := range clients {
+				installs[i], err = prepareMCPInstall(client, configPath, mcp.ServerName, command, mcpStartArgs)
+				if err != nil {
+					return fmt.Errorf("failed to install for %s: %w", client.Name, err)
+				}
+			}
+			for i, in := range installs {
+				if err := in.write(!noBackup); err != nil {
+					if i > 0 {
+						printMCPInstalled(cmd, installs[:i])
+					}
+					return fmt.Errorf("failed to install for %s: %w", in.client.Name, err)
+				}
+			}
+
+			printMCPInstalled(cmd, installs)
+			cmd.Printf("\nRestart your coding agents to load the new configuration.\n")
+			cmd.Printf("\nTry asking your AI assistant:\n")
+			for _, prompt := range []string{
+				"List my Tiger Cloud services",
+				"Create a new database service called my-app-db",
+				"Show me Tiger Cloud documentation about hypertables",
+				"What are the best practices for PostgreSQL indexing?",
+				"Help me optimize my PostgreSQL queries",
+				"Help me create a new database schema for my application",
+				"Help me figure out which tables should be hypertables",
+			} {
+				cmd.Printf("  %q\n", prompt)
+			}
+			return nil
 		},
 	}
 
-	// Add flags
 	cmd.Flags().BoolVar(&noBackup, "no-backup", false, "Skip creating backup of existing configuration (default: create backup)")
-	cmd.Flags().StringVar(&configPath, "config-path", "", "Custom path to configuration file (overrides default locations)")
+	cmd.Flags().StringVar(&configPath, "config-path", "", "Custom path to configuration file (overrides default locations; requires a single client)")
 	registerFlagCompletion(cmd, "config-path", fileCompletion())
 
 	return cmd
-}
-
-// MCPServerConfig represents the MCP server configuration
-type MCPServerConfig struct {
-	Command string   `json:"command"`
-	Args    []string `json:"args"`
 }
 
 // InstallOptions configures the MCP server installation behavior
@@ -115,15 +142,6 @@ type InstallOptions struct {
 	CustomConfigPath string
 }
 
-// getValidEditorNames returns all valid client names from supportedClients
-func getValidEditorNames() []string {
-	var validNames []string
-	for _, client := range supportedClients {
-		validNames = append(validNames, client.EditorNames...)
-	}
-	return validNames
-}
-
 // ClientInfo contains information about a supported MCP client.
 type ClientInfo struct {
 	// Name is the human-readable display name (e.g., "Claude Code", "Cursor")
@@ -134,12 +152,12 @@ type ClientInfo struct {
 
 // SupportedClients returns information about all supported MCP clients.
 func SupportedClients() []ClientInfo {
-	clients := make([]ClientInfo, 0, len(supportedClients))
-	for _, c := range supportedClients {
-		clients = append(clients, ClientInfo{
+	clients := make([]ClientInfo, len(supportedClients))
+	for i, c := range supportedClients {
+		clients[i] = ClientInfo{
 			Name:       c.Name,
 			ClientName: c.EditorNames[0],
-		})
+		}
 	}
 	return clients
 }
@@ -148,139 +166,48 @@ func SupportedClients() []ClientInfo {
 // This is a generic, configurable function exported for use by external projects via pkg/mcpinstall.
 // Required options: ServerName, Command, Args must all be provided.
 func InstallMCPForClient(opts InstallOptions) error {
-	// Validate required options
 	if opts.ClientName == "" {
-		return fmt.Errorf("missing required option: ClientName")
+		return errors.New("missing required option: ClientName")
 	}
 	if opts.ServerName == "" {
-		return fmt.Errorf("missing required option: ServerName")
+		return errors.New("missing required option: ServerName")
 	}
 	if opts.Command == "" {
-		return fmt.Errorf("missing required option: Command")
+		return errors.New("missing required option: Command")
 	}
 	if opts.Args == nil {
-		return fmt.Errorf("missing required option: Args")
+		return errors.New("missing required option: Args")
 	}
 
-	// Find the client configuration by name
-	clientCfg, err := findClientConfig(opts.ClientName)
+	client, err := findClientConfig(opts.ClientName)
 	if err != nil {
 		return err
 	}
-
-	mcpServersPathPrefix := clientCfg.MCPServersPathPrefix
-
-	var configPath string
-	if opts.CustomConfigPath != "" {
-		// Expand custom config path for ~ and environment variables, then use it directly
-		configPath = util.ExpandPath(opts.CustomConfigPath)
-	} else if len(clientCfg.MCPConfigPaths) > 0 {
-		// Use manual config path discovery for clients with configured paths
-		configPath, err = findClientConfigFile(clientCfg.MCPConfigPaths)
-		if err != nil {
-			return fmt.Errorf("failed to find configuration for %s: %w", opts.ClientName, err)
-		}
-	} else if clientCfg.buildMCPInstallCommand == nil {
-		// Client has neither MCPConfigPaths nor buildMCPInstallCommand
-		return fmt.Errorf("client %s has no MCPConfigPaths or buildMCPInstallCommand defined", opts.ClientName)
-	}
-	// else: CLI-only client - configPath remains empty, will use buildMCPInstallCommand
-
-	// Create backup if requested and we have a config file
-	if opts.CreateBackup && configPath != "" {
-		_, err = createConfigBackup(configPath)
-		if err != nil {
-			return fmt.Errorf("failed to create backup: %w", err)
-		}
-	}
-
-	// Add MCP server to configuration
-	if clientCfg.buildMCPInstallCommand != nil {
-		// Use CLI approach when install command builder is configured
-		if err := addMCPServerViaCLI(clientCfg, opts.ServerName, opts.Command, opts.Args); err != nil {
-			return fmt.Errorf("failed to add MCP server configuration: %w", err)
-		}
-	} else {
-		// Use JSON patching approach for JSON-config clients
-		if err := addMCPServerViaJSON(configPath, mcpServersPathPrefix, opts.ServerName, opts.Command, opts.Args); err != nil {
-			return fmt.Errorf("failed to add MCP server configuration: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// installTigerMCPForClient installs the Tiger MCP server configuration for the specified client.
-// This is the Tiger-specific wrapper used by the CLI that handles defaults and success messages.
-func installTigerMCPForClient(cmd *cobra.Command, clientName string, createBackup bool, customConfigPath string) error {
-	// Get the Tiger executable path
-	command, err := getTigerExecutablePath()
+	in, err := prepareMCPInstall(client, opts.CustomConfigPath, opts.ServerName, opts.Command, opts.Args)
 	if err != nil {
-		return fmt.Errorf("failed to get executable path: %w", err)
-	}
-
-	opts := InstallOptions{
-		ClientName:       clientName,
-		ServerName:       mcp.ServerName,
-		Command:          command,
-		Args:             []string{"mcp", "start"},
-		CreateBackup:     createBackup,
-		CustomConfigPath: customConfigPath,
-	}
-
-	if err := InstallMCPForClient(opts); err != nil {
 		return err
 	}
-
-	// Print Tiger-specific success messages
-	configPath := customConfigPath
-	if configPath == "" {
-		clientCfg, _ := findClientConfig(clientName)
-		if clientCfg != nil && len(clientCfg.MCPConfigPaths) > 0 {
-			configPath, _ = findClientConfigFile(clientCfg.MCPConfigPaths)
-		}
-	}
-
-	cmd.Printf("Installed Tiger MCP server configuration for %s\n", clientName)
-	if configPath != "" {
-		cmd.Printf("Configuration file: %s\n", configPath)
-	} else {
-		cmd.Printf("Configuration managed by %s\n", clientName)
-	}
-
-	cmd.Printf("\nNext steps:\n")
-	cmd.Printf("   1. Restart %s to load the new configuration\n", clientName)
-	cmd.Printf("   2. The Tiger MCP server will be available as '%s'\n", mcp.ServerName)
-	cmd.Printf("\nTry asking your AI assistant:\n")
-	cmd.Printf("   • \"List my Tiger Cloud services\"\n")
-	cmd.Printf("   • \"Create a new database service called my-app-db\"\n")
-	cmd.Printf("   • \"Show me Tiger Cloud documentation about hypertables\"\n")
-	cmd.Printf("   • \"What are the best practices for PostgreSQL indexing?\"\n")
-	cmd.Printf("   • \"Help me optimize my PostgreSQL queries\"\n")
-	cmd.Printf("   • \"Help me create a new database schema for my application\"\n")
-	cmd.Printf("   • \"Help me figure out which tables should be hypertables\"\n")
-
-	return nil
+	return in.write(opts.CreateBackup)
 }
 
-// findClientConfig finds the client configuration for a given client name
-// This consolidates the logic of mapping client names to client types and finding the config
+// getValidEditorNames returns all valid client names from supportedClients
+func getValidEditorNames() []string {
+	var validNames []string
+	for _, client := range supportedClients {
+		validNames = append(validNames, client.EditorNames...)
+	}
+	return validNames
+}
+
+// findClientConfig finds the client configuration for a given client name,
+// matched case-insensitively.
 func findClientConfig(clientName string) (*clientConfig, error) {
-	normalizedName := strings.ToLower(clientName)
-
-	// Look up in our supported clients config
 	for i := range supportedClients {
-		for _, name := range supportedClients[i].EditorNames {
-			if strings.ToLower(name) == normalizedName {
-				return &supportedClients[i], nil
-			}
+		if slices.ContainsFunc(supportedClients[i].EditorNames, func(n string) bool { return strings.EqualFold(n, clientName) }) {
+			return &supportedClients[i], nil
 		}
 	}
-
-	// Build list of supported clients from our config for error message
-	supportedNames := getValidEditorNames()
-
-	return nil, fmt.Errorf("unsupported client: %s. Supported clients: %s", clientName, strings.Join(supportedNames, ", "))
+	return nil, fmt.Errorf("unsupported client: %s. Supported clients: %s", clientName, strings.Join(getValidEditorNames(), ", "))
 }
 
 // generateSupportedEditorsHelp generates the supported clients section for help text
@@ -289,31 +216,107 @@ func generateSupportedEditorsHelp() string {
 	result.WriteString("Supported Clients:\n")
 	for _, cfg := range supportedClients {
 		// Show only the primary editor name in help text
-		primaryName := cfg.EditorNames[0]
-		result.WriteString(fmt.Sprintf("  %-24s Configure for %s\n", primaryName, cfg.Name))
+		fmt.Fprintf(&result, "  %-24s Configure for %s\n", cfg.EditorNames[0], cfg.Name)
 	}
 	return result.String()
 }
 
-// findClientConfigFile finds a client configuration file from a list of possible paths
-func findClientConfigFile(configPaths []string) (string, error) {
-	for _, path := range configPaths {
-		// Expand environment variables and home directory
-		expandedPath := util.ExpandPath(path)
-
-		// Check if file exists
-		if _, err := os.Stat(expandedPath); err == nil {
-			return expandedPath, nil
+// mcpClientsFromArgs returns the clients the given names select, in
+// supportedClients order and without duplicates.
+func mcpClientsFromArgs(names []string) ([]*clientConfig, error) {
+	selected := make([]bool, len(supportedClients))
+	for _, name := range names {
+		client, err := findClientConfig(name)
+		if err != nil {
+			return nil, err
+		}
+		selected[slices.IndexFunc(supportedClients, func(c clientConfig) bool { return c.ClientType == client.ClientType })] = true
+	}
+	var clients []*clientConfig
+	for i := range supportedClients {
+		if selected[i] {
+			clients = append(clients, &supportedClients[i])
 		}
 	}
+	return clients, nil
+}
 
-	// If no existing config found, use the first path as default
-	if len(configPaths) == 0 {
-		return "", fmt.Errorf("no config paths provided")
+// mcpClientsFromPicker prompts the user to choose clients, starting from the
+// ones the Tiger MCP server is already installed for, and returns the chosen
+// ones. It fails without a terminal to prompt on.
+func mcpClientsFromPicker(cmd *cobra.Command) ([]*clientConfig, error) {
+	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
+		return nil, errors.New("TTY not detected - specify clients as arguments (e.g. 'tiger mcp install claude-code')")
 	}
+	items := make([]pickerItem, len(supportedClients))
+	for i, c := range supportedClients {
+		path, err := c.MCPConfig.resolvePath()
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine configuration file for %s: %w", c.Name, err)
+		}
+		items[i] = pickerItem{
+			label:    c.Name,
+			detail:   displayPath(path),
+			selected: hasMCPServer(path, c.MCPConfig, mcp.ServerName),
+		}
+	}
+	header := ansi.Wordwrap("Select clients to install the Tiger MCP server for. Clients that already have it start out checked; unchecking one doesn't uninstall it.", 80, "")
 
-	defaultPath := util.ExpandPath(configPaths[0]) // Use first path as default
-	return defaultPath, nil
+	chosen, err := runPicker(cmd, header, items)
+	if err != nil {
+		return nil, err
+	}
+	var clients []*clientConfig
+	for i := range supportedClients {
+		if chosen[i] {
+			clients = append(clients, &supportedClients[i])
+		}
+	}
+	if len(clients) == 0 {
+		return nil, errors.New("no clients selected")
+	}
+	return clients, nil
+}
+
+// hasMCPServer reports whether the config file at path, laid out as f
+// describes, has an entry for the named server. Anything that can't be read or parsed counts as not
+// installed: this only decides what the picker starts with, and installing
+// would report the underlying problem.
+func hasMCPServer(path string, f mcpConfigFile, name string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	if f.isTOML() {
+		doc, err := edit.Parse(data)
+		return err == nil && doc.Has([]string{f.ServersKey, name})
+	}
+	doc, err := hujson.Parse(data)
+	if err != nil {
+		return false
+	}
+	root, ok := doc.Value.(*hujson.Object)
+	if !ok {
+		return false
+	}
+	servers := findJSONMember(root, f.ServersKey)
+	if servers == nil {
+		return false
+	}
+	obj, ok := servers.Value.(*hujson.Object)
+	return ok && findJSONMember(obj, name) != nil
+}
+
+// printMCPInstalled prints the clients installed for and their config files.
+func printMCPInstalled(cmd *cobra.Command, installs []mcpInstall) {
+	width := 0
+	for _, in := range installs {
+		width = max(width, len(in.client.Name))
+	}
+	cmd.Printf("Installed Tiger MCP server for:\n")
+	for _, in := range installs {
+		cmd.Printf("  %-*s  %s\n", width, in.client.Name, in.path)
+	}
 }
 
 // tigerExecutablePathFunc can be overridden in tests to return a fixed path
@@ -340,170 +343,226 @@ func defaultGetTigerExecutablePath() (string, error) {
 	return tigerPath, nil
 }
 
-// ClientOption represents a client choice for interactive selection
-type ClientOption struct {
-	Name       string // Display name
-	ClientName string // Client name to pass to installMCPForClient
+// mcpInstall is an MCP server installation into one client's config file,
+// prepared in memory and ready to write.
+type mcpInstall struct {
+	client  *clientConfig
+	path    string // the config file, as displayed
+	target  string // the file written: path with symlinks resolved
+	mode    fs.FileMode
+	content []byte // the new file content, or nil if the file is already up to date
 }
 
-// selectClientInteractively prompts the user to select a client using Bubble Tea
-func selectClientInteractively(cmd *cobra.Command) (string, error) {
-	// Build client options from supportedClients
-	var options []ClientOption
-	for _, cfg := range supportedClients {
-		// Use the first client name as the primary identifier
-		primaryName := cfg.EditorNames[0]
-		options = append(options, ClientOption{
-			Name:       cfg.Name,
-			ClientName: primaryName,
-		})
+// prepareMCPInstall reads client's config file (or customPath, if set) and
+// prepares it with the named server's entry set to run command with args,
+// replacing any existing entry of that name.
+func prepareMCPInstall(client *clientConfig, customPath, serverName, command string, args []string) (mcpInstall, error) {
+	in := mcpInstall{
+		client: client,
+		mode:   0o600,
+	}
+	var err error
+	if customPath != "" {
+		in.path, err = filepath.Abs(util.ExpandPath(customPath))
+	} else {
+		in.path, err = client.MCPConfig.resolvePath()
+	}
+	if err != nil {
+		return mcpInstall{}, fmt.Errorf("failed to determine configuration file: %w", err)
 	}
 
-	// Sort options alphabetically by name
-	sort.Slice(options, func(i, j int) bool {
-		return options[i].Name < options[j].Name
+	// Write through a symlink rather than replacing it, so a config file
+	// managed elsewhere (e.g. by a dotfiles repo) stays managed there.
+	in.target = in.path
+	if resolved, err := filepath.EvalSymlinks(in.path); err == nil {
+		in.target = resolved
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return mcpInstall{}, fmt.Errorf("failed to resolve configuration file: %w", err)
+	}
+
+	data, err := os.ReadFile(in.target)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+	case err != nil:
+		return mcpInstall{}, fmt.Errorf("failed to read configuration file: %w", err)
+	default:
+		info, err := os.Stat(in.target)
+		if err != nil {
+			return mcpInstall{}, fmt.Errorf("failed to read configuration file: %w", err)
+		}
+		in.mode = info.Mode().Perm()
+	}
+
+	entry := client.MCPConfig.Entry
+	entry.Command = command
+	entry.Args = args
+	if client.MCPConfig.isTOML() {
+		in.content, err = setTOMLServer(data, client.MCPConfig.ServersKey, serverName, entry)
+	} else {
+		in.content, err = setJSONServer(data, client.MCPConfig.ServersKey, serverName, entry)
+	}
+	if err != nil {
+		return mcpInstall{}, fmt.Errorf("failed to parse %s: %w", in.path, err)
+	}
+	return in, nil
+}
+
+// write writes the prepared config file, first backing up the existing one if
+// backup is set. It does nothing if the file is already up to date.
+func (in mcpInstall) write(backup bool) error {
+	if in.content == nil {
+		return nil
+	}
+	if backup {
+		if _, err := createConfigBackup(in.target); err != nil {
+			return fmt.Errorf("failed to create backup: %w", err)
+		}
+	}
+	if err := writeFileAtomic(in.target, in.content, in.mode); err != nil {
+		return fmt.Errorf("failed to write configuration file: %w", err)
+	}
+	return nil
+}
+
+// setJSONServer returns data, a JSON config file (comments and trailing commas
+// allowed), with servers[name] set to entry, or nil if it's already exactly
+// that. Only the entry's own bytes change; a new one goes on its own line,
+// indented like the rest of the file.
+func setJSONServer(data []byte, serversKey, name string, entry any) ([]byte, error) {
+	if len(bytes.TrimSpace(data)) == 0 {
+		data = []byte("{}\n")
+	}
+	doc, err := hujson.Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	root, ok := doc.Value.(*hujson.Object)
+	if !ok {
+		return nil, errors.New("not a JSON object")
+	}
+
+	indent := "  "
+	if len(root.Members) > 0 {
+		if before := string(root.Members[0].Name.BeforeExtra); strings.Contains(before, "\n") {
+			indent = before[strings.LastIndex(before, "\n")+1:]
+		}
+	}
+
+	servers := findJSONMember(root, serversKey)
+	if servers == nil {
+		servers = appendJSONMember(root, serversKey, &hujson.Object{}, "", indent)
+	}
+	obj, ok := servers.Value.(*hujson.Object)
+	if !ok {
+		return nil, fmt.Errorf("%s is not an object", serversKey)
+	}
+
+	entryJSON, err := json.MarshalIndent(entry, indent+indent, indent)
+	if err != nil {
+		return nil, err
+	}
+	value, err := hujson.Parse(entryJSON)
+	if err != nil {
+		return nil, err
+	}
+	if existing := findJSONMember(obj, name); existing != nil {
+		if equalJSON(*existing, value) {
+			return nil, nil
+		}
+		existing.Value = value.Value
+	} else {
+		appendJSONMember(obj, name, value.Value, indent, indent)
+	}
+	return doc.Pack(), nil
+}
+
+// findJSONMember returns the value of obj's member with the given name, or
+// nil if there's none.
+func findJSONMember(obj *hujson.Object, name string) *hujson.Value {
+	for i := range obj.Members {
+		if lit, ok := obj.Members[i].Name.Value.(hujson.Literal); ok && lit.String() == name {
+			return &obj.Members[i].Value
+		}
+	}
+	return nil
+}
+
+// appendJSONMember adds a member to obj on its own line and returns its value.
+// prefix is the indentation of obj's own line, and indent the file's
+// indentation unit.
+func appendJSONMember(obj *hujson.Object, name string, value hujson.ValueTrimmed, prefix, indent string) *hujson.Value {
+	if len(obj.Members) == 0 {
+		obj.AfterExtra = hujson.Extra("\n" + prefix)
+	}
+	obj.Members = append(obj.Members, hujson.ObjectMember{
+		Name: hujson.Value{
+			BeforeExtra: hujson.Extra("\n" + prefix + indent),
+			Value:       hujson.String(name),
+		},
+		Value: hujson.Value{
+			BeforeExtra: hujson.Extra(" "),
+			Value:       value,
+		},
 	})
-
-	model := clientSelectModel{
-		options: options,
-		cursor:  0,
-	}
-
-	program := tea.NewProgram(model,
-		tea.WithInput(cmd.InOrStdin()),
-		tea.WithOutput(cmd.ErrOrStderr()),
-		tea.WithContext(cmd.Context()),
-		tea.WithoutSignalHandler())
-	finalModel, err := program.Run()
-	if err != nil {
-		return "", fmt.Errorf("failed to run editor selection: %w", err)
-	}
-
-	result := finalModel.(clientSelectModel)
-	if result.selected == "" {
-		return "", fmt.Errorf("no editor selected")
-	}
-
-	return result.selected, nil
+	return &obj.Members[len(obj.Members)-1].Value
 }
 
-// clientSelectModel represents the Bubble Tea model for client selection
-type clientSelectModel struct {
-	options      []ClientOption
-	cursor       int
-	selected     string
-	numberBuffer string
-}
-
-func (m clientSelectModel) Init() tea.Cmd {
-	return nil
-}
-
-func (m clientSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "ctrl+c", "q", "esc":
-			return m, tea.Quit
-		case "up", "k":
-			// Clear buffer when using arrows
-			m.numberBuffer = ""
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "down", "j":
-			// Clear buffer when using arrows
-			m.numberBuffer = ""
-			if m.cursor < len(m.options)-1 {
-				m.cursor++
-			}
-		case "enter", "space":
-			m.selected = m.options[m.cursor].ClientName
-			return m, tea.Quit
-		case "backspace":
-			// Handle backspace to remove last character from buffer
-			if len(m.numberBuffer) > 0 {
-				m.updateNumberBuffer(m.numberBuffer[:len(m.numberBuffer)-1])
-			}
-		case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
-			// Add digit to buffer and update cursor position
-			m.updateNumberBuffer(m.numberBuffer + msg.String())
-		case "ctrl+w":
-			// Clear buffer
-			m.numberBuffer = ""
+// equalJSON reports whether a and b hold the same data, ignoring comments
+// and formatting.
+func equalJSON(a, b hujson.Value) bool {
+	var decoded [2]any
+	for i, v := range []hujson.Value{a, b} {
+		v = v.Clone()
+		v.Standardize()
+		if err := json.Unmarshal(v.Pack(), &decoded[i]); err != nil {
+			return false
 		}
 	}
-	return m, nil
+	return reflect.DeepEqual(decoded[0], decoded[1])
 }
 
-// updateNumberBuffer moves the cursor to the editor matching the number buffer
-func (m *clientSelectModel) updateNumberBuffer(newBuffer string) {
-	if newBuffer == "" {
-		m.numberBuffer = newBuffer
-		return
-	}
-
-	// Parse the buffer as a number
-	num, err := strconv.Atoi(newBuffer)
+// setTOMLServer returns data, a TOML config file, with [serversKey.name] set
+// to entry, or nil if it's already exactly that. The rest of the file keeps
+// its comments and layout.
+func setTOMLServer(data []byte, serversKey, name string, entry any) ([]byte, error) {
+	doc, err := edit.Parse(data)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	// Convert from 1-based to 0-based index and validate bounds
-	index := num - 1
-	if index >= 0 && index < len(m.options) {
-		m.numberBuffer = newBuffer
-		m.cursor = index
+	// The entry's fields, in order, decoded the way edit.Document.Get decodes
+	// existing values so the two compare equal.
+	entryJSON, err := json.Marshal(entry)
+	if err != nil {
+		return nil, err
 	}
-}
-
-func (m clientSelectModel) View() tea.View {
-	var s strings.Builder
-	s.WriteString("Select an MCP client to configure:\n\n")
-
-	for i, option := range m.options {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
+	fields, err := hujson.Parse(entryJSON)
+	if err != nil {
+		return nil, err
+	}
+	want := map[string]any{}
+	var keys []string
+	for _, m := range fields.Value.(*hujson.Object).Members {
+		key := m.Name.Value.(hujson.Literal).String()
+		var value any
+		if err := json.Unmarshal(m.Value.Pack(), &value); err != nil {
+			return nil, err
 		}
-		s.WriteString(fmt.Sprintf("%s %d. %s\n", cursor, i+1, option.Name))
+		keys = append(keys, key)
+		want[key] = value
 	}
 
-	// Show the current number buffer if user is typing
-	if m.numberBuffer != "" {
-		s.WriteString(fmt.Sprintf("\nTyping: %s", m.numberBuffer))
+	path := []string{serversKey, name}
+	if existing, ok := doc.Get(path); ok && reflect.DeepEqual(existing, want) {
+		return nil, nil
 	}
-
-	s.WriteString("\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit")
-	return tea.NewView(s.String())
-}
-
-// addMCPServerViaCLI adds an MCP server using a CLI command configured in clientConfig
-func addMCPServerViaCLI(clientCfg *clientConfig, serverName, command string, args []string) error {
-	if clientCfg.buildMCPInstallCommand == nil {
-		return fmt.Errorf("no install command configured for client %s", clientCfg.Name)
-	}
-
-	// Build the install command with the provided parameters
-	installCommand, err := clientCfg.BuildMCPInstallCommand(serverName, command, args)
-	if err != nil {
-		return fmt.Errorf("failed to build install command: %w", err)
-	}
-
-	// Run the configured CLI command
-	cmd := exec.Command(installCommand[0], installCommand[1:]...)
-
-	// Capture output
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		cmdStr := strings.Join(installCommand, " ")
-		if string(output) != "" {
-			return fmt.Errorf("failed to run %s installation command: %w\nCommand: %s\nOutput: %s", clientCfg.Name, err, cmdStr, string(output))
+	doc.Delete(path)
+	for _, key := range keys {
+		if err := doc.Set([]string{serversKey, name, key}, want[key]); err != nil {
+			return nil, err
 		}
-		return fmt.Errorf("failed to run %s installation command: %w\nCommand: %s", clientCfg.Name, err, cmdStr)
 	}
-
-	return nil
+	return doc.Bytes(), nil
 }
 
 // createConfigBackup creates a backup of the existing configuration file and returns the backup path
@@ -537,80 +596,29 @@ func createConfigBackup(configPath string) (string, error) {
 	return backupPath, nil
 }
 
-// addMCPServerViaJSON adds an MCP server to the configuration file using JSON patching
-func addMCPServerViaJSON(configPath, mcpServersPathPrefix, serverName, command string, args []string) error {
-	// Create configuration directory if it doesn't exist
-	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create configuration directory %s: %w", configDir, err)
+// writeFileAtomic writes data to path with the given permissions, creating
+// its directory if needed. The data goes to a temporary file beside path that
+// then replaces it, so a client reading the file never sees it half written.
+func writeFileAtomic(path string, data []byte, mode fs.FileMode) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
 	}
-
-	// MCP server configuration
-	serverConfig := MCPServerConfig{
-		Command: command,
-		Args:    args,
-	}
-
-	// Get original file mode to preserve it, fallback to 0600 for new files
-	var fileMode fs.FileMode = 0o600
-	if info, err := os.Stat(configPath); err == nil {
-		fileMode = info.Mode().Perm()
-	}
-
-	// Read existing configuration or create empty one
-	content, err := os.ReadFile(configPath)
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tiger-")
 	if err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("failed to read config file: %w", err)
-		}
-		content = []byte("{}")
+		return err
 	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
 
-	if len(content) == 0 {
-		// If the file is empty, initialize with empty JSON object
-		content = []byte("{}")
+	if _, err := tmp.Write(data); err != nil {
+		return err
 	}
-
-	// Parse the JSON with hujson
-	value, err := hujson.Parse(content)
-	if err != nil {
-		return fmt.Errorf("failed to parse existing config: %w", err)
+	if err := tmp.Chmod(mode); err != nil {
+		return err
 	}
-
-	// Check if the parent path exists using hujson's Find method
-	// Find uses JSON Pointer format (RFC 6901) which matches our path format
-	if value.Find(mcpServersPathPrefix) == nil {
-		// Path doesn't exist, create it
-		parentPatch := fmt.Sprintf(`[{ "op": "add", "path": "%s", "value": {} }]`, mcpServersPathPrefix)
-		if err := value.Patch([]byte(parentPatch)); err != nil {
-			return fmt.Errorf("failed to create MCP servers path: %w", err)
-		}
+	if err := tmp.Close(); err != nil {
+		return err
 	}
-
-	// Marshal the MCP server data
-	dataJSON, err := json.Marshal(serverConfig)
-	if err != nil {
-		return fmt.Errorf("failed to marshal MCP server data: %w", err)
-	}
-
-	// Create JSON patch to add the MCP server
-	patch := fmt.Sprintf(`[{ "op": "add", "path": "%s/%s", "value": %s }]`, mcpServersPathPrefix, serverName, dataJSON)
-
-	// Apply the patch
-	if err := value.Patch([]byte(patch)); err != nil {
-		return fmt.Errorf("failed to apply JSON patch: %w", err)
-	}
-
-	// Format the result
-	formatted, err := hujson.Format(value.Pack())
-	if err != nil {
-		return fmt.Errorf("failed to format patched JSON: %w", err)
-	}
-
-	// Write back to file (preserve original file mode)
-	if err := os.WriteFile(configPath, formatted, fileMode); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-
-	return nil
+	return os.Rename(tmp.Name(), path)
 }
