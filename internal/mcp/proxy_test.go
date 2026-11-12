@@ -16,6 +16,7 @@ func TestDocsProxy(t *testing.T) {
 	toolsAndPrompts := newDocsServer(docsFeatures{tools: true, prompts: true})
 	toolsAndResources := newDocsServer(docsFeatures{tools: true, resources: true})
 	promptsOnly := newDocsServer(docsFeatures{prompts: true})
+	paginated := newDocsServer(docsFeatures{tools: true, pageSize: 1})
 
 	runToolTests(t, []toolTest{
 		{
@@ -42,15 +43,24 @@ func TestDocsProxy(t *testing.T) {
 			wantCallErr: `calling "tools/call": unknown tool "search_docs"`,
 			checks:      []checkFunc{promptsOnly.checkListed("prompts/list")},
 		},
+		{
+			name:       "registers tools from every page",
+			tool:       "view_skill",
+			args:       map[string]any{},
+			opts:       []runOption{withDocsServer(paginated)},
+			wantOutput: map[string]any{"results": "docs"},
+			checks:     []checkFunc{paginated.checkListed("tools/list", "tools/list")},
+		},
 	})
 }
 
 // docsFeatures picks what a fake docs MCP server exposes, and therefore which
-// capabilities it advertises.
+// capabilities it advertises. A nonzero pageSize splits its lists into pages.
 type docsFeatures struct {
 	tools     bool
 	resources bool
 	prompts   bool
+	pageSize  int
 }
 
 // docsServer is a fake remote docs MCP server that records the list methods
@@ -64,18 +74,20 @@ type docsServer struct {
 
 func newDocsServer(features docsFeatures) *docsServer {
 	d := &docsServer{
-		server: mcp.NewServer(&mcp.Implementation{Name: "docs"}, nil),
+		server: mcp.NewServer(&mcp.Implementation{Name: "docs"}, &mcp.ServerOptions{PageSize: features.pageSize}),
 	}
 	if features.tools {
-		d.server.AddTool(&mcp.Tool{
-			Name:        "search_docs",
-			InputSchema: map[string]any{"type": "object"},
-		}, func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return &mcp.CallToolResult{
-				Content:           []mcp.Content{&mcp.TextContent{Text: `{"results":"docs"}`}},
-				StructuredContent: map[string]any{"results": "docs"},
-			}, nil
-		})
+		for _, name := range []string{"search_docs", "view_skill"} {
+			d.server.AddTool(&mcp.Tool{
+				Name:        name,
+				InputSchema: map[string]any{"type": "object"},
+			}, func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return &mcp.CallToolResult{
+					Content:           []mcp.Content{&mcp.TextContent{Text: `{"results":"docs"}`}},
+					StructuredContent: map[string]any{"results": "docs"},
+				}, nil
+			})
+		}
 	}
 	if features.resources {
 		readResource := func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {

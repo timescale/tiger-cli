@@ -123,18 +123,11 @@ func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) err
 		return fmt.Errorf("not connected to remote server")
 	}
 
-	// List tools from remote server
-	toolsResp, err := p.session.ListTools(ctx, &mcp.ListToolsParams{})
-	if err != nil {
-		return fmt.Errorf("failed to list tools from remote server: %w", err)
-	}
-
-	if toolsResp == nil || len(toolsResp.Tools) == 0 {
-		return nil
-	}
-
-	// Register each remote tool as a proxy tool
-	for _, tool := range toolsResp.Tools {
+	// Register each remote tool as a proxy tool, following pagination
+	for tool, err := range p.session.Tools(ctx, nil) {
+		if err != nil {
+			return fmt.Errorf("failed to list tools from remote server: %w", err)
+		}
 		if tool.Name == "" {
 			continue
 		}
@@ -180,18 +173,11 @@ func (p *ProxyClient) RegisterResources(ctx context.Context, server *mcp.Server)
 		return fmt.Errorf("not connected to remote server")
 	}
 
-	// List resources from remote server
-	resourcesResp, err := p.session.ListResources(ctx, &mcp.ListResourcesParams{})
-	if err != nil {
-		return fmt.Errorf("failed to list resources from remote server: %w", err)
-	}
-
-	if resourcesResp == nil || len(resourcesResp.Resources) == 0 {
-		return nil
-	}
-
-	// Register each remote resource as a proxy resource
-	for _, resource := range resourcesResp.Resources {
+	// Register each remote resource as a proxy resource, following pagination
+	for resource, err := range p.session.Resources(ctx, nil) {
+		if err != nil {
+			return fmt.Errorf("failed to list resources from remote server: %w", err)
+		}
 		if resource.URI == "" {
 			continue
 		}
@@ -212,18 +198,11 @@ func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp
 		return fmt.Errorf("not connected to remote server")
 	}
 
-	// List resource templates from remote server
-	templatesResp, err := p.session.ListResourceTemplates(ctx, &mcp.ListResourceTemplatesParams{})
-	if err != nil {
-		return fmt.Errorf("failed to list resource templates from remote server: %w", err)
-	}
-
-	if templatesResp == nil || len(templatesResp.ResourceTemplates) == 0 {
-		return nil
-	}
-
-	// Register each remote resource template as a proxy resource template
-	for _, resourceTemplate := range templatesResp.ResourceTemplates {
+	// Register each remote resource template as a proxy resource template, following pagination
+	for resourceTemplate, err := range p.session.ResourceTemplates(ctx, nil) {
+		if err != nil {
+			return fmt.Errorf("failed to list resource templates from remote server: %w", err)
+		}
 		if resourceTemplate.URITemplate == "" {
 			continue
 		}
@@ -261,18 +240,11 @@ func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) e
 		return fmt.Errorf("not connected to remote server")
 	}
 
-	// List prompts from remote server
-	promptsResp, err := p.session.ListPrompts(ctx, &mcp.ListPromptsParams{})
-	if err != nil {
-		return fmt.Errorf("failed to list prompts from remote server: %w", err)
-	}
-
-	if promptsResp == nil || len(promptsResp.Prompts) == 0 {
-		return nil
-	}
-
-	// Register each remote prompt as a proxy prompt
-	for _, prompt := range promptsResp.Prompts {
+	// Register each remote prompt as a proxy prompt, following pagination
+	for prompt, err := range p.session.Prompts(ctx, nil) {
+		if err != nil {
+			return fmt.Errorf("failed to list prompts from remote server: %w", err)
+		}
 		if prompt.Name == "" {
 			continue
 		}
