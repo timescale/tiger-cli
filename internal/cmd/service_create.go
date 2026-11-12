@@ -42,7 +42,7 @@ CPU/memory allocation. See the Tiger Data documentation for details. If --iops
 is not given, the service gets the baseline IOPS for your plan and its CPU
 allocation.`
 		experimentalExampleHelp = "\n\n  # Create a service on the fluid platform\n  tiger service create --name fluid-db --platform fluid" +
-			"\n\n  # Create a service with provisioned IOPS\n  tiger service create --name fast-db --cpu 2000 --iops 16000"
+			"\n\n  # Create a service with provisioned IOPS\n  tiger service create --name fast-db --cpu 2 --iops 16000"
 	}
 
 	cmd := &cobra.Command{
@@ -71,7 +71,7 @@ other will be automatically configured).` + iopsSectionHelp,
   tiger service create --name postgres-db --addons none
 
   # Create a service with more resources (waits for ready by default)
-  tiger service create --name resources-db --cpu 2000 --memory 8 --replicas 2
+  tiger service create --name resources-db --cpu 2 --memory 8 --replicas 2
 
   # Create service in a different region
   tiger service create --name eu-db --region eu-central-1
@@ -80,9 +80,9 @@ other will be automatically configured).` + iopsSectionHelp,
   tiger service create --name temp-db --no-set-default
 
   # Create service specifying only CPU (memory will be auto-configured to 8GB)
-  tiger service create --name auto-memory --cpu 2000
+  tiger service create --name auto-memory --cpu 2
 
-  # Create service specifying only memory (CPU will be auto-configured to 4000m)
+  # Create service specifying only memory (CPU will be auto-configured to 4 cores)
   tiger service create --name auto-cpu --memory 16
 
   # Create service without waiting for completion
@@ -243,7 +243,7 @@ other will be automatically configured).` + iopsSectionHelp,
 	cmd.Flags().StringVar(&name, "name", "", "Service name (auto-generated if not provided)")
 	cmd.Flags().StringSliceVar(&addons, "addons", nil, fmt.Sprintf("Addons to enable (%s, or 'none' for PostgreSQL-only)", strings.Join(common.ValidAddons(), ", ")))
 	cmd.Flags().StringVar(&region, "region", "", "Region code")
-	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores or 'shared'")
+	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in cores or 'shared'")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes or 'shared'")
 	cmd.Flags().IntVar(&replicas, "replicas", 0, "Number of high-availability replicas")
 	cmd.Flags().StringVar(&environment, "environment", "DEV", "Environment tag (DEV or PROD)")

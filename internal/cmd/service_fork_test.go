@@ -143,7 +143,7 @@ is not given, the fork inherits the source service's IOPS.`),
 			// The combination is validated against the source's platform, which
 			// the fork inherits, so the source is fetched first.
 			name: "invalid cpu/memory combination",
-			args: []string{"service", "fork", "svc-12345", "--cpu", "999", "--memory", "1"},
+			args: []string{"service", "fork", "svc-12345", "--cpu", "3", "--memory", "1"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService())
 			},
@@ -152,7 +152,7 @@ is not given, the fork inherits the source service's IOPS.`),
 		{
 			// Not gated on experimental: only a fluid source gets these.
 			name: "fluid source rejects a standard combination",
-			args: []string{"service", "fork", "svc-12345", "--cpu", "2000", "--memory", "8"},
+			args: []string{"service", "fork", "svc-12345", "--cpu", "2", "--memory", "8"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
 			},
@@ -295,7 +295,7 @@ Connect with: tiger db psql
 			name: "custom name environment and resources",
 			args: []string{
 				"service", "fork", "svc-12345", "--name", "my-fork",
-				"--cpu", "2000", "--memory", "8", "--environment", "prod",
+				"--cpu", "2", "--memory", "8", "--environment", "prod",
 				"--no-wait", "--no-set-default", "-o", "env",
 			},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -316,13 +316,51 @@ Connect with: tiger db psql
 		},
 		{
 			name: "fluid source cpu only auto-configures memory",
-			args: []string{"service", "fork", "svc-12345", "--cpu", "2000", "--no-wait", "--no-set-default", "-o", "env"},
+			args: []string{"service", "fork", "svc-12345", "--cpu", "2", "--no-wait", "--no-set-default", "-o", "env"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
 					ForkStrategy:   api.ForkStrategyNOW,
 					CPUMillis:      new("2000"),
 					MemoryGbs:      new("16"),
+					EnvironmentTag: new(api.EnvironmentTagDEV),
+				}).Return(&api.ForkServiceResponse{
+					HTTPResponse: httpResponse(http.StatusAccepted),
+					JSON202:      &forked,
+				}, nil)
+			},
+			wantStdout: forkedEnv,
+			wantStderr: noWaitStderr("Forking service 'test-service' (svc-12345) at current state..."),
+		},
+		{
+			name: "fractional cores",
+			args: []string{"service", "fork", "svc-12345", "--cpu", "0.5", "--no-wait", "--no-set-default", "-o", "env"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
+					ForkStrategy:   api.ForkStrategyNOW,
+					CPUMillis:      new("500"),
+					MemoryGbs:      new("2"),
+					EnvironmentTag: new(api.EnvironmentTagDEV),
+				}).Return(&api.ForkServiceResponse{
+					HTTPResponse: httpResponse(http.StatusAccepted),
+					JSON202:      &forked,
+				}, nil)
+			},
+			wantStdout: forkedEnv,
+			wantStderr: noWaitStderr("Forking service 'test-service' (svc-12345) at current state..."),
+		},
+		{
+			// Millicores are deprecated but still accepted for backwards
+			// compatibility.
+			name: "deprecated millicores",
+			args: []string{"service", "fork", "svc-12345", "--cpu", "500", "--no-wait", "--no-set-default", "-o", "env"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
+					ForkStrategy:   api.ForkStrategyNOW,
+					CPUMillis:      new("500"),
+					MemoryGbs:      new("2"),
 					EnvironmentTag: new(api.EnvironmentTagDEV),
 				}).Return(&api.ForkServiceResponse{
 					HTTPResponse: httpResponse(http.StatusAccepted),
@@ -360,7 +398,7 @@ Connect with: tiger db psql
 │ Platform          │ FLUID                                                                                       │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
-│ CPU               │ 1 cores (1000m)                                                                             │
+│ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
 │ IOPS              │ 12000                                                                                       │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
@@ -384,7 +422,7 @@ const sampleForkedServiceTable = `┌──────────────�
 │ Status            │ READY                                                                                       │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
-│ CPU               │ 1 cores (1000m)                                                                             │
+│ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │

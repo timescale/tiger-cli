@@ -330,7 +330,7 @@ func TestServiceCreateTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"service": detail(map[string]any{
 					"platform":  "FLUID",
-					"resources": map[string]any{"cpu": "1 cores", "memory": "8 GB"},
+					"resources": map[string]any{"cpu": "1 core", "memory": "8 GB"},
 				}),
 				"message": acceptedMsg,
 			},
@@ -356,7 +356,7 @@ func TestServiceCreateTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"service": detail(map[string]any{
 					"platform":  "FLUID",
-					"resources": map[string]any{"cpu": "1 cores", "memory": "8 GB", "iops": float64(12000)},
+					"resources": map[string]any{"cpu": "1 core", "memory": "8 GB", "iops": float64(12000)},
 				}),
 				"message": acceptedMsg,
 			},

@@ -87,7 +87,7 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 		},
 		{
 			name:    "invalid cpu/memory combination",
-			args:    []string{"branch", "create", "svc-12345", "--cpu", "1000", "--memory", "4"},
+			args:    []string{"branch", "create", "svc-12345", "--cpu", "1", "--memory", "4"},
 			opts:    []runOption{withExperimental()},
 			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
@@ -221,7 +221,7 @@ Branch is ready.
 		},
 		{
 			name: "custom name and compute",
-			args: []string{"branch", "create", "svc-12345", "--name", "ci-4821", "--cpu", "2000", "--memory", "16", "--no-wait", "-o", "env"},
+			args: []string{"branch", "create", "svc-12345", "--name", "ci-4821", "--cpu", "2", "--memory", "16", "--no-wait", "-o", "env"},
 			opts: []runOption{withExperimental()},
 			mock: setupCreate(api.BranchCreate{
 				Name:      new("ci-4821"),
@@ -230,6 +230,30 @@ Branch is ready.
 			}, created),
 			wantStdout: sampleBranchEnv,
 			wantStderr: noWaitStderr("Creating branch 'ci-4821' from service 'test-service' (svc-12345)..."),
+		},
+		{
+			name: "fractional cores",
+			args: []string{"branch", "create", "svc-12345", "--cpu", "0.25", "--no-wait", "-o", "env"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(api.BranchCreate{
+				CPUMillis: new(250),
+				MemoryGbs: new(2),
+			}, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			// Millicores are deprecated but still accepted for backwards
+			// compatibility.
+			name: "deprecated millicores",
+			args: []string{"branch", "create", "svc-12345", "--cpu", "500", "--no-wait", "-o", "env"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(api.BranchCreate{
+				CPUMillis: new(500),
+				MemoryGbs: new(4),
+			}, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
 		},
 		{
 			name:       "iops",

@@ -199,7 +199,7 @@ func convertToResourceInfo(service api.Service, experimental bool) *ResourceInfo
 	info := &ResourceInfo{}
 
 	if spec.CPUMillis != nil {
-		info.CPU = common.FormatCPUCores(*spec.CPUMillis) + " cores"
+		info.CPU = common.FormatCPUCoresWithUnit(*spec.CPUMillis)
 	} else {
 		// CPU is null - this indicates a free tier service
 		info.CPU = "shared"
@@ -455,7 +455,7 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, wi
 		Status:    string(branch.Status),
 		Created:   branch.Created.Format("2006-01-02T15:04:05Z"),
 		Resources: &ResourceInfo{
-			CPU:    common.FormatCPUCores(branch.CPUMillis) + " cores",
+			CPU:    common.FormatCPUCoresWithUnit(branch.CPUMillis),
 			Memory: fmt.Sprintf("%d GB", branch.MemoryGbs),
 			IOPS:   util.Deref(branch.Iops),
 		},
