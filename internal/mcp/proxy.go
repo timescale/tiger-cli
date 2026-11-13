@@ -82,6 +82,10 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 // MCP (its protocol version, identity, and capabilities), so forwarding it
 // could select a protocol version the remote server doesn't speak, or promise
 // features the proxy can't relay.
+//
+// Input requests the remote server makes anyway (elicitation and the like)
+// are passed back to the agent, whose retry is forwarded with its answers: the
+// proxy has nothing of its own to answer them with.
 type ProxyClient struct {
 	url     string
 	client  *mcp.Client
@@ -102,7 +106,8 @@ func NewProxyClient(ctx context.Context, url string, logger *slog.Logger) (*Prox
 	}, &mcp.ClientOptions{
 		Logger: logger,
 		// Without this, the SDK advertises roots support by default.
-		Capabilities: &mcp.ClientCapabilities{},
+		Capabilities:   &mcp.ClientCapabilities{},
+		MultiRoundTrip: &mcp.MultiRoundTripOptions{Disabled: true},
 	})
 
 	session, err := client.Connect(ctx, transport, nil)
@@ -160,8 +165,10 @@ func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 
 		// Forward the request to remote server with original tool name
 		params := &mcp.CallToolParams{
-			Name:      req.Params.Name,
-			Arguments: req.Params.Arguments,
+			Name:           req.Params.Name,
+			Arguments:      req.Params.Arguments,
+			InputResponses: req.Params.InputResponses,
+			RequestState:   req.Params.RequestState,
 		}
 
 		// Call remote tool

@@ -21,6 +21,7 @@ func TestDocsProxy(t *testing.T) {
 	paginated := newDocsServer(docsFeatures{tools: true, pageSize: 1})
 	whoami := newDocsServer(docsFeatures{whoami: true})
 	legacy := newDocsServer(docsFeatures{tools: true, whoami: true, legacy: true})
+	asks := newDocsServer(docsFeatures{asks: true})
 
 	// The proxy calls the docs server as a client in its own right, whatever
 	// the agent sends or supports.
@@ -86,12 +87,21 @@ func TestDocsProxy(t *testing.T) {
 			opts:       []runOption{withDocsServer(legacy), withElicitation(&mcp.ElicitResult{Action: "accept"})},
 			wantOutput: proxyIdentity("2025-11-25"),
 		},
+		{
+			name:       "passes the docs server's input requests through to the agent",
+			tool:       "ask",
+			args:       map[string]any{},
+			opts:       []runOption{withDocsServer(asks), withElicitation(&mcp.ElicitResult{Action: "accept", Content: map[string]any{"color": "blue"}})},
+			wantPrompt: &mcp.ElicitParams{Mode: "form", Message: "Favorite color?", RequestedSchema: askSchema},
+			wantOutput: map[string]any{"color": "blue", "request_state": "asked"},
+		},
 	})
 }
 
 // docsFeatures picks what a fake docs MCP server exposes, and therefore which
 // capabilities it advertises. A nonzero pageSize splits its lists into pages.
-// whoami adds a tool reporting the client the server sees. legacy serves only
+// whoami adds a tool reporting the client the server sees, and asks one that
+// asks the client for input before it answers. legacy serves only
 // protocol versions before 2026-07-28, as pg-aiguide did until it upgraded its
 // SDK.
 type docsFeatures struct {
@@ -99,6 +109,7 @@ type docsFeatures struct {
 	resources bool
 	prompts   bool
 	whoami    bool
+	asks      bool
 	legacy    bool
 	pageSize  int
 }
@@ -145,6 +156,28 @@ func newDocsServer(features docsFeatures) *docsServer {
 			}, nil
 		})
 	}
+	if features.asks {
+		d.server.AddTool(&mcp.Tool{
+			Name:        "ask",
+			InputSchema: map[string]any{"type": "object"},
+		}, func(_ context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			answer, ok := req.Params.InputResponses["color"].(*mcp.ElicitResult)
+			if !ok {
+				return &mcp.CallToolResult{
+					InputRequests: mcp.InputRequestMap{
+						"color": &mcp.ElicitParams{Message: "Favorite color?", RequestedSchema: askSchema},
+					},
+					RequestState: "asked",
+				}, nil
+			}
+			return &mcp.CallToolResult{
+				StructuredContent: map[string]any{
+					"color":         answer.Content["color"],
+					"request_state": req.Params.RequestState,
+				},
+			}, nil
+		})
+	}
 	if features.resources {
 		readResource := func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 			return &mcp.ReadResourceResult{}, nil
@@ -181,6 +214,12 @@ func (d *docsServer) checkListed(want ...string) checkFunc {
 			t.Errorf("listed methods mismatch (-want +got):\n%s", diff)
 		}
 	}
+}
+
+// askSchema is the form the docs server's ask tool requests.
+var askSchema = map[string]any{
+	"type":       "object",
+	"properties": map[string]any{"color": map[string]any{"type": "string"}},
 }
 
 // withDocsServer serves docs over streamable HTTP and enables the docs proxy
