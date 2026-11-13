@@ -224,7 +224,7 @@ Only the MCP server logs. `newLogger(w)` (`internal/cmd/logger_helper.go`) point
 
 ## MCP Server
 
-The server exposes two kinds of tools: native Tiger tools for service management and database operations (one file per tool), and documentation tools proxied from a remote docs MCP server (`proxy.go`). The proxy calls the docs server as a client in its own right: it never forwards the agent's `_meta`, which describes the agent's own connection, and advertises no capabilities, so it never promises the docs server a feature it can't relay (`ProxyClient`).
+The server exposes two kinds of tools: native Tiger tools for service management and database operations (one file per tool), and documentation tools proxied from a remote docs MCP server (see [Docs Proxy](#docs-proxy)).
 
 ### Server State
 
@@ -275,6 +275,14 @@ The CLI can be used to get around the MCP server's safeguards: `tiger config set
 A tool parameter that reads a file on the server's machine (`db_query`'s `file`) depends on the transport. Only a stdio server is known to share a machine with its client, so under any other transport the tool leaves the parameter out of its schema, which then rejects it. `mcp list`, `mcp get`, and completion describe the stdio server, since that's what a default `tiger mcp start` runs.
 
 Over stdio, reads are confined to the server's working directory — the directory the client launched it in — by going through `os.Root`, which also refuses symlinks that lead out of it. Unlike the CLI's path flags, such a path never has environment variables expanded: it comes from the model, and expansion would let it read the server's environment back out. `readWorkingDirFile` in `db_query.go` is the model.
+
+### Docs Proxy
+
+`proxy.go` connects to the docs MCP server (pg-aiguide, at `docs_mcp_url`) as the server starts, and re-offers whatever the docs server advertises (tools, prompts, resources and resource templates, and completions), forwarding each request to it. If the docs server can't be reached, the server starts without the docs features and logs why. The connection comes before the server is created, because whether the server handles completions is fixed then.
+
+The proxy calls the docs server as a client in its own right (`ProxyClient`): it negotiates its own protocol version, never forwards the agent's `_meta`, which describes the agent's own connection, and advertises no capabilities, so it never promises the docs server a feature it can't relay. Input requests the docs server returns anyway are passed back to the agent rather than answered by the proxy, and the agent's retry is forwarded with its answers.
+
+`TestDocsProxy` covers the proxy against fake docs servers, and `TestDocsProxyIntegration` against the production one (see [Build & Test](#build--test)).
 
 ## Read-Only Mode
 
