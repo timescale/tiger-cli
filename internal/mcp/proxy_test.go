@@ -138,7 +138,7 @@ func TestDocsProxy(t *testing.T) {
 			docs:          &docsFeatures{tools: true, resources: true, prompts: true, unnamed: true},
 			request:       listOffered(),
 			want:          slices.Concat(offersTools, offersResources, offersTemplates, offersPrompts),
-			wantDocsCalls: []string{"tools/list", "resources/list", "resources/templates/list", "prompts/list"},
+			wantDocsCalls: startup,
 		},
 		{
 			name:          "offers the rest when listing tools fails",
@@ -430,7 +430,6 @@ func runProxyTest(t *testing.T, tt proxyTest) {
 // wireJSON returns v as decoded from its JSON encoding, as it travels on the
 // wire, leaving out resultType: the SDK sets that on every result it decodes,
 // to record how it was delivered.
-
 func wireJSON(t *testing.T, v any) any {
 	t.Helper()
 	b, err := json.Marshal(v)
@@ -445,6 +444,13 @@ func wireJSON(t *testing.T, v any) any {
 		delete(m, "resultType")
 	}
 	return decoded
+}
+
+// withMeta returns result with its _meta replaced by meta, as the agent gets a
+// result the proxy passes through.
+func withMeta[R mcp.Result](result R, meta mcp.Meta) R {
+	result.SetMeta(meta)
+	return result
 }
 
 // matchResult asserts a response that can't be matched exactly, given as
@@ -478,40 +484,39 @@ type agentRequest struct {
 	send func(ctx context.Context, session *mcp.ClientSession) (any, error)
 }
 
-// callTool calls the named tool with args.
-func callTool(name string, args map[string]any) agentRequest {
-	params := &mcp.CallToolParams{Name: name, Arguments: args}
+// forwardedRequest is a request Tiger MCP forwards to the docs server: it
+// sends params by calling send on the agent's session, as in
+// forwardedRequest(params, (*mcp.ClientSession).CallTool).
+func forwardedRequest[P any, PP interface {
+	*P
+	mcp.Params
+}, R any](params PP, send func(*mcp.ClientSession, context.Context, PP) (R, error)) agentRequest {
 	return agentRequest{params: params, send: func(ctx context.Context, session *mcp.ClientSession) (any, error) {
 		// The SDK adds _meta to the params it sends, so send a copy.
-		params := *params
-		return session.CallTool(ctx, &params)
+		sent := PP(new(P))
+		*sent = *params
+		return send(session, ctx, sent)
 	}}
+}
+
+// callTool calls the named tool with args.
+func callTool(name string, args map[string]any) agentRequest {
+	return forwardedRequest(&mcp.CallToolParams{Name: name, Arguments: args}, (*mcp.ClientSession).CallTool)
 }
 
 // getPrompt gets the named prompt with args.
 func getPrompt(name string, args map[string]string) agentRequest {
-	params := &mcp.GetPromptParams{Name: name, Arguments: args}
-	return agentRequest{params: params, send: func(ctx context.Context, session *mcp.ClientSession) (any, error) {
-		params := *params
-		return session.GetPrompt(ctx, &params)
-	}}
+	return forwardedRequest(&mcp.GetPromptParams{Name: name, Arguments: args}, (*mcp.ClientSession).GetPrompt)
 }
 
 // readResource reads the resource at uri.
 func readResource(uri string) agentRequest {
-	params := &mcp.ReadResourceParams{URI: uri}
-	return agentRequest{params: params, send: func(ctx context.Context, session *mcp.ClientSession) (any, error) {
-		params := *params
-		return session.ReadResource(ctx, &params)
-	}}
+	return forwardedRequest(&mcp.ReadResourceParams{URI: uri}, (*mcp.ClientSession).ReadResource)
 }
 
 // complete requests completions for params.
 func complete(params *mcp.CompleteParams) agentRequest {
-	return agentRequest{params: params, send: func(ctx context.Context, session *mcp.ClientSession) (any, error) {
-		params := *params
-		return session.Complete(ctx, &params)
-	}}
+	return forwardedRequest(params, (*mcp.ClientSession).Complete)
 }
 
 // getFirstPrompt gets the first prompt the agent is offered, for a server
@@ -648,13 +653,6 @@ func docsResourceResult() *mcp.ReadResourceResult {
 	}
 }
 
-// withMeta returns result with its _meta replaced by meta, as the agent gets a
-// result the proxy passes through.
-func withMeta[R mcp.Result](result R, meta mcp.Meta) R {
-	result.SetMeta(meta)
-	return result
-}
-
 // docsCompletionResult is the result a fake docs server's completions return.
 func docsCompletionResult() *mcp.CompleteResult {
 	return &mcp.CompleteResult{
@@ -674,7 +672,7 @@ type docsServer struct {
 	mu        sync.Mutex
 	methods   []string     // the methods received after the handshake, in order
 	clients   []docsClient // the client behind each request that declares one
-	forwarded [][]byte     // the JSON params of each request the proxy forwarded from the agent
+	forwarded []mcp.Params // the params of each request the proxy forwarded from the agent
 }
 
 // docsClient is the client a fake docs server saw making a request, and the
@@ -819,11 +817,7 @@ func (d *docsServer) record(method string, req mcp.Request) {
 		d.clients = append(d.clients, docsClient{method: method, client: describeClient(params)})
 	}
 	if slices.Contains(forwardedMethods, method) {
-		forwarded, err := json.Marshal(req.GetParams())
-		if err != nil {
-			panic(err)
-		}
-		d.forwarded = append(d.forwarded, forwarded)
+		d.forwarded = append(d.forwarded, req.GetParams())
 	}
 }
 
@@ -868,11 +862,7 @@ func (d *docsServer) assertCalls(t *testing.T, want []string, params mcp.Params)
 	if params == nil {
 		return
 	}
-	sent, err := json.Marshal(params)
-	if err != nil {
-		t.Fatalf("encode params: %v", err)
-	}
-	wantParams := comparableParams(t, sent)
+	wantParams := comparableParams(t, params)
 	for _, forwarded := range d.forwarded {
 		if diff := cmp.Diff(wantParams, comparableParams(t, forwarded)); diff != "" {
 			t.Errorf("docs server params mismatch (-agent sent +docs server received):\n%s", diff)
@@ -880,12 +870,16 @@ func (d *docsServer) assertCalls(t *testing.T, want []string, params mcp.Params)
 	}
 }
 
-// comparableParams decodes JSON params, leaving out the fields assertCalls
-// doesn't compare.
-func comparableParams(t *testing.T, params []byte) map[string]any {
+// comparableParams returns params as decoded from their JSON encoding,
+// leaving out the fields assertCalls doesn't compare.
+func comparableParams(t *testing.T, params mcp.Params) map[string]any {
 	t.Helper()
+	encoded, err := json.Marshal(params)
+	if err != nil {
+		t.Fatalf("encode params: %v", err)
+	}
 	var decoded map[string]any
-	if err := json.Unmarshal(params, &decoded); err != nil {
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
 		t.Fatalf("decode params: %v", err)
 	}
 	for _, field := range []string{"_meta", "inputResponses", "requestState"} {
