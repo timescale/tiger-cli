@@ -2,8 +2,10 @@ package mcp
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -17,6 +19,18 @@ func TestDocsProxy(t *testing.T) {
 	toolsAndResources := newDocsServer(docsFeatures{tools: true, resources: true})
 	promptsOnly := newDocsServer(docsFeatures{prompts: true})
 	paginated := newDocsServer(docsFeatures{tools: true, pageSize: 1})
+	whoami := newDocsServer(docsFeatures{whoami: true})
+	legacy := newDocsServer(docsFeatures{tools: true, whoami: true, legacy: true})
+
+	// The proxy calls the docs server as a client in its own right, whatever
+	// the agent sends or supports.
+	proxyIdentity := func(protocolVersion string) map[string]any {
+		return map[string]any{
+			"client":           "tiger-mcp-proxy-client",
+			"protocol_version": protocolVersion,
+			"capabilities":     []any{},
+		}
+	}
 
 	runToolTests(t, []toolTest{
 		{
@@ -51,15 +65,41 @@ func TestDocsProxy(t *testing.T) {
 			wantOutput: map[string]any{"results": "docs"},
 			checks:     []checkFunc{paginated.checkListed("tools/list", "tools/list")},
 		},
+		{
+			name:       "calls tools on a docs server that only speaks older protocol versions",
+			tool:       "search_docs",
+			args:       map[string]any{},
+			opts:       []runOption{withDocsServer(legacy)},
+			wantOutput: map[string]any{"results": "docs"},
+		},
+		{
+			name:       "calls the docs server as itself on newer protocol versions",
+			tool:       "whoami",
+			args:       map[string]any{},
+			opts:       []runOption{withDocsServer(whoami), withElicitation(&mcp.ElicitResult{Action: "accept"})},
+			wantOutput: proxyIdentity("2026-07-28"),
+		},
+		{
+			name:       "calls the docs server as itself on older protocol versions",
+			tool:       "whoami",
+			args:       map[string]any{},
+			opts:       []runOption{withDocsServer(legacy), withElicitation(&mcp.ElicitResult{Action: "accept"})},
+			wantOutput: proxyIdentity("2025-11-25"),
+		},
 	})
 }
 
 // docsFeatures picks what a fake docs MCP server exposes, and therefore which
 // capabilities it advertises. A nonzero pageSize splits its lists into pages.
+// whoami adds a tool reporting the client the server sees. legacy serves only
+// protocol versions before 2026-07-28, as pg-aiguide did until it upgraded its
+// SDK.
 type docsFeatures struct {
 	tools     bool
 	resources bool
 	prompts   bool
+	whoami    bool
+	legacy    bool
 	pageSize  int
 }
 
@@ -67,6 +107,7 @@ type docsFeatures struct {
 // it receives, so a test can assert which ones the proxy requested.
 type docsServer struct {
 	server *mcp.Server
+	legacy bool
 
 	mu     sync.Mutex
 	listed []string
@@ -75,6 +116,7 @@ type docsServer struct {
 func newDocsServer(features docsFeatures) *docsServer {
 	d := &docsServer{
 		server: mcp.NewServer(&mcp.Implementation{Name: "docs"}, &mcp.ServerOptions{PageSize: features.pageSize}),
+		legacy: features.legacy,
 	}
 	if features.tools {
 		for _, name := range []string{"search_docs", "view_skill"} {
@@ -88,6 +130,20 @@ func newDocsServer(features docsFeatures) *docsServer {
 				}, nil
 			})
 		}
+	}
+	if features.whoami {
+		d.server.AddTool(&mcp.Tool{
+			Name:        "whoami",
+			InputSchema: map[string]any{"type": "object"},
+		}, func(_ context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return &mcp.CallToolResult{
+				StructuredContent: map[string]any{
+					"client":           req.ClientInfo().Name,
+					"protocol_version": req.ProtocolVersion(),
+					"capabilities":     capabilityNames(req.Session.InitializeParams().Capabilities),
+				},
+			}, nil
+		})
 	}
 	if features.resources {
 		readResource := func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
@@ -128,13 +184,13 @@ func (d *docsServer) checkListed(want ...string) checkFunc {
 }
 
 // withDocsServer serves docs over streamable HTTP and enables the docs proxy
-// against it. The SDK only accepts the latest protocol version on a stateless
-// server, which is what the proxy client negotiates by default.
+// against it. The SDK serves protocol versions from 2026-07-28 on only from a
+// stateless server, so a legacy docs server is a stateful one.
 func withDocsServer(docs *docsServer) runOption {
 	return withSetup(func(t *testing.T) {
 		srv := httptest.NewServer(mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 			return docs.server
-		}, &mcp.StreamableHTTPOptions{Stateless: true}))
+		}, &mcp.StreamableHTTPOptions{Stateless: !docs.legacy}))
 		t.Cleanup(func() {
 			srv.CloseClientConnections()
 			srv.Close()
@@ -142,4 +198,23 @@ func withDocsServer(docs *docsServer) runOption {
 		t.Setenv("TIGER_DOCS_MCP", "true")
 		t.Setenv("TIGER_DOCS_MCP_URL", srv.URL)
 	})
+}
+
+// capabilityNames lists the client capabilities a server sees as present.
+func capabilityNames(caps *mcp.ClientCapabilities) []any {
+	names := []any{}
+	if caps == nil {
+		return names
+	}
+	if caps.Elicitation != nil {
+		names = append(names, "elicitation")
+	}
+	//lint:ignore SA1019 the SDK still advertises roots by default, so a test must see it
+	if caps.RootsV2 != nil {
+		names = append(names, "roots")
+	}
+	for _, name := range slices.Sorted(maps.Keys(caps.Extensions)) {
+		names = append(names, name)
+	}
+	return names
 }

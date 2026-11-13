@@ -74,7 +74,14 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 	}
 }
 
-// ProxyClient manages connection to a remote MCP server and forwards requests
+// ProxyClient manages connection to a remote MCP server and forwards requests.
+//
+// It calls the remote server as a client in its own right: it negotiates its
+// own protocol version and advertises no capabilities, and it never forwards
+// the agent's _meta. That _meta describes the agent's own connection to Tiger
+// MCP (its protocol version, identity, and capabilities), so forwarding it
+// could select a protocol version the remote server doesn't speak, or promise
+// features the proxy can't relay.
 type ProxyClient struct {
 	url     string
 	client  *mcp.Client
@@ -94,6 +101,8 @@ func NewProxyClient(ctx context.Context, url string, logger *slog.Logger) (*Prox
 		Version: config.Version,
 	}, &mcp.ClientOptions{
 		Logger: logger,
+		// Without this, the SDK advertises roots support by default.
+		Capabilities: &mcp.ClientCapabilities{},
 	})
 
 	session, err := client.Connect(ctx, transport, nil)
@@ -151,7 +160,6 @@ func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 
 		// Forward the request to remote server with original tool name
 		params := &mcp.CallToolParams{
-			Meta:      req.Params.Meta,
 			Name:      req.Params.Name,
 			Arguments: req.Params.Arguments,
 		}
@@ -225,7 +233,9 @@ func (p *ProxyClient) createProxyResourceHandler() mcp.ResourceHandler {
 		}
 
 		// Call remote resource
-		result, err := p.session.ReadResource(ctx, req.Params)
+		params := *req.Params
+		params.Meta = nil
+		result, err := p.session.ReadResource(ctx, &params)
 		if err != nil {
 			return nil, fmt.Errorf("remote resource read failed: %w", err)
 		}
@@ -267,7 +277,9 @@ func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
 		}
 
 		// Call remote prompt
-		result, err := p.session.GetPrompt(ctx, req.Params)
+		params := *req.Params
+		params.Meta = nil
+		result, err := p.session.GetPrompt(ctx, &params)
 		if err != nil {
 			return nil, fmt.Errorf("remote prompt request failed: %w", err)
 		}
