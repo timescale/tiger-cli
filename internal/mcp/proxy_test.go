@@ -38,7 +38,6 @@ func TestDocsProxy(t *testing.T) {
 	offersTemplates := []string{"template:docs://chapters/{chapter}", "template:docs://pages/{page}"}
 	offersPrompts := []string{"prompt:intro", "prompt:setup"}
 	offersCompletions := []string{"completions"}
-	offers := slices.Concat[[]string]
 
 	// The _meta Tiger MCP puts on a result for an agent on 2026-07-28, in place
 	// of the docs server's. An agent on an older version gets none.
@@ -86,35 +85,35 @@ func TestDocsProxy(t *testing.T) {
 			name:          "offers everything the docs server advertises",
 			docs:          &everything,
 			request:       listOffered(),
-			want:          offers(offersTools, offersResources, offersTemplates, offersPrompts, offersCompletions),
+			want:          slices.Concat(offersTools, offersResources, offersTemplates, offersPrompts, offersCompletions),
 			wantDocsCalls: startup,
 		},
 		{
 			name:          "skips tools the docs server doesn't advertise",
 			docs:          &docsFeatures{resources: true, prompts: true, completions: true},
 			request:       listOffered(),
-			want:          offers(offersResources, offersTemplates, offersPrompts, offersCompletions),
+			want:          slices.Concat(offersResources, offersTemplates, offersPrompts, offersCompletions),
 			wantDocsCalls: []string{"resources/list", "resources/templates/list", "prompts/list"},
 		},
 		{
 			name:          "skips resources the docs server doesn't advertise",
 			docs:          &docsFeatures{tools: true, prompts: true, completions: true},
 			request:       listOffered(),
-			want:          offers(offersTools, offersPrompts, offersCompletions),
+			want:          slices.Concat(offersTools, offersPrompts, offersCompletions),
 			wantDocsCalls: []string{"tools/list", "prompts/list"},
 		},
 		{
 			name:          "skips prompts the docs server doesn't advertise",
 			docs:          &docsFeatures{tools: true, resources: true, completions: true},
 			request:       listOffered(),
-			want:          offers(offersTools, offersResources, offersTemplates, offersCompletions),
+			want:          slices.Concat(offersTools, offersResources, offersTemplates, offersCompletions),
 			wantDocsCalls: []string{"tools/list", "resources/list", "resources/templates/list"},
 		},
 		{
 			name:          "skips completions the docs server doesn't advertise",
 			docs:          &docsFeatures{tools: true, resources: true, prompts: true},
 			request:       listOffered(),
-			want:          offers(offersTools, offersResources, offersTemplates, offersPrompts),
+			want:          slices.Concat(offersTools, offersResources, offersTemplates, offersPrompts),
 			wantDocsCalls: startup,
 		},
 		{
@@ -126,7 +125,7 @@ func TestDocsProxy(t *testing.T) {
 			name:    "offers everything from every page",
 			docs:    &docsFeatures{tools: true, resources: true, prompts: true, pageSize: 1},
 			request: listOffered(),
-			want:    offers(offersTools, offersResources, offersTemplates, offersPrompts),
+			want:    slices.Concat(offersTools, offersResources, offersTemplates, offersPrompts),
 			wantDocsCalls: []string{
 				"tools/list", "tools/list",
 				"resources/list", "resources/list",
@@ -138,35 +137,35 @@ func TestDocsProxy(t *testing.T) {
 			name:          "skips entries without a name or URI",
 			docs:          &docsFeatures{tools: true, resources: true, prompts: true, unnamed: true},
 			request:       listOffered(),
-			want:          offers(offersTools, offersResources, offersTemplates, offersPrompts),
+			want:          slices.Concat(offersTools, offersResources, offersTemplates, offersPrompts),
 			wantDocsCalls: []string{"tools/list", "resources/list", "resources/templates/list", "prompts/list"},
 		},
 		{
 			name:          "offers the rest when listing tools fails",
 			docs:          failing("tools/list"),
 			request:       listOffered(),
-			want:          offers(offersResources, offersTemplates, offersPrompts, offersCompletions),
+			want:          slices.Concat(offersResources, offersTemplates, offersPrompts, offersCompletions),
 			wantDocsCalls: startup,
 		},
 		{
 			name:          "offers the rest when listing resources fails",
 			docs:          failing("resources/list"),
 			request:       listOffered(),
-			want:          offers(offersTools, offersTemplates, offersPrompts, offersCompletions),
+			want:          slices.Concat(offersTools, offersTemplates, offersPrompts, offersCompletions),
 			wantDocsCalls: startup,
 		},
 		{
 			name:          "offers the rest when listing resource templates fails",
 			docs:          failing("resources/templates/list"),
 			request:       listOffered(),
-			want:          offers(offersTools, offersResources, offersPrompts, offersCompletions),
+			want:          slices.Concat(offersTools, offersResources, offersPrompts, offersCompletions),
 			wantDocsCalls: startup,
 		},
 		{
 			name:          "offers the rest when listing prompts fails",
 			docs:          failing("prompts/list"),
 			request:       listOffered(),
-			want:          offers(offersTools, offersResources, offersTemplates, offersCompletions),
+			want:          slices.Concat(offersTools, offersResources, offersTemplates, offersCompletions),
 			wantDocsCalls: startup,
 		},
 
