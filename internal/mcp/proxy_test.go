@@ -23,6 +23,9 @@ import (
 
 func TestDocsProxy(t *testing.T) {
 	everything := docsFeatures{tools: true, resources: true, prompts: true, completions: true}
+	// The protocol versions before 2026-07-28, newest first, all that pg-aiguide
+	// supported until it upgraded its SDK.
+	olderVersions := []string{"2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"}
 	failing := func(methods ...string) *docsFeatures {
 		features := everything
 		features.fail = methods
@@ -106,7 +109,7 @@ func TestDocsProxy(t *testing.T) {
 		},
 		{
 			name:    "offers nothing when the docs server advertises no capabilities",
-			docs:    &docsFeatures{tools: true, legacy: true, noCapabilities: true},
+			docs:    &docsFeatures{tools: true, protocolVersions: olderVersions, noCapabilities: true},
 			request: listOffered(),
 		},
 		{
@@ -231,7 +234,7 @@ func TestDocsProxy(t *testing.T) {
 		},
 		{
 			name:          "calls tools on a docs server that only speaks older protocol versions",
-			docs:          &docsFeatures{tools: true, legacy: true},
+			docs:          &docsFeatures{tools: true, protocolVersions: olderVersions},
 			request:       callTool("search_docs", nil),
 			want:          "search results",
 			wantDocsCalls: []string{"tools/list", "tools/call"},
@@ -564,20 +567,21 @@ func listOffered() agentRequest {
 // client for input before it answers.
 //
 // The rest change how the server behaves. A nonzero pageSize splits its lists
-// into pages. legacy serves only protocol versions before 2026-07-28, as
-// pg-aiguide did until it upgraded its SDK, and noCapabilities makes such a
-// server advertise none. unnamed adds an entry of each kind with no name or
-// URI. fail lists methods the server fails with errDocsFailure.
+// into pages. protocolVersions, newest first, limits the protocol versions the
+// server supports, which are the SDK's when empty. noCapabilities makes it
+// advertise none, which only a server limited to versions before 2026-07-28
+// can do. unnamed adds an entry of each kind with no name or URI. fail lists
+// methods the server fails with errDocsFailure.
 type docsFeatures struct {
-	tools          bool
-	resources      bool
-	prompts        bool
-	completions    bool
-	pageSize       int
-	legacy         bool
-	noCapabilities bool
-	unnamed        bool
-	fail           []string
+	tools            bool
+	resources        bool
+	prompts          bool
+	completions      bool
+	pageSize         int
+	protocolVersions []string
+	noCapabilities   bool
+	unnamed          bool
+	fail             []string
 }
 
 // errDocsFailure is the error a fake docs server fails its docsFeatures.fail
@@ -589,30 +593,38 @@ var errDocsFailure = errors.New("docs server failure")
 const docsTitle = "Docs"
 
 // docsServer is a fake docs MCP server, served over streamable HTTP, that
-// records the requests it receives.
+// records the requests it receives and the clients making them.
 type docsServer struct {
-	url    string
-	legacy bool
+	url string
+	// protocolVersion is the protocol version the proxy negotiates with the
+	// server.
+	protocolVersion string
 
-	mu    sync.Mutex
-	calls []docsCall
+	mu      sync.Mutex
+	methods []string     // the methods received after the handshake, in order
+	clients []docsClient // the client behind each request that declares one
 }
 
-// docsCall is a request a fake docs server received: its method, and the
-// client the server saw making it.
-type docsCall struct {
+// docsClient is the client a fake docs server saw making a request, and the
+// request's method.
+type docsClient struct {
 	method string
 	client string
 }
 
 // startDocsServer starts a fake docs server with the given features, stopping
-// it when the test ends. The SDK serves protocol versions from 2026-07-28 on
-// only from a stateless server, so a legacy docs server is a stateful one.
+// it when the test ends. Like pg-aiguide, it's stateless.
 func startDocsServer(t *testing.T, features docsFeatures) *docsServer {
 	t.Helper()
-	d := &docsServer{legacy: features.legacy}
+	d := &docsServer{protocolVersion: "2026-07-28"}
+	if len(features.protocolVersions) > 0 {
+		d.protocolVersion = features.protocolVersions[0]
+	}
 
-	opts := &mcp.ServerOptions{PageSize: features.pageSize}
+	opts := &mcp.ServerOptions{
+		PageSize:                  features.pageSize,
+		SupportedProtocolVersions: features.protocolVersions,
+	}
 	if features.completions {
 		opts.CompletionHandler = func(_ context.Context, req *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
 			return &mcp.CompleteResult{Completion: mcp.CompletionResultDetails{Values: []string{req.Params.Argument.Value + "tables"}}}, nil
@@ -699,7 +711,7 @@ func startDocsServer(t *testing.T, features docsFeatures) *docsServer {
 
 	srv := httptest.NewServer(mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server
-	}, &mcp.StreamableHTTPOptions{Stateless: !features.legacy}))
+	}, &mcp.StreamableHTTPOptions{Stateless: true}))
 	t.Cleanup(func() {
 		srv.CloseClientConnections()
 		srv.Close()
@@ -708,24 +720,29 @@ func startDocsServer(t *testing.T, features docsFeatures) *docsServer {
 	return d
 }
 
-// handshakeMethods are the requests that establish a session, which a fake
-// docs server doesn't record.
+// handshakeMethods are the requests that establish a session, whose methods a
+// fake docs server doesn't record.
 var handshakeMethods = []string{"initialize", "notifications/initialized", "server/discover"}
 
-// record records a request, with the client making it.
+// record records a request's method, unless it's part of the handshake, and
+// the client making it, if the request declares one. Before 2026-07-28, only
+// the initialize request does, since a stateless server forgets it afterwards;
+// from 2026-07-28 on, every request does, in its _meta.
 func (d *docsServer) record(method string, req mcp.Request) {
-	if slices.Contains(handshakeMethods, method) {
-		return
-	}
-	var client string
-	if session, ok := req.GetSession().(*mcp.ServerSession); ok {
-		if params := session.InitializeParams(); params != nil {
-			client = describeClient(params)
+	params, ok := req.GetParams().(*mcp.InitializeParams)
+	if !ok {
+		if session, ok := req.GetSession().(*mcp.ServerSession); ok {
+			params = session.InitializeParams()
 		}
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.calls = append(d.calls, docsCall{method: method, client: client})
+	if !slices.Contains(handshakeMethods, method) {
+		d.methods = append(d.methods, method)
+	}
+	if params != nil && params.ClientInfo != nil {
+		d.clients = append(d.clients, docsClient{method: method, client: describeClient(params)})
+	}
 }
 
 // describeClient describes the client making a request: its name, its
@@ -739,32 +756,26 @@ func describeClient(params *mcp.InitializeParams) string {
 		name, params.ProtocolVersion, cmp.Diff(&mcp.ClientCapabilities{}, params.Capabilities))
 }
 
-// assertCalls asserts the methods the docs server received, in order, and
-// that each came from the proxy as a client in its own right: never as the
-// agent, at the protocol version it negotiated with the docs server, and
-// advertising no capabilities.
+// assertCalls asserts the methods the docs server received after the
+// handshake, in order, and that every client it saw was the proxy as a client
+// in its own right: never the agent, at the protocol version it negotiated
+// with the docs server, and advertising no capabilities.
 func (d *docsServer) assertCalls(t *testing.T, want []string) {
 	t.Helper()
-	protocolVersion := "2026-07-28"
-	if d.legacy {
-		protocolVersion = "2025-11-25"
-	}
 	proxy := describeClient(&mcp.InitializeParams{
 		ClientInfo:      &mcp.Implementation{Name: "tiger-mcp-proxy-client"},
-		ProtocolVersion: protocolVersion,
+		ProtocolVersion: d.protocolVersion,
 		Capabilities:    &mcp.ClientCapabilities{},
 	})
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	var methods []string
-	for _, call := range d.calls {
-		methods = append(methods, call.method)
-		if call.client != proxy {
-			t.Errorf("docs server received %s from %s, want %s", call.method, call.client, proxy)
+	for _, c := range d.clients {
+		if c.client != proxy {
+			t.Errorf("docs server received %s from %s, want %s", c.method, c.client, proxy)
 		}
 	}
-	if diff := cmp.Diff(want, methods); diff != "" {
+	if diff := cmp.Diff(want, d.methods); diff != "" {
 		t.Errorf("docs server calls mismatch (-want +got):\n%s", diff)
 	}
 }
