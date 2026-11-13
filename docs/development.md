@@ -91,7 +91,7 @@ Integration tests execute real API calls against a Tiger environment and other l
 ./scripts/test-integration.sh -v -run TestServiceLifecycleIntegration
 
 # Without the script, set TIGER_INTEGRATION yourself. Integration tests skip
-# when it's unset, and fail if it's set but credentials they need are missing.
+# when it's unset, or when credentials they need are missing.
 export $(cat .env | xargs) && TIGER_INTEGRATION=1 go test ./... -v -run Integration
 ```
 
