@@ -244,8 +244,6 @@ func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, ex
 	// readOnlyGatedTools and stays registered in every read-only mode.
 	addTool(s, mode, newFeedbackTool(), s.handleFeedback)
 
-	// TODO: Register more tool groups
-
 	// Register remote docs MCP server proxy
 	s.registerDocsProxy(ctx)
 }
