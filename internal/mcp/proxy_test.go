@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -346,14 +345,10 @@ func TestDocsProxy(t *testing.T) {
 // TestDocsProxyIntegration runs the docs proxy against the production docs MCP
 // server (pg-aiguide), for agents on the latest and the previous protocol
 // version, to catch an incompatibility as soon as either side changes. It
-// needs no credentials, but skips without them like the rest of the
-// integration tests, so it runs exactly when they do. It asserts only what
-// stays stable as the docs change: that the docs features register and
-// return content.
+// asserts only what stays stable as the docs change: that the docs features
+// register and return content.
 func TestDocsProxyIntegration(t *testing.T) {
-	if os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION") == "" || os.Getenv("TIGER_SECRET_KEY_INTEGRATION") == "" {
-		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
-	}
+	requireIntegration(t)
 
 	// Keyword-only search, so the test doesn't depend on the docs server's
 	// embeddings provider.

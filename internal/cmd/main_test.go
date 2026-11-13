@@ -788,3 +788,22 @@ func testFlags(t *testing.T, dir string) *pflag.FlagSet {
 	}
 	return flags
 }
+
+// requireIntegration skips an integration test unless TIGER_INTEGRATION is
+// set, and fails it if any of the environment variables it requires are
+// missing, so a misconfigured run fails rather than quietly skipping tests.
+func requireIntegration(t *testing.T, required ...string) {
+	t.Helper()
+	if os.Getenv("TIGER_INTEGRATION") == "" {
+		t.Skip("Skipping integration test: set TIGER_INTEGRATION=1 to run")
+	}
+	var missing []string
+	for _, name := range required {
+		if os.Getenv(name) == "" {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("integration test requires %s", strings.Join(missing, ", "))
+	}
+}

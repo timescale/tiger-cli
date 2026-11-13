@@ -27,4 +27,4 @@ fi
 go build -o bin/tiger ./cmd/tiger || exit 1
 
 # Run tests with env vars from .env file, defaulting to Integration pattern
-env $(cat .env | grep -v '^#' | xargs) go test ./... -run Integration "$@"
+env TIGER_INTEGRATION=1 $(cat .env | grep -v '^#' | xargs) go test ./... -run Integration "$@"

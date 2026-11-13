@@ -136,9 +136,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	if publicKey == "" || secretKey == "" {
-		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
-	}
+	requireIntegration(t, "TIGER_PUBLIC_KEY_INTEGRATION", "TIGER_SECRET_KEY_INTEGRATION")
 
 	// Set up isolated test environment with temporary config directory
 	tmpDir := setupIntegrationTest(t)
@@ -1531,9 +1529,7 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
 	keyring.MockInit()
 
-	if publicKey == "" || secretKey == "" {
-		t.Skip("Skipping service not found test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
-	}
+	requireIntegration(t, "TIGER_PUBLIC_KEY_INTEGRATION", "TIGER_SECRET_KEY_INTEGRATION")
 
 	// Set up isolated test environment with temporary config directory
 	tmpDir := setupIntegrationTest(t)
@@ -1657,9 +1653,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 	existingServiceID := os.Getenv("TIGER_EXISTING_SERVICE_ID_INTEGRATION") // Optional: use existing service
 	keyring.MockInit()
 
-	if publicKey == "" || secretKey == "" {
-		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
-	}
+	requireIntegration(t, "TIGER_PUBLIC_KEY_INTEGRATION", "TIGER_SECRET_KEY_INTEGRATION")
 
 	if existingServiceID == "" {
 		t.Skip("Skipping database integration test: TIGER_EXISTING_SERVICE_ID_INTEGRATION not set")
@@ -1716,14 +1710,8 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 // TestAuthenticationErrorsIntegration tests that all commands requiring authentication
 // properly handle authentication failures and return appropriate exit codes
 func TestAuthenticationErrorsIntegration(t *testing.T) {
-	// Check if we have valid integration test credentials
-	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
-	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
 	keyring.MockInit()
-
-	if publicKey == "" || secretKey == "" {
-		t.Skip("Skipping authentication error integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
-	}
+	requireIntegration(t)
 
 	// Set up isolated test environment with temporary config directory
 	tmpDir := setupIntegrationTest(t)
@@ -1876,9 +1864,7 @@ func TestServiceForkIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	if publicKey == "" || secretKey == "" {
-		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
-	}
+	requireIntegration(t, "TIGER_PUBLIC_KEY_INTEGRATION", "TIGER_SECRET_KEY_INTEGRATION")
 
 	// Set up isolated test environment with temporary config directory
 	tmpDir := setupIntegrationTest(t)
