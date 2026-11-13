@@ -135,6 +135,22 @@ func (p *ProxyClient) capabilities() *mcp.ServerCapabilities {
 	return &mcp.ServerCapabilities{}
 }
 
+// createProxyCompletionHandler creates a handler function that forwards
+// completion requests to the remote server
+func (p *ProxyClient) createProxyCompletionHandler() func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+	return func(ctx context.Context, req *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+		// Call remote completion
+		params := *req.Params
+		params.Meta = nil
+		result, err := p.session.Complete(ctx, &params)
+		if err != nil {
+			return nil, fmt.Errorf("remote completion failed: %w", err)
+		}
+
+		return result, nil
+	}
+}
+
 // RegisterTools discovers tools from remote server and registers them as proxy tools
 func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) error {
 	// Register each remote tool as a proxy tool, following pagination
@@ -265,22 +281,6 @@ func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
 		result, err := p.session.GetPrompt(ctx, &params)
 		if err != nil {
 			return nil, fmt.Errorf("remote prompt request failed: %w", err)
-		}
-
-		return result, nil
-	}
-}
-
-// createProxyCompletionHandler creates a handler function that forwards
-// completion requests to the remote server
-func (p *ProxyClient) createProxyCompletionHandler() func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
-	return func(ctx context.Context, req *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
-		// Call remote completion
-		params := *req.Params
-		params.Meta = nil
-		result, err := p.session.Complete(ctx, &params)
-		if err != nil {
-			return nil, fmt.Errorf("remote completion failed: %w", err)
 		}
 
 		return result, nil
