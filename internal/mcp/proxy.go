@@ -136,8 +136,14 @@ func (p *ProxyClient) capabilities() *mcp.ServerCapabilities {
 }
 
 // createProxyCompletionHandler creates a handler function that forwards
-// completion requests to the remote server
+// completion requests to the remote server. Returns nil, so the server doesn't
+// handle completions, if the proxy isn't connected or the remote server
+// doesn't support them. Tiger MCP has no prompts or resources of its own, so
+// every completion request is for a proxied one.
 func (p *ProxyClient) createProxyCompletionHandler() func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+	if p == nil || p.capabilities().Completions == nil {
+		return nil
+	}
 	return func(ctx context.Context, req *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
 		// Call remote completion
 		params := *req.Params

@@ -172,21 +172,15 @@ func NewServer(ctx context.Context, app *common.App, logger *slog.Logger, transp
 	// completions depends on whether the docs server does.
 	docsProxyClient := connectDocsProxy(ctx, cfg, logger)
 
-	opts := &mcp.ServerOptions{
-		Instructions: buildServerInstructions(cfg),
-		Logger:       logger,
-	}
-	// Tiger MCP has no prompts or resources of its own, so every completion
-	// request is for a proxied one.
-	if docsProxyClient != nil && docsProxyClient.capabilities().Completions != nil {
-		opts.CompletionHandler = docsProxyClient.createProxyCompletionHandler()
-	}
-
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    ServerName,
 		Title:   serverTitle,
 		Version: config.Version,
-	}, opts)
+	}, &mcp.ServerOptions{
+		Instructions:      buildServerInstructions(cfg),
+		Logger:            logger,
+		CompletionHandler: docsProxyClient.createProxyCompletionHandler(),
+	})
 
 	server := &Server{
 		mcpServer:       mcpServer,
