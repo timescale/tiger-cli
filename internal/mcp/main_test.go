@@ -80,7 +80,7 @@ type toolTest struct {
 	// wantCallErr is the exact text of a transport error, which is how the SDK
 	// reports a tool the server never registered — a handler's own error comes
 	// back as a result, not as one of these. Set it and the result assertions
-	// are skipped, since there is no result; the checks still run.
+	// are skipped, since there is no result.
 	wantCallErr string
 
 	// synctest runs the case inside a [synctest] bubble, where time is
@@ -125,24 +125,24 @@ func runToolTest(t *testing.T, tt toolTest) {
 		if got := result.err.Error(); got != tt.wantCallErr {
 			t.Errorf("call error = %q, want %q", got, tt.wantCallErr)
 		}
-	} else {
-		if result.err != nil {
-			t.Fatalf("unexpected call error: %v", result.err)
-		}
+		return
+	}
+	if result.err != nil {
+		t.Fatalf("unexpected call error: %v", result.err)
+	}
 
-		if diff := cmp.Diff(tt.wantPrompt, result.prompt); diff != "" {
-			t.Errorf("prompt mismatch (-want +got):\n%s", diff)
-		}
-		if got := resultError(result.res); got != tt.wantErr {
-			t.Errorf("error = %q, want %q", got, tt.wantErr)
-		}
-		var wantStructured any
-		if tt.wantOutput != nil {
-			wantStructured = tt.wantOutput
-		}
-		if diff := cmp.Diff(wantStructured, result.res.StructuredContent); diff != "" {
-			t.Errorf("structured content mismatch (-want +got):\n%s", diff)
-		}
+	if diff := cmp.Diff(tt.wantPrompt, result.prompt); diff != "" {
+		t.Errorf("prompt mismatch (-want +got):\n%s", diff)
+	}
+	if got := resultError(result.res); got != tt.wantErr {
+		t.Errorf("error = %q, want %q", got, tt.wantErr)
+	}
+	var wantStructured any
+	if tt.wantOutput != nil {
+		wantStructured = tt.wantOutput
+	}
+	if diff := cmp.Diff(wantStructured, result.res.StructuredContent); diff != "" {
+		t.Errorf("structured content mismatch (-want +got):\n%s", diff)
 	}
 
 	for _, check := range tt.checks {
