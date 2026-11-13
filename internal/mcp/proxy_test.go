@@ -2,10 +2,8 @@ package mcp
 
 import (
 	"context"
-	"maps"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -28,9 +26,9 @@ func TestDocsProxy(t *testing.T) {
 	// the agent sends or supports.
 	proxyIdentity := func(protocolVersion string) map[string]any {
 		return map[string]any{
-			"client":           "tiger-mcp-proxy-client",
-			"protocol_version": protocolVersion,
-			"capabilities":     []any{},
+			"client":            "tiger-mcp-proxy-client",
+			"protocol_version":  protocolVersion,
+			"capabilities_diff": "",
 		}
 	}
 
@@ -186,7 +184,8 @@ func newDocsServer(features docsFeatures) *docsServer {
 				StructuredContent: map[string]any{
 					"client":           req.ClientInfo().Name,
 					"protocol_version": req.ProtocolVersion(),
-					"capabilities":     capabilityNames(req.Session.InitializeParams().Capabilities),
+					// Empty when the client advertises no capabilities at all.
+					"capabilities_diff": cmp.Diff(&mcp.ClientCapabilities{}, req.Session.InitializeParams().Capabilities),
 				},
 			}, nil
 		})
@@ -297,23 +296,4 @@ func withDocsServer(docs *docsServer) runOption {
 		t.Setenv("TIGER_DOCS_MCP", "true")
 		t.Setenv("TIGER_DOCS_MCP_URL", srv.URL)
 	})
-}
-
-// capabilityNames lists the client capabilities a server sees as present.
-func capabilityNames(caps *mcp.ClientCapabilities) []any {
-	names := []any{}
-	if caps == nil {
-		return names
-	}
-	if caps.Elicitation != nil {
-		names = append(names, "elicitation")
-	}
-	//lint:ignore SA1019 the SDK still advertises roots by default, so a test must see it
-	if caps.RootsV2 != nil {
-		names = append(names, "roots")
-	}
-	for _, name := range slices.Sorted(maps.Keys(caps.Extensions)) {
-		names = append(names, name)
-	}
-	return names
 }
