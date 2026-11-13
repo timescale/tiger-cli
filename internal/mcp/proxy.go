@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -12,31 +13,41 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// registerDocsProxy establishes a connection to the remote docs MCP server and
-// registers all tools, resources, resource templates, and prompts exposed by
-// the server. Does not connect if the docs MCP server is disabled in the
-// config or there is no URL in the config.
-func (s *Server) registerDocsProxy(ctx context.Context) {
-	cfg := s.app.GetConfig()
-
+// connectDocsProxy connects to the remote docs MCP server. Returns nil if the
+// docs MCP server is disabled in the config, there is no URL in the config, or
+// the connection fails.
+func connectDocsProxy(ctx context.Context, cfg *config.Config, logger *slog.Logger) *ProxyClient {
 	if !cfg.DocsMCP || cfg.DocsMCPURL == "" {
-		s.logger.Info("Docs MCP proxy is disabled")
-		return
+		logger.Info("Docs MCP proxy is disabled")
+		return nil
 	}
 
 	// Create timeout for establishing proxy (matches Ghost)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	proxyClient, err := NewProxyClient(ctx, cfg.DocsMCPURL, s.logger)
+	proxyClient, err := NewProxyClient(ctx, cfg.DocsMCPURL, logger)
 	if err != nil {
-		s.logger.Error("Failed to connect to docs MCP server",
+		logger.Error("Failed to connect to docs MCP server",
 			slog.String("url", cfg.DocsMCPURL),
 			slog.Any("error", err),
 		)
+		return nil
+	}
+	return proxyClient
+}
+
+// registerDocsProxy registers all tools, resources, resource templates, and
+// prompts exposed by the remote docs MCP server. Does nothing if the proxy
+// isn't connected.
+func (s *Server) registerDocsProxy(ctx context.Context) {
+	proxyClient := s.docsProxyClient
+	if proxyClient == nil {
 		return
 	}
-	s.docsProxyClient = proxyClient
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 
 	// Only list what the remote server advertises. Servers on newer protocol
 	// versions reject unsupported list methods at the HTTP level, which would
@@ -289,6 +300,26 @@ func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
 		result, err := p.session.GetPrompt(ctx, &params)
 		if err != nil {
 			return nil, fmt.Errorf("remote prompt request failed: %w", err)
+		}
+
+		return result, nil
+	}
+}
+
+// createProxyCompletionHandler creates a handler function that forwards
+// completion requests to the remote server
+func (p *ProxyClient) createProxyCompletionHandler() func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+	return func(ctx context.Context, req *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+		if p.session == nil {
+			return nil, errors.New("not connected to remote MCP server")
+		}
+
+		// Call remote completion
+		params := *req.Params
+		params.Meta = nil
+		result, err := p.session.Complete(ctx, &params)
+		if err != nil {
+			return nil, fmt.Errorf("remote completion failed: %w", err)
 		}
 
 		return result, nil

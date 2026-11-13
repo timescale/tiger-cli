@@ -22,6 +22,7 @@ func TestDocsProxy(t *testing.T) {
 	whoami := newDocsServer(docsFeatures{whoami: true})
 	legacy := newDocsServer(docsFeatures{tools: true, whoami: true, legacy: true})
 	asks := newDocsServer(docsFeatures{asks: true})
+	completions := newDocsServer(docsFeatures{tools: true, prompts: true, completions: true})
 
 	// The proxy calls the docs server as a client in its own right, whatever
 	// the agent sends or supports.
@@ -95,23 +96,50 @@ func TestDocsProxy(t *testing.T) {
 			wantPrompt: &mcp.ElicitParams{Mode: "form", Message: "Favorite color?", RequestedSchema: askSchema},
 			wantOutput: map[string]any{"color": "blue", "request_state": "asked"},
 		},
+		{
+			name:       "proxies completions when the server advertises them",
+			tool:       "search_docs",
+			args:       map[string]any{},
+			opts:       []runOption{withDocsServer(completions)},
+			wantOutput: map[string]any{"results": "docs"},
+			checks: []checkFunc{
+				checkAdvertisesCompletions(true),
+				checkCompletion(
+					&mcp.CompleteParams{
+						Ref:      &mcp.CompleteReference{Type: "ref/prompt", Name: "setup"},
+						Argument: mcp.CompleteParamsArgument{Name: "topic", Value: "hyper"},
+					},
+					mcp.CompletionResultDetails{Values: []string{"setup topic hyper"}},
+				),
+			},
+		},
+		{
+			name:       "skips completions the server doesn't advertise",
+			tool:       "search_docs",
+			args:       map[string]any{},
+			opts:       []runOption{withDocsServer(toolsAndPrompts)},
+			wantOutput: map[string]any{"results": "docs"},
+			checks:     []checkFunc{checkAdvertisesCompletions(false)},
+		},
 	})
 }
 
 // docsFeatures picks what a fake docs MCP server exposes, and therefore which
-// capabilities it advertises. A nonzero pageSize splits its lists into pages.
+// capabilities it advertises. A nonzero pageSize splits its lists into pages,
+// and completions completes any argument with its prompt, name, and value.
 // whoami adds a tool reporting the client the server sees, and asks one that
 // asks the client for input before it answers. legacy serves only
 // protocol versions before 2026-07-28, as pg-aiguide did until it upgraded its
 // SDK.
 type docsFeatures struct {
-	tools     bool
-	resources bool
-	prompts   bool
-	whoami    bool
-	asks      bool
-	legacy    bool
-	pageSize  int
+	tools       bool
+	resources   bool
+	prompts     bool
+	whoami      bool
+	asks        bool
+	completions bool
+	legacy      bool
+	pageSize    int
 }
 
 // docsServer is a fake remote docs MCP server that records the list methods
@@ -125,8 +153,15 @@ type docsServer struct {
 }
 
 func newDocsServer(features docsFeatures) *docsServer {
+	opts := &mcp.ServerOptions{PageSize: features.pageSize}
+	if features.completions {
+		opts.CompletionHandler = func(_ context.Context, req *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+			value := strings.Join([]string{req.Params.Ref.Name, req.Params.Argument.Name, req.Params.Argument.Value}, " ")
+			return &mcp.CompleteResult{Completion: mcp.CompletionResultDetails{Values: []string{value}}}, nil
+		}
+	}
 	d := &docsServer{
-		server: mcp.NewServer(&mcp.Implementation{Name: "docs"}, &mcp.ServerOptions{PageSize: features.pageSize}),
+		server: mcp.NewServer(&mcp.Implementation{Name: "docs"}, opts),
 		legacy: features.legacy,
 	}
 	if features.tools {
@@ -212,6 +247,31 @@ func (d *docsServer) checkListed(want ...string) checkFunc {
 		defer d.mu.Unlock()
 		if diff := cmp.Diff(want, d.listed); diff != "" {
 			t.Errorf("listed methods mismatch (-want +got):\n%s", diff)
+		}
+	}
+}
+
+// checkAdvertisesCompletions returns a check asserting whether the server
+// advertises completion support to the client.
+func checkAdvertisesCompletions(want bool) checkFunc {
+	return func(t *testing.T, result toolResult) {
+		t.Helper()
+		if got := result.session.InitializeResult().Capabilities.Completions != nil; got != want {
+			t.Errorf("advertises completions = %v, want %v", got, want)
+		}
+	}
+}
+
+// checkCompletion returns a check asserting the completion of params.
+func checkCompletion(params *mcp.CompleteParams, want mcp.CompletionResultDetails) checkFunc {
+	return func(t *testing.T, result toolResult) {
+		t.Helper()
+		got, err := result.session.Complete(context.Background(), params)
+		if err != nil {
+			t.Fatalf("complete: %v", err)
+		}
+		if diff := cmp.Diff(want, got.Completion); diff != "" {
+			t.Errorf("completion mismatch (-want +got):\n%s", diff)
 		}
 	}
 }

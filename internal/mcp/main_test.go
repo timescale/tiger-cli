@@ -178,6 +178,10 @@ type toolResult struct {
 	err       error // the transport error, if the call itself broke
 	configDir string
 
+	// session is the client's session, still open, for checks that make
+	// requests of their own after the tool call.
+	session *mcp.ClientSession
+
 	// prompt is the elicitation the tool raised, as the client received it
 	// after the JSON round trip (which is where the SDK fills in the mode).
 	// Nil when the tool never prompted.
@@ -288,6 +292,7 @@ func runTool(
 		t.Fatalf("client connect: %v", err)
 	}
 	t.Cleanup(func() { _ = clientSession.Close() })
+	result.session = clientSession
 
 	// A handler's returned error travels as an IsError result, not a transport
 	// error, so a non-nil err here means the call itself broke.
