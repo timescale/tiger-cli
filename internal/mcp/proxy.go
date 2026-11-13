@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -98,8 +97,6 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 // are passed back to the agent, whose retry is forwarded with its answers: the
 // proxy has nothing of its own to answer them with.
 type ProxyClient struct {
-	url     string
-	client  *mcp.Client
 	session *mcp.ClientSession
 }
 
@@ -126,11 +123,7 @@ func NewProxyClient(ctx context.Context, url string, logger *slog.Logger) (*Prox
 		return nil, fmt.Errorf("failed to connect to remote MCP server: %w", err)
 	}
 
-	return &ProxyClient{
-		url:     url,
-		client:  client,
-		session: session,
-	}, nil
+	return &ProxyClient{session: session}, nil
 }
 
 // capabilities returns the capabilities the remote server advertised when the
@@ -144,10 +137,6 @@ func (p *ProxyClient) capabilities() *mcp.ServerCapabilities {
 
 // RegisterTools discovers tools from remote server and registers them as proxy tools
 func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) error {
-	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
-	}
-
 	// Register each remote tool as a proxy tool, following pagination
 	for tool, err := range p.session.Tools(ctx, nil) {
 		if err != nil {
@@ -170,10 +159,6 @@ func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) err
 // createProxyToolHandler creates a handler function that forwards tool calls to the remote server
 func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		if p.session == nil {
-			return nil, fmt.Errorf("not connected to remote MCP server")
-		}
-
 		// Forward the request to remote server with original tool name
 		params := &mcp.CallToolParams{
 			Name:           req.Params.Name,
@@ -195,10 +180,6 @@ func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 // RegisterResources discovers resources from remote server and registers them
 // as proxy resources
 func (p *ProxyClient) RegisterResources(ctx context.Context, server *mcp.Server) error {
-	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
-	}
-
 	// Register each remote resource as a proxy resource, following pagination
 	for resource, err := range p.session.Resources(ctx, nil) {
 		if err != nil {
@@ -220,10 +201,6 @@ func (p *ProxyClient) RegisterResources(ctx context.Context, server *mcp.Server)
 
 // RegisterResourceTemplates discovers resource templates from remote server and registers them as proxy resource templates
 func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp.Server) error {
-	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
-	}
-
 	// Register each remote resource template as a proxy resource template, following pagination
 	for resourceTemplate, err := range p.session.ResourceTemplates(ctx, nil) {
 		if err != nil {
@@ -246,10 +223,6 @@ func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp
 // createProxyResourceHandler creates a handler function that forwards resource reads to the remote server
 func (p *ProxyClient) createProxyResourceHandler() mcp.ResourceHandler {
 	return func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
-		if p.session == nil {
-			return nil, fmt.Errorf("not connected to remote MCP server")
-		}
-
 		// Call remote resource
 		params := *req.Params
 		params.Meta = nil
@@ -264,10 +237,6 @@ func (p *ProxyClient) createProxyResourceHandler() mcp.ResourceHandler {
 
 // RegisterPrompts discovers prompts from remote server and registers them as proxy prompts
 func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) error {
-	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
-	}
-
 	// Register each remote prompt as a proxy prompt, following pagination
 	for prompt, err := range p.session.Prompts(ctx, nil) {
 		if err != nil {
@@ -290,10 +259,6 @@ func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) e
 // createProxyPromptHandler creates a handler function that forwards prompt requests to the remote server
 func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
 	return func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		if p.session == nil {
-			return nil, fmt.Errorf("not connected to remote MCP server")
-		}
-
 		// Call remote prompt
 		params := *req.Params
 		params.Meta = nil
@@ -310,10 +275,6 @@ func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
 // completion requests to the remote server
 func (p *ProxyClient) createProxyCompletionHandler() func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
 	return func(ctx context.Context, req *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
-		if p.session == nil {
-			return nil, errors.New("not connected to remote MCP server")
-		}
-
 		// Call remote completion
 		params := *req.Params
 		params.Meta = nil
@@ -326,10 +287,11 @@ func (p *ProxyClient) createProxyCompletionHandler() func(context.Context, *mcp.
 	}
 }
 
-// Close closes the connection to the remote MCP server
+// Close closes the connection to the remote MCP server. A nil ProxyClient,
+// as when the proxy is disabled, has nothing to close.
 func (p *ProxyClient) Close() error {
-	if p != nil && p.session != nil {
-		return p.session.Close()
+	if p == nil {
+		return nil
 	}
-	return nil
+	return p.session.Close()
 }
