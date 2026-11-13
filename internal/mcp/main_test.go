@@ -782,21 +782,10 @@ var validCtx = gomock.Cond(func(x any) bool {
 })
 
 // requireIntegration skips an integration test unless TIGER_INTEGRATION is
-// set and every environment variable it requires (typically credentials) is
-// too. Pull requests from forks don't get CI's credentials, so they still run
-// the integration tests that need none.
-func requireIntegration(t *testing.T, required ...string) {
+// set.
+func requireIntegration(t *testing.T) {
 	t.Helper()
 	if os.Getenv("TIGER_INTEGRATION") == "" {
 		t.Skip("Skipping integration test: set TIGER_INTEGRATION=1 to run")
-	}
-	var missing []string
-	for _, name := range required {
-		if os.Getenv(name) == "" {
-			missing = append(missing, name)
-		}
-	}
-	if len(missing) > 0 {
-		t.Skipf("Skipping integration test: %s must be set", strings.Join(missing, ", "))
 	}
 }

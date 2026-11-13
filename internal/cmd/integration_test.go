@@ -133,10 +133,7 @@ func sweepStaleIntegrationServices(t *testing.T, threshold time.Duration) {
 // login -> status -> create -> get -> update-password -> delete -> logout
 func TestServiceLifecycleIntegration(t *testing.T) {
 	keyring.MockInit()
-	// Check for required environment variables
-	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
-	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	requireIntegration(t, "TIGER_PUBLIC_KEY_INTEGRATION", "TIGER_SECRET_KEY_INTEGRATION")
+	publicKey, secretKey := requireIntegrationCreds(t)
 
 	// Set up isolated test environment with temporary config directory
 	tmpDir := setupIntegrationTest(t)
@@ -1524,12 +1521,8 @@ func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
 
 // TestServiceNotFoundIntegration tests that commands requiring service ID fail with correct exit code for non-existent services
 func TestServiceNotFoundIntegration(t *testing.T) {
-	// Check for required environment variables
-	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
-	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
 	keyring.MockInit()
-
-	requireIntegration(t, "TIGER_PUBLIC_KEY_INTEGRATION", "TIGER_SECRET_KEY_INTEGRATION")
+	publicKey, secretKey := requireIntegrationCreds(t)
 
 	// Set up isolated test environment with temporary config directory
 	tmpDir := setupIntegrationTest(t)
@@ -1647,13 +1640,10 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 
 // TestDatabaseCommandsIntegration tests database-related commands that don't require service creation
 func TestDatabaseCommandsIntegration(t *testing.T) {
-	// Check for required environment variables
-	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
-	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	existingServiceID := os.Getenv("TIGER_EXISTING_SERVICE_ID_INTEGRATION") // Optional: use existing service
 	keyring.MockInit()
+	publicKey, secretKey := requireIntegrationCreds(t)
 
-	requireIntegration(t, "TIGER_PUBLIC_KEY_INTEGRATION", "TIGER_SECRET_KEY_INTEGRATION")
+	existingServiceID := os.Getenv("TIGER_EXISTING_SERVICE_ID_INTEGRATION") // Optional: use existing service
 
 	if existingServiceID == "" {
 		t.Skip("Skipping database integration test: TIGER_EXISTING_SERVICE_ID_INTEGRATION not set")
@@ -1861,10 +1851,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 // TestServiceForkIntegration tests forking a service at the current state (the default) and validates data is correctly copied
 func TestServiceForkIntegration(t *testing.T) {
 	keyring.MockInit()
-	// Check for required environment variables
-	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
-	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	requireIntegration(t, "TIGER_PUBLIC_KEY_INTEGRATION", "TIGER_SECRET_KEY_INTEGRATION")
+	publicKey, secretKey := requireIntegrationCreds(t)
 
 	// Set up isolated test environment with temporary config directory
 	tmpDir := setupIntegrationTest(t)

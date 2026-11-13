@@ -790,21 +790,25 @@ func testFlags(t *testing.T, dir string) *pflag.FlagSet {
 }
 
 // requireIntegration skips an integration test unless TIGER_INTEGRATION is
-// set and every environment variable it requires (typically credentials) is
-// too. Pull requests from forks don't get CI's credentials, so they still run
-// the integration tests that need none.
-func requireIntegration(t *testing.T, required ...string) {
+// set.
+func requireIntegration(t *testing.T) {
 	t.Helper()
 	if os.Getenv("TIGER_INTEGRATION") == "" {
 		t.Skip("Skipping integration test: set TIGER_INTEGRATION=1 to run")
 	}
-	var missing []string
-	for _, name := range required {
-		if os.Getenv(name) == "" {
-			missing = append(missing, name)
-		}
+}
+
+// requireIntegrationCreds skips an integration test unless TIGER_INTEGRATION
+// and the integration credentials are set, and returns the credentials. Pull
+// requests from forks don't get CI's credentials, so they still run the
+// integration tests that need none.
+func requireIntegrationCreds(t *testing.T) (publicKey, secretKey string) {
+	t.Helper()
+	requireIntegration(t)
+	publicKey = os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
+	secretKey = os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
 	}
-	if len(missing) > 0 {
-		t.Skipf("Skipping integration test: %s must be set", strings.Join(missing, ", "))
-	}
+	return publicKey, secretKey
 }
