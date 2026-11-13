@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -13,331 +14,228 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/zalando/go-keyring"
+
+	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 )
 
 func TestDocsProxy(t *testing.T) {
 	everything := docsFeatures{tools: true, resources: true, prompts: true, completions: true}
-	full := newDocsServer(everything)
-	toolsAndPrompts := newDocsServer(docsFeatures{tools: true, prompts: true})
-	toolsAndResources := newDocsServer(docsFeatures{tools: true, resources: true})
-	promptsOnly := newDocsServer(docsFeatures{prompts: true})
-	legacy := newDocsServer(docsFeatures{tools: true, legacy: true})
-	noCapabilities := newDocsServer(docsFeatures{tools: true, legacy: true, noCapabilities: true})
-	paginated := newDocsServer(docsFeatures{tools: true, resources: true, prompts: true, pageSize: 1})
-	unnamed := newDocsServer(docsFeatures{tools: true, resources: true, prompts: true, unnamed: true})
-	failingLists := func(methods ...string) *docsServer {
+	failing := func(methods ...string) *docsFeatures {
 		features := everything
 		features.fail = methods
-		return newDocsServer(features)
-	}
-	failingCalls := failingLists("tools/call", "prompts/get", "resources/read", "completion/complete")
-
-	// The proxy calls the docs server as a client in its own right, whatever
-	// the agent sends or supports.
-	proxyIdentity := func(protocolVersion string) map[string]any {
-		return map[string]any{
-			"client":            "tiger-mcp-proxy-client",
-			"protocol_version":  protocolVersion,
-			"capabilities_diff": "",
-		}
-	}
-	const proxyIdentityText = `client=tiger-mcp-proxy-client protocol_version=2026-07-28 capabilities_diff=""`
-
-	everythingRegistered := docsRegistration{
-		tools:     []string{"ask", "search_docs", "view_skill", "whoami"},
-		resources: []string{"docs://ask", "docs://guide"},
-		templates: []string{"docs://chapters/{chapter}", "docs://pages/{page}"},
-		prompts:   []string{"ask", "setup"},
-	}
-	nothingRegistered := docsRegistration{}
-	answerBlue := withElicitation(&mcp.ElicitResult{Action: "accept", Content: map[string]any{"color": "blue"}})
-	completeSetup := &mcp.CompleteParams{
-		Ref:      &mcp.CompleteReference{Type: "ref/prompt", Name: "setup"},
-		Argument: mcp.CompleteParamsArgument{Name: "topic", Value: "hyper"},
+		return &features
 	}
 
-	runToolTests(t, []toolTest{
+	// What listOffered renders for each kind of the fake docs server's features.
+	const (
+		offersTools       = "tool:ask tool:search_docs"
+		offersResources   = "resource:docs://guide resource:docs://intro"
+		offersTemplates   = "template:docs://chapters/{chapter} template:docs://pages/{page}"
+		offersPrompts     = "prompt:intro prompt:setup"
+		offersCompletions = "completions"
+	)
+	offers := func(kinds ...string) string { return strings.Join(kinds, " ") }
+
+	// The list requests Tiger MCP makes of a docs server that advertises
+	// everything, as it starts.
+	startup := []string{"tools/list", "resources/list", "resources/templates/list", "prompts/list"}
+	afterStartup := func(methods ...string) []string { return append(slices.Clone(startup), methods...) }
+
+	unreachable := httptest.NewServer(http.NotFoundHandler())
+	unreachable.Close()
+
+	runProxyTests(t, []proxyTest{
 		// Connecting
 		{
-			name:        "skips the proxy when docs MCP is disabled",
-			tool:        "search_docs",
-			args:        map[string]any{},
-			wantCallErr: `calling "tools/call": unknown tool "search_docs"`,
-			checks: []checkFunc{
-				checkStartupLogs("level=INFO msg=\"Docs MCP proxy is disabled\"\n"),
-				checkDocsRegistered(nothingRegistered),
-			},
+			name:    "skips the proxy when docs MCP is disabled",
+			docs:    &everything,
+			config:  map[string]any{"docs_mcp": false},
+			request: listOffered(),
 		},
 		{
-			name:        "skips the proxy when there is no docs MCP URL",
-			tool:        "search_docs",
-			args:        map[string]any{},
-			opts:        []runOption{withConfig(map[string]any{"docs_mcp": true, "docs_mcp_url": ""})},
-			wantCallErr: `calling "tools/call": unknown tool "search_docs"`,
-			checks: []checkFunc{
-				checkStartupLogs("level=INFO msg=\"Docs MCP proxy is disabled\"\n"),
-				checkDocsRegistered(nothingRegistered),
-			},
+			name:    "skips the proxy when there is no docs MCP URL",
+			docs:    &everything,
+			config:  map[string]any{"docs_mcp_url": ""},
+			request: listOffered(),
 		},
 		{
-			name:        "starts without docs features when the docs server is unreachable",
-			tool:        "search_docs",
-			args:        map[string]any{},
-			opts:        []runOption{withUnreachableDocsServer()},
-			wantCallErr: `calling "tools/call": unknown tool "search_docs"`,
-			checks: []checkFunc{
-				// The connection error names a random port and comes from the
-				// OS, so only the message itself can be matched exactly.
-				checkStartupLogsPrefix(`level=ERROR msg="Failed to connect to docs MCP server" url=http://127.0.0.1:`),
-				checkDocsRegistered(nothingRegistered),
-			},
+			name:    "starts without docs features when the docs server is unreachable",
+			docs:    &everything,
+			config:  map[string]any{"docs_mcp_url": unreachable.URL},
+			request: listOffered(),
 		},
 
 		// Registering what the docs server advertises
 		{
-			name:       "registers everything the server advertises",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(full)},
-			wantOutput: map[string]any{"results": "docs"},
-			checks: []checkFunc{
-				checkStartupLogs(""),
-				full.checkListed("tools/list", "resources/list", "resources/templates/list", "prompts/list"),
-				checkDocsRegistered(everythingRegistered),
-				checkAdvertisesCompletions(true),
+			name:          "offers everything the docs server advertises",
+			docs:          &everything,
+			request:       listOffered(),
+			want:          offers(offersTools, offersResources, offersTemplates, offersPrompts, offersCompletions),
+			wantDocsCalls: startup,
+		},
+		{
+			name:          "skips resources and completions the docs server doesn't advertise",
+			docs:          &docsFeatures{tools: true, prompts: true},
+			request:       listOffered(),
+			want:          offers(offersTools, offersPrompts),
+			wantDocsCalls: []string{"tools/list", "prompts/list"},
+		},
+		{
+			name:          "skips prompts the docs server doesn't advertise",
+			docs:          &docsFeatures{tools: true, resources: true},
+			request:       listOffered(),
+			want:          offers(offersTools, offersResources, offersTemplates),
+			wantDocsCalls: []string{"tools/list", "resources/list", "resources/templates/list"},
+		},
+		{
+			name:          "skips tools the docs server doesn't advertise",
+			docs:          &docsFeatures{prompts: true},
+			request:       listOffered(),
+			want:          offers(offersPrompts),
+			wantDocsCalls: []string{"prompts/list"},
+		},
+		{
+			name:    "offers nothing when the docs server advertises no capabilities",
+			docs:    &docsFeatures{tools: true, legacy: true, noCapabilities: true},
+			request: listOffered(),
+		},
+		{
+			name:    "offers everything from every page",
+			docs:    &docsFeatures{tools: true, resources: true, prompts: true, pageSize: 1},
+			request: listOffered(),
+			want:    offers(offersTools, offersResources, offersTemplates, offersPrompts),
+			wantDocsCalls: []string{
+				"tools/list", "tools/list",
+				"resources/list", "resources/list",
+				"resources/templates/list", "resources/templates/list",
+				"prompts/list", "prompts/list",
 			},
 		},
 		{
-			name:       "skips resources and completions the server doesn't advertise",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(toolsAndPrompts)},
-			wantOutput: map[string]any{"results": "docs"},
-			checks: []checkFunc{
-				toolsAndPrompts.checkListed("tools/list", "prompts/list"),
-				checkDocsRegistered(docsRegistration{tools: everythingRegistered.tools, prompts: everythingRegistered.prompts}),
-				checkAdvertisesCompletions(false),
-			},
+			name:          "skips entries without a name or URI",
+			docs:          &docsFeatures{tools: true, resources: true, prompts: true, unnamed: true},
+			request:       listOffered(),
+			want:          offers(offersTools, offersResources, offersTemplates, offersPrompts),
+			wantDocsCalls: []string{"tools/list", "resources/list", "resources/templates/list", "prompts/list"},
 		},
 		{
-			name:       "skips prompts the server doesn't advertise",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(toolsAndResources)},
-			wantOutput: map[string]any{"results": "docs"},
-			checks: []checkFunc{
-				toolsAndResources.checkListed("tools/list", "resources/list", "resources/templates/list"),
-				checkDocsRegistered(docsRegistration{
-					tools:     everythingRegistered.tools,
-					resources: everythingRegistered.resources,
-					templates: everythingRegistered.templates,
-				}),
-			},
+			name:          "offers the rest when listing tools fails",
+			docs:          failing("tools/list"),
+			request:       listOffered(),
+			want:          offers(offersResources, offersTemplates, offersPrompts, offersCompletions),
+			wantDocsCalls: startup,
 		},
 		{
-			name:        "skips tools the server doesn't advertise",
-			tool:        "search_docs",
-			args:        map[string]any{},
-			opts:        []runOption{withDocsServer(promptsOnly)},
-			wantCallErr: `calling "tools/call": unknown tool "search_docs"`,
-			checks: []checkFunc{
-				promptsOnly.checkListed("prompts/list"),
-				checkDocsRegistered(docsRegistration{prompts: everythingRegistered.prompts}),
-			},
+			name:          "offers the rest when listing resources fails",
+			docs:          failing("resources/list"),
+			request:       listOffered(),
+			want:          offers(offersTools, offersTemplates, offersPrompts, offersCompletions),
+			wantDocsCalls: startup,
 		},
 		{
-			name:        "registers nothing when the server advertises no capabilities",
-			tool:        "search_docs",
-			args:        map[string]any{},
-			opts:        []runOption{withDocsServer(noCapabilities)},
-			wantCallErr: `calling "tools/call": unknown tool "search_docs"`,
-			checks: []checkFunc{
-				noCapabilities.checkListed(),
-				checkDocsRegistered(nothingRegistered),
-			},
+			name:          "offers the rest when listing resource templates fails",
+			docs:          failing("resources/templates/list"),
+			request:       listOffered(),
+			want:          offers(offersTools, offersResources, offersPrompts, offersCompletions),
+			wantDocsCalls: startup,
 		},
 		{
-			name:       "registers everything from every page",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(paginated)},
-			wantOutput: map[string]any{"results": "docs"},
-			checks: []checkFunc{
-				paginated.checkListed(
-					"tools/list", "tools/list", "tools/list", "tools/list",
-					"resources/list", "resources/list",
-					"resources/templates/list", "resources/templates/list",
-					"prompts/list", "prompts/list",
-				),
-				checkDocsRegistered(docsRegistration{
-					tools:     everythingRegistered.tools,
-					resources: everythingRegistered.resources,
-					templates: everythingRegistered.templates,
-					prompts:   everythingRegistered.prompts,
-				}),
-			},
-		},
-		{
-			name:       "skips entries without a name or URI",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(unnamed)},
-			wantOutput: map[string]any{"results": "docs"},
-			checks: []checkFunc{
-				checkDocsRegistered(docsRegistration{
-					tools:     everythingRegistered.tools,
-					resources: everythingRegistered.resources,
-					templates: everythingRegistered.templates,
-					prompts:   everythingRegistered.prompts,
-				}),
-			},
-		},
-		{
-			name:        "registers the rest when listing tools fails",
-			tool:        "search_docs",
-			args:        map[string]any{},
-			opts:        []runOption{withDocsServer(failingLists("tools/list"))},
-			wantCallErr: `calling "tools/call": unknown tool "search_docs"`,
-			checks: []checkFunc{
-				checkStartupLogs("level=ERROR msg=\"Failed to register tools from docs MCP server\" error=\"failed to list tools from remote server: calling \\\"tools/list\\\": docs server failure\"\n"),
-				checkDocsRegistered(docsRegistration{
-					resources: everythingRegistered.resources,
-					templates: everythingRegistered.templates,
-					prompts:   everythingRegistered.prompts,
-				}),
-			},
-		},
-		{
-			name:       "registers the rest when listing resources fails",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(failingLists("resources/list"))},
-			wantOutput: map[string]any{"results": "docs"},
-			checks: []checkFunc{
-				checkStartupLogs("level=ERROR msg=\"Failed to register resources from docs MCP server\" error=\"failed to list resources from remote server: calling \\\"resources/list\\\": docs server failure\"\n"),
-				checkDocsRegistered(docsRegistration{
-					tools:     everythingRegistered.tools,
-					templates: everythingRegistered.templates,
-					prompts:   everythingRegistered.prompts,
-				}),
-			},
-		},
-		{
-			name:       "registers the rest when listing resource templates fails",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(failingLists("resources/templates/list"))},
-			wantOutput: map[string]any{"results": "docs"},
-			checks: []checkFunc{
-				checkStartupLogs("level=ERROR msg=\"Failed to register resource templates from docs MCP server\" error=\"failed to list resource templates from remote server: calling \\\"resources/templates/list\\\": docs server failure\"\n"),
-				checkDocsRegistered(docsRegistration{
-					tools:     everythingRegistered.tools,
-					resources: everythingRegistered.resources,
-					prompts:   everythingRegistered.prompts,
-				}),
-			},
-		},
-		{
-			name:       "registers the rest when listing prompts fails",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(failingLists("prompts/list"))},
-			wantOutput: map[string]any{"results": "docs"},
-			checks: []checkFunc{
-				checkStartupLogs("level=ERROR msg=\"Failed to register prompts from docs MCP server\" error=\"failed to list prompts from remote server: calling \\\"prompts/list\\\": docs server failure\"\n"),
-				checkDocsRegistered(docsRegistration{
-					tools:     everythingRegistered.tools,
-					resources: everythingRegistered.resources,
-					templates: everythingRegistered.templates,
-				}),
-			},
+			name:          "offers the rest when listing prompts fails",
+			docs:          failing("prompts/list"),
+			request:       listOffered(),
+			want:          offers(offersTools, offersResources, offersTemplates, offersCompletions),
+			wantDocsCalls: startup,
 		},
 
 		// Forwarding requests
 		{
-			name:       "forwards prompts, resources, and completions",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(full)},
-			wantOutput: map[string]any{"results": "docs"},
-			checks: []checkFunc{
-				checkGetPrompt("setup", "setup: "+proxyIdentityText),
-				checkReadResource("docs://guide", "docs://guide: "+proxyIdentityText),
-				checkReadResource("docs://pages/intro", "docs://pages/intro: "+proxyIdentityText),
-				checkCompletion(completeSetup, mcp.CompletionResultDetails{Values: []string{"setup topic=hyper: " + proxyIdentityText}}),
-			},
+			name:          "forwards tool calls",
+			docs:          &everything,
+			request:       callTool("search_docs", nil),
+			want:          "search results",
+			wantDocsCalls: afterStartup("tools/call"),
 		},
 		{
-			name:        "reports the docs server's errors",
-			tool:        "search_docs",
-			args:        map[string]any{},
-			opts:        []runOption{withDocsServer(failingCalls)},
-			wantCallErr: `calling "tools/call": remote tool call failed: calling "tools/call": docs server failure`,
-			checks: []checkFunc{
-				checkGetPromptErr("setup", `calling "prompts/get": remote prompt request failed: calling "prompts/get": docs server failure`),
-				checkReadResourceErr("docs://guide", `calling "resources/read": remote resource read failed: calling "resources/read": docs server failure`),
-				checkCompletionErr(completeSetup, `calling "completion/complete": remote completion failed: calling "completion/complete": docs server failure`),
-			},
+			name:          "forwards prompt requests",
+			docs:          &everything,
+			request:       getPrompt("setup"),
+			want:          "setup prompt",
+			wantDocsCalls: afterStartup("prompts/get"),
 		},
 		{
-			name:       "calls the docs server as itself",
-			tool:       "whoami",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(full), answerBlue},
-			wantOutput: proxyIdentity("2026-07-28"),
+			name:          "forwards resource reads",
+			docs:          &everything,
+			request:       readResource("docs://guide"),
+			want:          "contents of docs://guide",
+			wantDocsCalls: afterStartup("resources/read"),
 		},
 		{
-			name:       "calls the docs server as itself for agents on older protocol versions",
-			tool:       "whoami",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(full), withClientProtocolVersion("2025-11-25"), answerBlue},
-			wantOutput: proxyIdentity("2026-07-28"),
+			name:          "forwards resource template reads",
+			docs:          &everything,
+			request:       readResource("docs://pages/intro"),
+			want:          "contents of docs://pages/intro",
+			wantDocsCalls: afterStartup("resources/read"),
 		},
 		{
-			name:       "calls tools on a docs server that only speaks older protocol versions",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(legacy)},
-			wantOutput: map[string]any{"results": "docs"},
+			name:          "forwards completion requests",
+			docs:          &everything,
+			request:       complete("setup", "topic", "hyper"),
+			want:          "hypertables",
+			wantDocsCalls: afterStartup("completion/complete"),
 		},
 		{
-			name:       "calls a docs server that only speaks older protocol versions as itself",
-			tool:       "whoami",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(legacy), answerBlue},
-			wantOutput: proxyIdentity("2025-11-25"),
+			name:          "reports the docs server's tool call errors",
+			docs:          failing("tools/call"),
+			request:       callTool("search_docs", nil),
+			wantErr:       `calling "tools/call": remote tool call failed: calling "tools/call": docs server failure`,
+			wantDocsCalls: afterStartup("tools/call"),
 		},
 		{
-			name:       "passes the docs server's input requests through to the agent",
-			tool:       "ask",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(full), answerBlue},
-			wantPrompt: &mcp.ElicitParams{Mode: "form", Message: "Favorite color?", RequestedSchema: askSchema},
-			wantOutput: map[string]any{"color": "blue", "request_state": "asked"},
-			checks: []checkFunc{
-				checkGetPrompt("ask", "ask: color=blue request_state=asked"),
-				checkReadResource("docs://ask", "docs://ask: color=blue request_state=asked"),
-			},
-		},
-
-		// Shutting down
-		{
-			name:       "closes the docs server connection",
-			tool:       "search_docs",
-			args:       map[string]any{},
-			opts:       []runOption{withDocsServer(full)},
-			wantOutput: map[string]any{"results": "docs"},
-			checks: []checkFunc{
-				checkClose(),
-				checkCallToolErr("search_docs", `calling "tools/call": remote tool call failed: connection closed: calling "tools/call": client is closing`),
-			},
+			name:          "reports the docs server's prompt request errors",
+			docs:          failing("prompts/get"),
+			request:       getPrompt("setup"),
+			wantErr:       `calling "prompts/get": remote prompt request failed: calling "prompts/get": docs server failure`,
+			wantDocsCalls: afterStartup("prompts/get"),
 		},
 		{
-			name:        "closes with the proxy disabled",
-			tool:        "search_docs",
-			args:        map[string]any{},
-			wantCallErr: `calling "tools/call": unknown tool "search_docs"`,
-			checks:      []checkFunc{checkClose()},
+			name:          "reports the docs server's resource read errors",
+			docs:          failing("resources/read"),
+			request:       readResource("docs://guide"),
+			wantErr:       `calling "resources/read": remote resource read failed: calling "resources/read": docs server failure`,
+			wantDocsCalls: afterStartup("resources/read"),
+		},
+		{
+			name:          "reports the docs server's completion errors",
+			docs:          failing("completion/complete"),
+			request:       complete("setup", "topic", "hyper"),
+			wantErr:       `calling "completion/complete": remote completion failed: calling "completion/complete": docs server failure`,
+			wantDocsCalls: afterStartup("completion/complete"),
+		},
+		{
+			name:                 "calls tools the same way for agents on older protocol versions",
+			docs:                 &everything,
+			agentProtocolVersion: "2025-11-25",
+			request:              callTool("search_docs", nil),
+			want:                 "search results",
+			wantDocsCalls:        afterStartup("tools/call"),
+		},
+		{
+			name:          "calls tools on a docs server that only speaks older protocol versions",
+			docs:          &docsFeatures{tools: true, legacy: true},
+			request:       callTool("search_docs", nil),
+			want:          "search results",
+			wantDocsCalls: []string{"tools/list", "tools/call"},
+		},
+		{
+			name:          "passes the docs server's input requests through to the agent",
+			docs:          &everything,
+			answer:        &mcp.ElicitResult{Action: "accept", Content: map[string]any{"color": "blue"}},
+			request:       callTool("ask", nil),
+			want:          "color=blue request_state=asked",
+			wantDocsCalls: afterStartup("tools/call", "tools/call"),
 		},
 	})
 }
@@ -345,92 +243,303 @@ func TestDocsProxy(t *testing.T) {
 // TestDocsProxyIntegration runs the docs proxy against the production docs MCP
 // server (pg-aiguide), for agents on the latest and the previous protocol
 // version, to catch an incompatibility as soon as either side changes. It
-// asserts only what stays stable as the docs change: that the docs features
-// register and return content.
+// asserts only what stays stable as the docs change: that each request returns
+// content.
 func TestDocsProxyIntegration(t *testing.T) {
 	requireIntegration(t)
 
 	// Keyword-only search, so the test doesn't depend on the docs server's
 	// embeddings provider.
-	searchArgs := map[string]any{"source": "tiger", "query": "hypertable", "limit": 3, "semanticWeight": 0}
+	search := callTool("search_docs", map[string]any{"source": "tiger", "query": "hypertable", "limit": 3, "semanticWeight": 0})
 	// A skill name of "." lists the skills, which stays valid as they change.
-	viewSkillArgs := map[string]any{"skill_name": ".", "path": ""}
+	viewSkills := callTool("view_skill", map[string]any{"skill_name": ".", "path": ""})
 
-	var tests []toolTest
+	var tests []proxyTest
 	for _, version := range []string{"2026-07-28", "2025-11-25"} {
-		opts := []runOption{withConfig(map[string]any{"docs_mcp": true}), withClientProtocolVersion(version)}
+		// The live docs change, so only that there's content can be asserted.
 		tests = append(tests,
-			toolTest{
-				name: "searches the docs, agent on " + version,
-				tool: "search_docs",
-				args: searchArgs,
-				opts: opts,
-				// The live docs change, so only their shape can be asserted.
-				wantOutput: matchNonEmpty("results"),
-				checks:     []checkFunc{checkStartupLogs(""), checkGetsAPrompt()},
-			},
-			toolTest{
-				name: "views the skills, agent on " + version,
-				tool: "view_skill",
-				args: viewSkillArgs,
-				opts: opts,
-				// The live skills change, so only their shape can be asserted.
-				wantOutput: matchNonEmpty("content"),
-			},
+			proxyTest{name: "searches the docs, agent on " + version, agentProtocolVersion: version, request: search, want: matchNonEmpty()},
+			proxyTest{name: "views the skills, agent on " + version, agentProtocolVersion: version, request: viewSkills, want: matchNonEmpty()},
+			proxyTest{name: "gets a prompt, agent on " + version, agentProtocolVersion: version, request: getFirstPrompt(), want: matchNonEmpty()},
 		)
 	}
-	runToolTests(t, tests)
+	runProxyTests(t, tests)
 }
 
-// matchNonEmpty asserts structured content whose key holds a non-empty value.
-func matchNonEmpty(key string) matchOutput {
-	return func(t *testing.T, got any) {
-		t.Helper()
-		m, ok := got.(map[string]any)
-		if !ok {
-			t.Fatalf("structured content = %#v, want an object", got)
-		}
-		switch v := m[key].(type) {
-		case string:
-			if v != "" {
-				return
-			}
-		case []any:
-			if len(v) > 0 {
-				return
-			}
-		}
-		t.Errorf("structured content %q = %#v, want a non-empty string or list", key, m[key])
+// proxyTest is a test case for the docs proxy: a fake docs MCP server for
+// Tiger MCP to proxy, a request an agent makes of Tiger MCP, and what the agent
+// and the docs server should see.
+type proxyTest struct {
+	name string
+
+	// docs is the fake docs server Tiger MCP proxies. Left nil, Tiger MCP
+	// proxies the production docs server instead, which only the integration
+	// test does.
+	docs *docsFeatures
+	// config is merged over the config Tiger MCP starts with, which enables
+	// the docs proxy and points it at docs.
+	config map[string]any
+
+	// agentProtocolVersion is the protocol version the agent asks Tiger MCP
+	// for; the SDK's latest if empty.
+	agentProtocolVersion string
+	// answer, if set, makes the agent support elicitation and answer every
+	// prompt with it.
+	answer *mcp.ElicitResult
+
+	request agentRequest
+
+	// want is the response as request renders it, or a matchText for a live
+	// server's, and wantErr the error it returns instead. Left unset, they
+	// assert an empty response and no error respectively.
+	want    any
+	wantErr string
+	// wantDocsCalls lists the methods the docs server received after the
+	// handshake, in order. The runner also asserts that each came from the
+	// proxy as a client in its own right.
+	wantDocsCalls []string
+}
+
+// runProxyTests runs a slice of docs proxy test cases.
+func runProxyTests(t *testing.T, tests []proxyTest) {
+	t.Helper()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { runProxyTest(t, tt) })
 	}
 }
 
-// checkGetsAPrompt returns a check asserting the first prompt the agent is
-// offered returns messages.
-func checkGetsAPrompt() checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		ctx := context.Background()
-		for prompt, err := range result.session.Prompts(ctx, nil) {
-			if err != nil {
-				t.Fatalf("list prompts: %v", err)
-			}
-			res, err := result.session.GetPrompt(ctx, &mcp.GetPromptParams{Name: prompt.Name})
-			if err != nil {
-				t.Fatalf("get prompt %q: %v", prompt.Name, err)
-			}
-			if len(res.Messages) == 0 {
-				t.Errorf("prompt %q returned no messages", prompt.Name)
-			}
-			return
+// runProxyTest serves tt.docs over streamable HTTP, builds a real Tiger MCP
+// server proxying it, connects an in-memory agent, makes tt.request, and
+// asserts what the agent and the docs server saw. It closes Tiger MCP
+// afterwards, asserting that closes cleanly too.
+//
+// Not t.Parallel-safe: it resets the process-wide mock keyring and sets
+// TIGER_CONFIG_DIR.
+func runProxyTest(t *testing.T, tt proxyTest) {
+	t.Helper()
+	ctx := t.Context()
+	keyring.MockInit()
+
+	values := map[string]any{"analytics": false, "docs_mcp": true}
+	var docs *docsServer
+	if tt.docs != nil {
+		docs = startDocsServer(t, *tt.docs)
+		values["docs_mcp_url"] = docs.url
+	}
+	maps.Copy(values, tt.config)
+	configDir := t.TempDir()
+	writeConfigFile(t, configDir, values)
+	t.Setenv("TIGER_CONFIG_DIR", configDir)
+
+	app := &common.App{}
+	app.SetClientFactory(func(context.Context, *config.Config) (api.ClientWithResponsesInterface, string, error) {
+		return nil, "", errors.New("the docs proxy uses no API client")
+	})
+	if _, _, _, err := app.Load(ctx); err != nil {
+		t.Fatalf("load app: %v", err)
+	}
+	server, err := NewServer(ctx, app, nil, TransportStdio)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	clientTransport, serverTransport := mcp.NewInMemoryTransports()
+	serverSession, err := server.mcpServer.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatalf("server connect: %v", err)
+	}
+	t.Cleanup(func() { _ = serverSession.Close() })
+
+	clientOpts := &mcp.ClientOptions{}
+	if tt.answer != nil {
+		clientOpts.ElicitationHandler = func(context.Context, *mcp.ElicitRequest) (*mcp.ElicitResult, error) {
+			return tt.answer, nil
 		}
-		t.Error("no prompts offered")
+	}
+	agent := mcp.NewClient(&mcp.Implementation{Name: "test-agent"}, clientOpts)
+	session, err := agent.Connect(ctx, clientTransport, &mcp.ClientSessionOptions{ProtocolVersion: tt.agentProtocolVersion})
+	if err != nil {
+		t.Fatalf("agent connect: %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+
+	got, err := tt.request(ctx, session)
+	if tt.wantErr != "" {
+		if err == nil {
+			t.Errorf("expected error %q, got response %q", tt.wantErr, got)
+		} else if err.Error() != tt.wantErr {
+			t.Errorf("error = %q, want %q", err.Error(), tt.wantErr)
+		}
+	} else if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if match, ok := tt.want.(matchText); ok {
+		match(t, got)
+	} else {
+		want, _ := tt.want.(string)
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("response mismatch (-want +got):\n%s", diff)
+		}
+	}
+
+	if docs != nil {
+		docs.assertCalls(t, tt.wantDocsCalls)
+	}
+
+	if err := server.Close(); err != nil {
+		t.Errorf("close: %v", err)
+	}
+}
+
+// matchText asserts a response that can't be matched exactly.
+type matchText func(t *testing.T, got string)
+
+// matchNonEmpty asserts the response isn't empty.
+func matchNonEmpty() matchText {
+	return func(t *testing.T, got string) {
+		t.Helper()
+		if got == "" {
+			t.Error("response is empty, want content")
+		}
+	}
+}
+
+// agentRequest is a request an agent makes of Tiger MCP. It returns the
+// response rendered as text, or the error the request returned.
+type agentRequest func(ctx context.Context, session *mcp.ClientSession) (string, error)
+
+// callTool calls the named tool with args, rendering the text content of the
+// result.
+func callTool(name string, args map[string]any) agentRequest {
+	return func(ctx context.Context, session *mcp.ClientSession) (string, error) {
+		if args == nil {
+			args = map[string]any{}
+		}
+		res, err := session.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: args})
+		if err != nil {
+			return "", err
+		}
+		var texts []string
+		for _, content := range res.Content {
+			if text, ok := content.(*mcp.TextContent); ok {
+				texts = append(texts, text.Text)
+			}
+		}
+		if res.IsError {
+			return "", fmt.Errorf("tool error: %s", strings.Join(texts, "\n"))
+		}
+		return strings.Join(texts, "\n"), nil
+	}
+}
+
+// getPrompt gets the named prompt, rendering the text of its messages.
+func getPrompt(name string) agentRequest {
+	return func(ctx context.Context, session *mcp.ClientSession) (string, error) {
+		res, err := session.GetPrompt(ctx, &mcp.GetPromptParams{Name: name})
+		if err != nil {
+			return "", err
+		}
+		var texts []string
+		for _, message := range res.Messages {
+			if text, ok := message.Content.(*mcp.TextContent); ok {
+				texts = append(texts, text.Text)
+			}
+		}
+		return strings.Join(texts, "\n"), nil
+	}
+}
+
+// getFirstPrompt gets the first prompt the agent is offered, for a server
+// whose prompts aren't known in advance.
+func getFirstPrompt() agentRequest {
+	return func(ctx context.Context, session *mcp.ClientSession) (string, error) {
+		for prompt, err := range session.Prompts(ctx, nil) {
+			if err != nil {
+				return "", err
+			}
+			return getPrompt(prompt.Name)(ctx, session)
+		}
+		return "", errors.New("no prompts offered")
+	}
+}
+
+// readResource reads the resource at uri, rendering the text of its contents.
+func readResource(uri string) agentRequest {
+	return func(ctx context.Context, session *mcp.ClientSession) (string, error) {
+		res, err := session.ReadResource(ctx, &mcp.ReadResourceParams{URI: uri})
+		if err != nil {
+			return "", err
+		}
+		var texts []string
+		for _, contents := range res.Contents {
+			texts = append(texts, contents.Text)
+		}
+		return strings.Join(texts, "\n"), nil
+	}
+}
+
+// complete completes the value of the named prompt's argument, rendering the
+// completions.
+func complete(prompt, argument, value string) agentRequest {
+	return func(ctx context.Context, session *mcp.ClientSession) (string, error) {
+		res, err := session.Complete(ctx, &mcp.CompleteParams{
+			Ref:      &mcp.CompleteReference{Type: "ref/prompt", Name: prompt},
+			Argument: mcp.CompleteParamsArgument{Name: argument, Value: value},
+		})
+		if err != nil {
+			return "", err
+		}
+		return strings.Join(res.Completion.Values, " "), nil
+	}
+}
+
+// listOffered lists the docs features Tiger MCP offers the agent: tools,
+// resources, resource templates, and prompts, each sorted and prefixed with its
+// kind, then "completions" if it offers those.
+func listOffered() agentRequest {
+	return func(ctx context.Context, session *mcp.ClientSession) (string, error) {
+		var tools, resources, templates, prompts []string
+		for tool, err := range session.Tools(ctx, nil) {
+			if err != nil {
+				return "", err
+			}
+			if tool.Title == docsTitle {
+				tools = append(tools, "tool:"+tool.Name)
+			}
+		}
+		for resource, err := range session.Resources(ctx, nil) {
+			if err != nil {
+				return "", err
+			}
+			resources = append(resources, "resource:"+resource.URI)
+		}
+		for template, err := range session.ResourceTemplates(ctx, nil) {
+			if err != nil {
+				return "", err
+			}
+			templates = append(templates, "template:"+template.URITemplate)
+		}
+		for prompt, err := range session.Prompts(ctx, nil) {
+			if err != nil {
+				return "", err
+			}
+			prompts = append(prompts, "prompt:"+prompt.Name)
+		}
+		var offered []string
+		for _, names := range [][]string{tools, resources, templates, prompts} {
+			slices.Sort(names)
+			offered = append(offered, names...)
+		}
+		if session.InitializeResult().Capabilities.Completions != nil {
+			offered = append(offered, "completions")
+		}
+		return strings.Join(offered, " "), nil
 	}
 }
 
 // docsFeatures picks what a fake docs MCP server exposes, and therefore which
-// capabilities it advertises: tools, resources (with resource templates),
-// prompts, and completions. Each kind includes an entry that reports the
-// client it sees and one that asks the client for input before it answers.
+// capabilities it advertises: two each of tools, resources, resource templates
+// (with resources), and prompts, plus completions. The ask tool asks the
+// client for input before it answers.
 //
 // The rest change how the server behaves. A nonzero pageSize splits its lists
 // into pages. legacy serves only protocol versions before 2026-07-28, as
@@ -457,126 +566,104 @@ var errDocsFailure = errors.New("docs server failure")
 // from Tiger MCP's own.
 const docsTitle = "Docs"
 
-// askSchema is the form a fake docs server requests when it asks for input.
-var askSchema = map[string]any{
-	"type":       "object",
-	"properties": map[string]any{"color": map[string]any{"type": "string"}},
-}
-
-// docsServer is a fake remote docs MCP server that records the list methods
-// it receives, so a test can assert which ones the proxy requested.
+// docsServer is a fake docs MCP server, served over streamable HTTP, that
+// records the requests it receives.
 type docsServer struct {
-	server *mcp.Server
+	url    string
 	legacy bool
 
-	mu     sync.Mutex
-	listed []string
+	mu    sync.Mutex
+	calls []docsCall
 }
 
-func newDocsServer(features docsFeatures) *docsServer {
+// docsCall is a request a fake docs server received: its method, and the
+// client the server saw making it.
+type docsCall struct {
+	method string
+	client string
+}
+
+// startDocsServer starts a fake docs server with the given features, stopping
+// it when the test ends. The SDK serves protocol versions from 2026-07-28 on
+// only from a stateless server, so a legacy docs server is a stateful one.
+func startDocsServer(t *testing.T, features docsFeatures) *docsServer {
+	t.Helper()
+	d := &docsServer{legacy: features.legacy}
+
 	opts := &mcp.ServerOptions{PageSize: features.pageSize}
 	if features.completions {
 		opts.CompletionHandler = func(_ context.Context, req *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
-			value := fmt.Sprintf("%s %s=%s: %s", req.Params.Ref.Name, req.Params.Argument.Name, req.Params.Argument.Value, clientIdentity(req))
-			return &mcp.CompleteResult{Completion: mcp.CompletionResultDetails{Values: []string{value}}}, nil
+			return &mcp.CompleteResult{Completion: mcp.CompletionResultDetails{Values: []string{req.Params.Argument.Value + "tables"}}}, nil
 		}
 	}
-	d := &docsServer{
-		server: mcp.NewServer(&mcp.Implementation{Name: "docs"}, opts),
-		legacy: features.legacy,
-	}
+	server := mcp.NewServer(&mcp.Implementation{Name: "docs"}, opts)
 
 	if features.tools {
-		docsResult := func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return &mcp.CallToolResult{
-				Content:           []mcp.Content{&mcp.TextContent{Text: `{"results":"docs"}`}},
-				StructuredContent: map[string]any{"results": "docs"},
-			}, nil
-		}
-		whoami := func(_ context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return &mcp.CallToolResult{
-				StructuredContent: map[string]any{
-					"client":           req.ClientInfo().Name,
-					"protocol_version": req.ProtocolVersion(),
-					// Empty when the client advertises no capabilities at all.
-					"capabilities_diff": cmp.Diff(&mcp.ClientCapabilities{}, req.Session.InitializeParams().Capabilities),
-				},
-			}, nil
+		search := func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "search results"}}}, nil
 		}
 		ask := func(_ context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			color, ok := askedColor(req.Params.InputResponses)
+			answer, ok := req.Params.InputResponses["color"].(*mcp.ElicitResult)
 			if !ok {
-				return &mcp.CallToolResult{InputRequests: askForColor(), RequestState: "asked"}, nil
+				return &mcp.CallToolResult{
+					InputRequests: mcp.InputRequestMap{"color": &mcp.ElicitParams{
+						Message: "Favorite color?",
+						RequestedSchema: map[string]any{
+							"type":       "object",
+							"properties": map[string]any{"color": map[string]any{"type": "string"}},
+						},
+					}},
+					RequestState: "asked",
+				}, nil
 			}
-			return &mcp.CallToolResult{
-				StructuredContent: map[string]any{"color": color, "request_state": req.Params.RequestState},
-			}, nil
+			text := fmt.Sprintf("color=%v request_state=%s", answer.Content["color"], req.Params.RequestState)
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, nil
 		}
-		handlers := map[string]mcp.ToolHandler{"search_docs": docsResult, "view_skill": docsResult, "whoami": whoami, "ask": ask}
+		tools := map[string]mcp.ToolHandler{"search_docs": search, "ask": ask}
 		if features.unnamed {
-			handlers[""] = docsResult
+			tools[""] = search
 		}
-		for name, handler := range handlers {
-			d.server.AddTool(&mcp.Tool{Name: name, Title: docsTitle, InputSchema: map[string]any{"type": "object"}}, handler)
+		for name, handler := range tools {
+			server.AddTool(&mcp.Tool{Name: name, Title: docsTitle, InputSchema: map[string]any{"type": "object"}}, handler)
 		}
 	}
 
 	if features.resources {
 		read := func(_ context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
-			text := req.Params.URI + ": " + clientIdentity(req)
-			if strings.HasSuffix(req.Params.URI, "/ask") {
-				color, ok := askedColor(req.Params.InputResponses)
-				if !ok {
-					return &mcp.ReadResourceResult{InputRequests: askForColor(), RequestState: "asked"}, nil
-				}
-				text = fmt.Sprintf("%s: color=%s request_state=%s", req.Params.URI, color, req.Params.RequestState)
-			}
-			return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{URI: req.Params.URI, Text: text}}}, nil
+			return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{URI: req.Params.URI, Text: "contents of " + req.Params.URI}}}, nil
 		}
-		resources := []string{"docs://guide", "docs://ask"}
+		resources := []string{"docs://guide", "docs://intro"}
 		templates := []string{"docs://pages/{page}", "docs://chapters/{chapter}"}
 		if features.unnamed {
 			resources = append(resources, "")
 			templates = append(templates, "")
 		}
 		for _, uri := range resources {
-			d.server.AddResource(&mcp.Resource{Name: uri, URI: uri}, read)
+			server.AddResource(&mcp.Resource{Name: uri, URI: uri}, read)
 		}
 		for _, uriTemplate := range templates {
-			d.server.AddResourceTemplate(&mcp.ResourceTemplate{Name: uriTemplate, URITemplate: uriTemplate}, read)
+			server.AddResourceTemplate(&mcp.ResourceTemplate{Name: uriTemplate, URITemplate: uriTemplate}, read)
 		}
 	}
 
 	if features.prompts {
 		get := func(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-			text := req.Params.Name + ": " + clientIdentity(req)
-			if req.Params.Name == "ask" {
-				color, ok := askedColor(req.Params.InputResponses)
-				if !ok {
-					return &mcp.GetPromptResult{InputRequests: askForColor(), RequestState: "asked"}, nil
-				}
-				text = fmt.Sprintf("ask: color=%s request_state=%s", color, req.Params.RequestState)
-			}
 			return &mcp.GetPromptResult{
-				Messages: []*mcp.PromptMessage{{Role: "user", Content: &mcp.TextContent{Text: text}}},
+				Messages: []*mcp.PromptMessage{{Role: "user", Content: &mcp.TextContent{Text: req.Params.Name + " prompt"}}},
 			}, nil
 		}
-		names := []string{"setup", "ask"}
+		prompts := []string{"setup", "intro"}
 		if features.unnamed {
-			names = append(names, "")
+			prompts = append(prompts, "")
 		}
-		for _, name := range names {
-			d.server.AddPrompt(&mcp.Prompt{Name: name}, get)
+		for _, name := range prompts {
+			server.AddPrompt(&mcp.Prompt{Name: name}, get)
 		}
 	}
 
-	d.server.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
+	server.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
-			if strings.HasSuffix(method, "/list") {
-				d.mu.Lock()
-				d.listed = append(d.listed, method)
-				d.mu.Unlock()
-			}
+			d.record(method, req)
 			if slices.Contains(features.fail, method) {
 				return nil, errDocsFailure
 			}
@@ -587,275 +674,75 @@ func newDocsServer(features docsFeatures) *docsServer {
 			return res, err
 		}
 	})
+
+	srv := httptest.NewServer(mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		return server
+	}, &mcp.StreamableHTTPOptions{Stateless: !features.legacy}))
+	t.Cleanup(func() {
+		srv.CloseClientConnections()
+		srv.Close()
+	})
+	d.url = srv.URL
 	return d
 }
 
-// clientIdentity describes the client a fake docs server sees making req.
-func clientIdentity[P mcp.Params](req *mcp.ServerRequest[P]) string {
+// handshakeMethods are the requests that establish a session, which a fake
+// docs server doesn't record.
+var handshakeMethods = []string{"initialize", "notifications/initialized", "server/discover"}
+
+// record records a request, with the client making it.
+func (d *docsServer) record(method string, req mcp.Request) {
+	if slices.Contains(handshakeMethods, method) {
+		return
+	}
+	var client string
+	if session, ok := req.GetSession().(*mcp.ServerSession); ok {
+		if params := session.InitializeParams(); params != nil {
+			client = describeClient(params)
+		}
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.calls = append(d.calls, docsCall{method: method, client: client})
+}
+
+// describeClient describes the client making a request: its name, its
+// protocol version, and how its capabilities differ from none at all.
+func describeClient(params *mcp.InitializeParams) string {
+	var name string
+	if params.ClientInfo != nil {
+		name = params.ClientInfo.Name
+	}
 	return fmt.Sprintf("client=%s protocol_version=%s capabilities_diff=%q",
-		req.ClientInfo().Name,
-		req.ProtocolVersion(),
-		cmp.Diff(&mcp.ClientCapabilities{}, req.Session.InitializeParams().Capabilities),
-	)
+		name, params.ProtocolVersion, cmp.Diff(&mcp.ClientCapabilities{}, params.Capabilities))
 }
 
-// askForColor is the input request a fake docs server makes before it
-// answers.
-func askForColor() mcp.InputRequestMap {
-	return mcp.InputRequestMap{"color": &mcp.ElicitParams{Message: "Favorite color?", RequestedSchema: askSchema}}
-}
-
-// askedColor returns the color the client answered askForColor with, if it
-// has.
-func askedColor(responses mcp.InputResponseMap) (any, bool) {
-	answer, ok := responses["color"].(*mcp.ElicitResult)
-	if !ok {
-		return nil, false
-	}
-	return answer.Content["color"], true
-}
-
-// withDocsServer serves docs over streamable HTTP and enables the docs proxy
-// against it. The SDK serves protocol versions from 2026-07-28 on only from a
-// stateless server, so a legacy docs server is a stateful one.
-func withDocsServer(docs *docsServer) runOption {
-	return withSetup(func(t *testing.T) {
-		srv := httptest.NewServer(mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-			return docs.server
-		}, &mcp.StreamableHTTPOptions{Stateless: !docs.legacy}))
-		t.Cleanup(func() {
-			srv.CloseClientConnections()
-			srv.Close()
-		})
-		t.Setenv("TIGER_DOCS_MCP", "true")
-		t.Setenv("TIGER_DOCS_MCP_URL", srv.URL)
-	})
-}
-
-// withUnreachableDocsServer enables the docs proxy against a URL nothing
-// listens on.
-func withUnreachableDocsServer() runOption {
-	return withSetup(func(t *testing.T) {
-		srv := httptest.NewServer(http.NotFoundHandler())
-		srv.Close()
-		t.Setenv("TIGER_DOCS_MCP", "true")
-		t.Setenv("TIGER_DOCS_MCP_URL", srv.URL)
-	})
-}
-
-// checkListed returns a check asserting the list methods the proxy requested
-// from the docs server, in order.
-func (d *docsServer) checkListed(want ...string) checkFunc {
-	return func(t *testing.T, _ toolResult) {
-		t.Helper()
-		d.mu.Lock()
-		defer d.mu.Unlock()
-		if diff := cmp.Diff(want, d.listed, cmpEmptyEqualsNil); diff != "" {
-			t.Errorf("listed methods mismatch (-want +got):\n%s", diff)
-		}
-	}
-}
-
-// cmpEmptyEqualsNil treats an empty slice as equal to a nil one.
-var cmpEmptyEqualsNil = cmp.FilterValues(func(x, y []string) bool {
-	return len(x) == 0 && len(y) == 0
-}, cmp.Comparer(func(_, _ []string) bool { return true }))
-
-// docsRegistration lists the docs server's features as an agent sees them
-// through Tiger MCP: tools by name, resources by URI, resource templates by URI
-// template, and prompts by name, each sorted.
-type docsRegistration struct {
-	tools     []string
-	resources []string
-	templates []string
-	prompts   []string
-}
-
-// checkDocsRegistered returns a check asserting which of the docs server's
-// features Tiger MCP offers the agent.
-func checkDocsRegistered(want docsRegistration) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		ctx := context.Background()
-		var got docsRegistration
-		for tool, err := range result.session.Tools(ctx, nil) {
-			if err != nil {
-				t.Fatalf("list tools: %v", err)
-			}
-			if tool.Title == docsTitle {
-				got.tools = append(got.tools, tool.Name)
-			}
-		}
-		for resource, err := range result.session.Resources(ctx, nil) {
-			if err != nil {
-				t.Fatalf("list resources: %v", err)
-			}
-			got.resources = append(got.resources, resource.URI)
-		}
-		for template, err := range result.session.ResourceTemplates(ctx, nil) {
-			if err != nil {
-				t.Fatalf("list resource templates: %v", err)
-			}
-			got.templates = append(got.templates, template.URITemplate)
-		}
-		for prompt, err := range result.session.Prompts(ctx, nil) {
-			if err != nil {
-				t.Fatalf("list prompts: %v", err)
-			}
-			got.prompts = append(got.prompts, prompt.Name)
-		}
-		for _, names := range [][]string{got.tools, got.resources, got.templates, got.prompts} {
-			slices.Sort(names)
-		}
-		if diff := cmp.Diff(want, got, cmp.AllowUnexported(docsRegistration{}), cmpEmptyEqualsNil); diff != "" {
-			t.Errorf("registered docs features mismatch (-want +got):\n%s", diff)
-		}
-	}
-}
-
-// checkStartupLogs returns a check asserting what the server logged while it
-// started.
-func checkStartupLogs(want string) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		if diff := cmp.Diff(want, result.startupLogs); diff != "" {
-			t.Errorf("startup logs mismatch (-want +got):\n%s", diff)
-		}
-	}
-}
-
-// checkStartupLogsPrefix returns a check asserting how what the server logged
-// while it started begins, for logs that can't be matched exactly.
-func checkStartupLogsPrefix(want string) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		if !strings.HasPrefix(result.startupLogs, want) {
-			t.Errorf("startup logs = %q, want prefix %q", result.startupLogs, want)
-		}
-	}
-}
-
-// checkAdvertisesCompletions returns a check asserting whether the server
-// advertises completion support to the client.
-func checkAdvertisesCompletions(want bool) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		if got := result.session.InitializeResult().Capabilities.Completions != nil; got != want {
-			t.Errorf("advertises completions = %v, want %v", got, want)
-		}
-	}
-}
-
-// checkCallToolErr returns a check asserting the error calling the named tool
-// again returns.
-func checkCallToolErr(name, wantErr string) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		_, err := result.session.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: map[string]any{}})
-		checkErr(t, err, wantErr)
-	}
-}
-
-// checkGetPrompt returns a check asserting the text of the single message the
-// named prompt returns.
-func checkGetPrompt(name, want string) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		res, err := result.session.GetPrompt(context.Background(), &mcp.GetPromptParams{Name: name})
-		if err != nil {
-			t.Fatalf("get prompt: %v", err)
-		}
-		var got []string
-		for _, message := range res.Messages {
-			got = append(got, message.Content.(*mcp.TextContent).Text)
-		}
-		if diff := cmp.Diff([]string{want}, got); diff != "" {
-			t.Errorf("prompt messages mismatch (-want +got):\n%s", diff)
-		}
-	}
-}
-
-// checkGetPromptErr returns a check asserting the error getting the named
-// prompt returns.
-func checkGetPromptErr(name, wantErr string) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		_, err := result.session.GetPrompt(context.Background(), &mcp.GetPromptParams{Name: name})
-		checkErr(t, err, wantErr)
-	}
-}
-
-// checkReadResource returns a check asserting the text of the single content
-// reading uri returns.
-func checkReadResource(uri, want string) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		res, err := result.session.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: uri})
-		if err != nil {
-			t.Fatalf("read resource: %v", err)
-		}
-		var got []string
-		for _, contents := range res.Contents {
-			got = append(got, contents.Text)
-		}
-		if diff := cmp.Diff([]string{want}, got); diff != "" {
-			t.Errorf("resource contents mismatch (-want +got):\n%s", diff)
-		}
-	}
-}
-
-// checkReadResourceErr returns a check asserting the error reading uri
-// returns.
-func checkReadResourceErr(uri, wantErr string) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		_, err := result.session.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: uri})
-		checkErr(t, err, wantErr)
-	}
-}
-
-// checkCompletion returns a check asserting the completion of params.
-func checkCompletion(params *mcp.CompleteParams, want mcp.CompletionResultDetails) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		got, err := result.session.Complete(context.Background(), params)
-		if err != nil {
-			t.Fatalf("complete: %v", err)
-		}
-		if diff := cmp.Diff(want, got.Completion); diff != "" {
-			t.Errorf("completion mismatch (-want +got):\n%s", diff)
-		}
-	}
-}
-
-// checkCompletionErr returns a check asserting the error completing params
-// returns.
-func checkCompletionErr(params *mcp.CompleteParams, wantErr string) checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		_, err := result.session.Complete(context.Background(), params)
-		checkErr(t, err, wantErr)
-	}
-}
-
-// checkClose returns a check that closes the server, asserting it closes
-// cleanly.
-func checkClose() checkFunc {
-	return func(t *testing.T, result toolResult) {
-		t.Helper()
-		if err := result.server.Close(); err != nil {
-			t.Errorf("close: %v", err)
-		}
-	}
-}
-
-// checkErr asserts err has the text wantErr.
-func checkErr(t *testing.T, err error, wantErr string) {
+// assertCalls asserts the methods the docs server received, in order, and
+// that each came from the proxy as a client in its own right: never as the
+// agent, at the protocol version it negotiated with the docs server, and
+// advertising no capabilities.
+func (d *docsServer) assertCalls(t *testing.T, want []string) {
 	t.Helper()
-	if err == nil {
-		t.Fatalf("expected error %q, got none", wantErr)
+	protocolVersion := "2026-07-28"
+	if d.legacy {
+		protocolVersion = "2025-11-25"
 	}
-	if got := err.Error(); got != wantErr {
-		t.Errorf("error = %q, want %q", got, wantErr)
+	proxy := describeClient(&mcp.InitializeParams{
+		ClientInfo:      &mcp.Implementation{Name: "tiger-mcp-proxy-client"},
+		ProtocolVersion: protocolVersion,
+		Capabilities:    &mcp.ClientCapabilities{},
+	})
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var methods []string
+	for _, call := range d.calls {
+		methods = append(methods, call.method)
+		if call.client != proxy {
+			t.Errorf("docs server received %s from %s, want %s", call.method, call.client, proxy)
+		}
+	}
+	if diff := cmp.Diff(want, methods); diff != "" {
+		t.Errorf("docs server calls mismatch (-want +got):\n%s", diff)
 	}
 }
