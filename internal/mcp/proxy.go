@@ -91,7 +91,10 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 // the agent's _meta. That _meta describes the agent's own connection to Tiger
 // MCP (its protocol version, identity, and capabilities), so forwarding it
 // could select a protocol version the remote server doesn't speak, or promise
-// features the proxy can't relay.
+// features the proxy can't relay. Likewise, it doesn't pass the remote server's
+// _meta back to the agent: that describes the remote server's connection to the
+// proxy, including the remote server's identity, so the agent would see a server
+// it never connected to.
 //
 // Input requests the remote server makes anyway (elicitation and the like)
 // are passed back to the agent, whose retry is forwarded with its answers: the
@@ -153,6 +156,7 @@ func (p *ProxyClient) createProxyCompletionHandler() func(context.Context, *mcp.
 			return nil, fmt.Errorf("remote completion failed: %w", err)
 		}
 
+		result.Meta = nil
 		return result, nil
 	}
 }
@@ -195,6 +199,7 @@ func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 			return nil, fmt.Errorf("remote tool call failed: %w", err)
 		}
 
+		result.Meta = nil
 		return result, nil
 	}
 }
@@ -253,6 +258,7 @@ func (p *ProxyClient) createProxyResourceHandler() mcp.ResourceHandler {
 			return nil, fmt.Errorf("remote resource read failed: %w", err)
 		}
 
+		result.Meta = nil
 		return result, nil
 	}
 }
@@ -289,6 +295,7 @@ func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
 			return nil, fmt.Errorf("remote prompt request failed: %w", err)
 		}
 
+		result.Meta = nil
 		return result, nil
 	}
 }

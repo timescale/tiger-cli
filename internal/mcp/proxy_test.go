@@ -40,6 +40,10 @@ func TestDocsProxy(t *testing.T) {
 	offersCompletions := []string{"completions"}
 	offers := slices.Concat[[]string]
 
+	// The _meta Tiger MCP puts on a result for an agent on 2026-07-28, in place
+	// of the docs server's. An agent on an older version gets none.
+	tigerMeta := mcp.Meta{mcp.MetaKeyServerInfo: &mcp.Implementation{Name: ServerName, Title: serverTitle, Version: config.Version}}
+
 	searchDocs := callTool("search_docs", map[string]any{"query": "hypertables", "limit": 3})
 	setupPrompt := getPrompt("setup", map[string]string{"topic": "hypertables"})
 	completeTopic := complete(&mcp.CompleteParams{
@@ -171,35 +175,35 @@ func TestDocsProxy(t *testing.T) {
 			name:          "forwards tool calls",
 			docs:          &everything,
 			request:       searchDocs,
-			want:          docsToolResult(),
+			want:          withMeta(docsToolResult(), tigerMeta),
 			wantDocsCalls: afterStartup("tools/call"),
 		},
 		{
 			name:          "forwards prompt requests",
 			docs:          &everything,
 			request:       setupPrompt,
-			want:          docsPromptResult(),
+			want:          withMeta(docsPromptResult(), tigerMeta),
 			wantDocsCalls: afterStartup("prompts/get"),
 		},
 		{
 			name:          "forwards resource reads",
 			docs:          &everything,
 			request:       readResource("docs://guide"),
-			want:          docsResourceResult(),
+			want:          withMeta(docsResourceResult(), tigerMeta),
 			wantDocsCalls: afterStartup("resources/read"),
 		},
 		{
 			name:          "forwards resource template reads",
 			docs:          &everything,
 			request:       readResource("docs://pages/intro"),
-			want:          docsResourceResult(),
+			want:          withMeta(docsResourceResult(), tigerMeta),
 			wantDocsCalls: afterStartup("resources/read"),
 		},
 		{
 			name:          "forwards completion requests",
 			docs:          &everything,
 			request:       completeTopic,
-			want:          docsCompletionResult(),
+			want:          withMeta(docsCompletionResult(), tigerMeta),
 			wantDocsCalls: afterStartup("completion/complete"),
 		},
 		{
@@ -235,14 +239,14 @@ func TestDocsProxy(t *testing.T) {
 			docs:                 &everything,
 			agentProtocolVersion: "2025-11-25",
 			request:              searchDocs,
-			want:                 docsToolResult(),
+			want:                 withMeta(docsToolResult(), nil),
 			wantDocsCalls:        afterStartup("tools/call"),
 		},
 		{
 			name:          "calls tools on a docs server that only speaks older protocol versions",
 			docs:          &docsFeatures{tools: true, protocolVersions: olderVersions},
 			request:       searchDocs,
-			want:          docsToolResult(),
+			want:          withMeta(docsToolResult(), tigerMeta),
 			wantDocsCalls: []string{"tools/list", "tools/call"},
 		},
 		{
@@ -251,6 +255,7 @@ func TestDocsProxy(t *testing.T) {
 			answer:  &mcp.ElicitResult{Action: "accept", Content: map[string]any{"color": "blue"}},
 			request: callTool("ask", nil),
 			want: &mcp.CallToolResult{
+				Meta:              tigerMeta,
 				Content:           []mcp.Content{},
 				StructuredContent: map[string]any{"color": "blue", "request_state": "asked"},
 			},
@@ -426,11 +431,7 @@ func runProxyTest(t *testing.T, tt proxyTest) {
 // wireJSON returns v as decoded from its JSON encoding, as it travels on the
 // wire, leaving out resultType: the SDK sets that on every result it decodes,
 // to record how it was delivered.
-//
-// It also leaves out the serverInfo the SDK adds to a result's _meta, for now:
-// the agent gets the docs server's on a result Tiger MCP proxies from a
-// 2026-07-28 docs server, and Tiger MCP's otherwise, which is still to be
-// decided.
+
 func wireJSON(t *testing.T, v any) any {
 	t.Helper()
 	b, err := json.Marshal(v)
@@ -443,12 +444,6 @@ func wireJSON(t *testing.T, v any) any {
 	}
 	if m, ok := decoded.(map[string]any); ok {
 		delete(m, "resultType")
-		if meta, ok := m["_meta"].(map[string]any); ok {
-			delete(meta, "io.modelcontextprotocol/serverInfo")
-			if len(meta) == 0 {
-				delete(m, "_meta")
-			}
-		}
 	}
 	return decoded
 }
@@ -611,8 +606,8 @@ var errDocsFailure = errors.New("docs server failure")
 const docsTitle = "Docs"
 
 // docsToolResult is the result a fake docs server's tools return, with every
-// kind of content, structured content, and _meta, all of which the proxy
-// should pass through unchanged.
+// kind of content, structured content, and _meta. The proxy should pass it
+// through unchanged apart from the _meta (see withMeta).
 func docsToolResult() *mcp.CallToolResult {
 	return &mcp.CallToolResult{
 		Meta: mcp.Meta{"docs/source": "fake"},
@@ -644,13 +639,21 @@ func docsPromptResult() *mcp.GetPromptResult {
 // resource templates return, with text and binary contents and caching hints.
 func docsResourceResult() *mcp.ReadResourceResult {
 	return &mcp.ReadResourceResult{
-		Meta:      mcp.Meta{"docs/source": "fake"},
-		Cacheable: mcp.Cacheable{TTLMs: 60000, CacheScope: "private"},
+		Meta:       mcp.Meta{"docs/source": "fake"},
+		TTLMs:      60000,
+		CacheScope: "private",
 		Contents: []*mcp.ResourceContents{
 			{URI: "docs://guide", MIMEType: "text/markdown", Text: "guide"},
 			{URI: "docs://guide/diagram", MIMEType: "image/png", Blob: []byte("png")},
 		},
 	}
+}
+
+// withMeta returns result with its _meta replaced by meta, as the agent gets a
+// result the proxy passes through.
+func withMeta[R mcp.Result](result R, meta mcp.Meta) R {
+	result.SetMeta(meta)
+	return result
 }
 
 // docsCompletionResult is the result a fake docs server's completions return.
