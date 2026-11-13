@@ -12,11 +12,17 @@ import (
 
 func TestServiceGetCmd(t *testing.T) {
 	// A fully populated service, exercising every optional table row: an
-	// environment tag, HA replicas, and a connection pooler endpoint.
+	// environment tag, storage usage, HA replicas, and a connection pooler
+	// endpoint.
 	fullService := sampleService(func(s *api.Service) {
 		s.Metadata = &api.ServiceMetadata{Environment: new("PROD")}
 		s.Resources[0].Spec.CPUMillis = new(2000)
 		s.Resources[0].Spec.MemoryGbs = new(8)
+		s.Metrics = &api.ServiceMetrics{
+			CPUMillicores: new(1200),
+			MemoryMb:      new(3072),
+			StorageMb:     new(863744),
+		}
 		s.HaReplicas = &api.HAReplica{ReplicaCount: new(2)}
 		s.ConnectionPooler = &api.ConnectionPooler{
 			Endpoint: &api.Endpoint{
@@ -171,6 +177,7 @@ func TestServiceGetCmd(t *testing.T) {
 │ Environment       │ PROD                                                                                        │
 │ CPU               │ 2 cores                                                                                     │
 │ Memory            │ 8 GB                                                                                        │
+│ Storage           │ 843.5 GB used                                                                               │
 │ Replicas          │ 2                                                                                           │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Pooler Endpoint   │ svc-12345.project.pooler.tsdb.cloud.timescale.com:6432                                      │

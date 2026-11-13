@@ -16,6 +16,17 @@ func TestBranchGetCmd(t *testing.T) {
 		expectResolveBranch(m, "br-12345", sampleBranch())
 		expectGetService(m, "svc-12345", sampleService(fluidPlatform))
 	}
+	getWithMetrics := func(m *mocks.MockClientWithResponsesInterface) {
+		expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) {
+			b.Iops = new(16000)
+			b.Metrics = &api.BranchMetrics{
+				CPUMillicores: new(120),
+				MemoryMb:      new(512),
+				StorageMb:     new(1229),
+			}
+		}))
+		expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+	}
 
 	runCmdTests(t, []cmdTest{
 		{
@@ -117,6 +128,77 @@ role: tsdbadmin
 service_id: svc-12345
 service_name: test-service
 status: READY
+`,
+		},
+		{
+			name: "table with metrics",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: getWithMetrics,
+			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                                    VALUE                                                    │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Branch ID         │ br-12345                                                                                                    │
+│ Name              │ test-branch                                                                                                 │
+│ Parent Service    │ test-service (svc-12345)                                                                                    │
+│ Status            │ READY                                                                                                       │
+│ CPU               │ 0.25 cores                                                                                                  │
+│ Memory            │ 2 GB                                                                                                        │
+│ IOPS              │ 16000                                                                                                       │
+│ Storage           │ 1.2 GB changed on this branch (billed)                                                                      │
+│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
+│ Created           │ 2025-01-16 09:00:00 UTC                                                                                     │
+│ Connection String │ postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
+└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+		},
+		{
+			// The API doesn't report a branch's storage yet, so there's no row
+			// for it until it does.
+			name: "table with metrics but no storage",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) {
+					b.Metrics = &api.BranchMetrics{CPUMillicores: new(120), MemoryMb: new(512)}
+				}))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchTable,
+		},
+		{
+			name: "json with metrics",
+			args: []string{"branch", "get", "br-12345", "-o", "json"},
+			opts: []runOption{withExperimental()},
+			mock: getWithMetrics,
+			wantStdout: `{
+  "cpu_millis": 250,
+  "created": "2025-01-16T09:00:00Z",
+  "endpoint": {
+    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+    "port": 36956
+  },
+  "id": "br-12345",
+  "iops": 16000,
+  "memory_gbs": 2,
+  "metrics": {
+    "cpu_millicores": 120,
+    "memory_mb": 512,
+    "storage_mb": 1229
+  },
+  "name": "test-branch",
+  "project_id": "test-project-123",
+  "service_id": "svc-12345",
+  "status": "READY",
+  "service_name": "test-service",
+  "role": "tsdbadmin",
+  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+  "port": 36956,
+  "database": "tsdb",
+  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
+}
 `,
 		},
 		{

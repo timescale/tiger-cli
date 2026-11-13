@@ -219,6 +219,22 @@ func convertToResourceInfo(service api.Service, experimental bool) *ResourceInfo
 	return info
 }
 
+// setServiceStorageSchemaProperties sets the storage property shared by the
+// service output types.
+func setServiceStorageSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["storage"].Description = "Amount of storage the service is using"
+	schema.Properties["storage"].Examples = []any{"512 MB", "843.5 GB"}
+}
+
+// convertToServiceStorage returns the storage a service is using in its MCP
+// output form, or "" if the API didn't report it.
+func convertToServiceStorage(service api.Service) string {
+	if service.Metrics == nil || service.Metrics.StorageMb == nil {
+		return ""
+	}
+	return util.FormatStorageMB(*service.Metrics.StorageMb)
+}
+
 // ServiceDetail represents detailed service information
 type ServiceDetail struct {
 	ServiceID        string        `json:"id"`
@@ -230,6 +246,7 @@ type ServiceDetail struct {
 	Created          string        `json:"created,omitempty"`
 	Environment      string        `json:"environment"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
+	Storage          string        `json:"storage,omitempty"`
 	Replicas         int           `json:"replicas"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
 	PoolerEndpoint   string        `json:"pooler_endpoint,omitempty"`
@@ -259,6 +276,8 @@ func setServiceDetailSchemaProperties(schema *jsonschema.Schema, experimental bo
 
 	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
 
+	setServiceStorageSchemaProperties(schema)
+
 	schema.Properties["replicas"].Description = "Number of HA replicas (0=single node/no HA, 1+=HA enabled)"
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint"
 	schema.Properties["pooler_endpoint"].Description = "Connection pooler endpoint"
@@ -285,6 +304,7 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	}
 
 	detail.Resources = convertToResourceInfo(service, s.app.Experimental)
+	detail.Storage = convertToServiceStorage(service)
 
 	// Add replica information
 	if service.HaReplicas != nil && service.HaReplicas.ReplicaCount != nil {
@@ -393,6 +413,7 @@ type BranchDetail struct {
 	Status           string        `json:"status"`
 	Created          string        `json:"created,omitempty"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
+	Storage          string        `json:"storage,omitempty"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
 	Password         string        `json:"password,omitempty"`
 	ConnectionString string        `json:"connection_string,omitempty"`
@@ -412,6 +433,9 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 	// The branch tools only exist behind the experimental gate, so the IOPS
 	// are always included.
 	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
+
+	schema.Properties["storage"].Description = "Amount of storage the branch has changed since it was created. The branch is billed only for this storage, not for the storage it still shares with its parent service."
+	schema.Properties["storage"].Examples = []any{"512 MB", "1.2 GB"}
 
 	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint (absent while the branch is still provisioning)"
 	schema.Properties["password"].Description = "Password for the branch's tsdbadmin user (only included if with_password=true)"
@@ -435,6 +459,10 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, wi
 			Memory: fmt.Sprintf("%d GB", branch.MemoryGbs),
 			IOPS:   util.Deref(branch.Iops),
 		},
+	}
+
+	if branch.Metrics != nil && branch.Metrics.StorageMb != nil {
+		detail.Storage = util.FormatStorageMB(*branch.Metrics.StorageMb)
 	}
 
 	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {

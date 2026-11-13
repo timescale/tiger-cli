@@ -34,6 +34,7 @@ Output:
       • cpu: string - CPU allocation
       • memory: string - Memory allocation
     • status (required): string - Service status
+    • storage: string - Amount of storage the service is using
     • type (required): string
 
 `
@@ -45,7 +46,7 @@ Output:
 Tool name: service_list
 
 Description:
-List all database services in your Tiger Cloud project. Returns services with status, type, region, and resource allocation.
+List all database services in your Tiger Cloud project. Returns services with status, type, region, resource allocation, and storage usage.
 
 Output:
   • services (required): []object, null
@@ -58,6 +59,7 @@ Output:
       • cpu: string - CPU allocation
       • memory: string - Memory allocation
     • status (required): string - Service status
+    • storage: string - Amount of storage the service is using
     • type (required): string
 
 `
@@ -69,7 +71,7 @@ Output:
     "readOnlyHint": true,
     "title": "List Database Services"
   },
-  "description": "List all database services in your Tiger Cloud project. Returns services with status, type, region, and resource allocation.",
+  "description": "List all database services in your Tiger Cloud project. Returns services with status, type, region, resource allocation, and storage usage.",
   "inputSchema": {
     "additionalProperties": false,
     "type": "object"
@@ -136,6 +138,14 @@ Output:
               ],
               "type": "string"
             },
+            "storage": {
+              "description": "Amount of storage the service is using",
+              "examples": [
+                "512 MB",
+                "843.5 GB"
+              ],
+              "type": "string"
+            },
             "type": {
               "enum": [
                 "TIMESCALEDB",
@@ -175,7 +185,7 @@ Output:
   openWorldHint: false
   readOnlyHint: true
   title: List Database Services
-description: List all database services in your Tiger Cloud project. Returns services with status, type, region, and resource allocation.
+description: List all database services in your Tiger Cloud project. Returns services with status, type, region, resource allocation, and storage usage.
 inputSchema:
   additionalProperties: false
   type: object
@@ -226,6 +236,12 @@ outputSchema:
               - PAUSED
               - CONFIGURING
               - UPGRADING
+            type: string
+          storage:
+            description: Amount of storage the service is using
+            examples:
+              - 512 MB
+              - 843.5 GB
             type: string
           type:
             enum:

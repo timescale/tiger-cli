@@ -26,11 +26,12 @@ func TestServiceListTool(t *testing.T) {
 	// service, fractional cores with a PROD tag, a free tier service whose null
 	// CPU and memory read as "shared", and a service with no resources at all.
 	// The first carries IOPS, a preview field dropped without the experimental
-	// gate.
+	// gate, and storage usage.
 	services := []api.Service{
 		sampleService(func(s *api.Service) {
 			s.Created = created
 			s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(4000), MemoryGbs: new(16), Iops: new(6000)}}}
+			s.Metrics = &api.ServiceMetrics{CPUMillicores: new(1200), MemoryMb: new(3072), StorageMb: new(1229)}
 		}),
 		sampleService(func(s *api.Service) {
 			s.ServiceID = "u8me885b93"
@@ -65,6 +66,7 @@ func TestServiceListTool(t *testing.T) {
 				"created":     "2025-01-15T09:30:00Z",
 				"environment": "DEV",
 				"resources":   map[string]any{"cpu": "4 cores", "memory": "16 GB"},
+				"storage":     "1.2 GB",
 			},
 			map[string]any{
 				"id":          "u8me885b93",
