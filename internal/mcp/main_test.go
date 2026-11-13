@@ -1,9 +1,11 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"maps"
 	"net/http"
 	"os"
@@ -80,7 +82,7 @@ type toolTest struct {
 	// wantCallErr is the exact text of a transport error, which is how the SDK
 	// reports a tool the server never registered — a handler's own error comes
 	// back as a result, not as one of these. Set it and the result assertions
-	// are skipped, since there is no result.
+	// are skipped, since there is no result; the checks still run.
 	wantCallErr string
 
 	// synctest runs the case inside a [synctest] bubble, where time is
@@ -125,6 +127,7 @@ func runToolTest(t *testing.T, tt toolTest) {
 		if got := result.err.Error(); got != tt.wantCallErr {
 			t.Errorf("call error = %q, want %q", got, tt.wantCallErr)
 		}
+		runChecks(t, tt.checks, result)
 		return
 	}
 	if result.err != nil {
@@ -145,7 +148,13 @@ func runToolTest(t *testing.T, tt toolTest) {
 		t.Errorf("structured content mismatch (-want +got):\n%s", diff)
 	}
 
-	for _, check := range tt.checks {
+	runChecks(t, tt.checks, result)
+}
+
+// runChecks runs a case's extra assertions in order.
+func runChecks(t *testing.T, checks []checkFunc, result toolResult) {
+	t.Helper()
+	for _, check := range checks {
 		check(t, result)
 	}
 }
@@ -169,8 +178,9 @@ type runConfig struct {
 	transport Transport // the transport the server is built for; stdio unless withTransport sets it
 
 	// MCP client
-	clientCaps *mcp.ClientCapabilities // overrides the client's advertised capabilities
-	answer     *mcp.ElicitResult       // if set, the client supports elicitation and answers every prompt with this
+	clientCaps            *mcp.ClientCapabilities // overrides the client's advertised capabilities
+	clientProtocolVersion string                  // the protocol version the client asks for; the SDK's latest if empty
+	answer                *mcp.ElicitResult       // if set, the client supports elicitation and answers every prompt with this
 }
 
 type toolResult struct {
@@ -181,6 +191,11 @@ type toolResult struct {
 	// session is the client's session, still open, for checks that make
 	// requests of their own after the tool call.
 	session *mcp.ClientSession
+	// server is the server the session is connected to.
+	server *Server
+	// startupLogs is what the server logged while it started, without
+	// timestamps.
+	startupLogs string
 
 	// prompt is the elicitation the tool raised, as the client received it
 	// after the JSON round trip (which is where the SDK fills in the mode).
@@ -255,10 +270,20 @@ func runTool(
 
 	// The session itself always runs over an in-memory transport; rc.transport
 	// only decides what the server exposes.
-	server, err := NewServer(ctx, app, nil, rc.transport)
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if len(groups) == 0 && a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
+	}))
+	server, err := NewServer(ctx, app, logger, rc.transport)
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
+	startupLogs := logs.String()
 	server.mcpServer.AddReceivingMiddleware(recoverMockFailure)
 
 	// Registration has happened by now, so this rewrite reaches only the
@@ -278,7 +303,7 @@ func runTool(
 
 	// The SDK's default client capabilities don't include elicitation, so a
 	// client with no handler is one that can't prompt.
-	result := toolResult{configDir: configDir}
+	result := toolResult{configDir: configDir, server: server, startupLogs: startupLogs}
 	clientOpts := &mcp.ClientOptions{Capabilities: rc.clientCaps}
 	if rc.answer != nil {
 		clientOpts.ElicitationHandler = func(_ context.Context, req *mcp.ElicitRequest) (*mcp.ElicitResult, error) {
@@ -287,7 +312,7 @@ func runTool(
 		}
 	}
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client"}, clientOpts)
-	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	clientSession, err := client.Connect(ctx, clientTransport, &mcp.ClientSessionOptions{ProtocolVersion: rc.clientProtocolVersion})
 	if err != nil {
 		t.Fatalf("client connect: %v", err)
 	}
@@ -436,6 +461,14 @@ func withTransport(transport Transport) runOption {
 func withClientCapabilities(caps *mcp.ClientCapabilities) runOption {
 	return func(rc *runConfig) {
 		rc.clientCaps = caps
+	}
+}
+
+// withClientProtocolVersion makes the MCP client ask for the given protocol
+// version instead of the SDK's latest.
+func withClientProtocolVersion(version string) runOption {
+	return func(rc *runConfig) {
+		rc.clientProtocolVersion = version
 	}
 }
 
