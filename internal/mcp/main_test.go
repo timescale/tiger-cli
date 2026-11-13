@@ -129,38 +129,31 @@ func runToolTest(t *testing.T, tt toolTest) {
 		if got := result.err.Error(); got != tt.wantCallErr {
 			t.Errorf("call error = %q, want %q", got, tt.wantCallErr)
 		}
-		runChecks(t, tt.checks, result)
-		return
-	}
-	if result.err != nil {
-		t.Fatalf("unexpected call error: %v", result.err)
+	} else {
+		if result.err != nil {
+			t.Fatalf("unexpected call error: %v", result.err)
+		}
+
+		if diff := cmp.Diff(tt.wantPrompt, result.prompt); diff != "" {
+			t.Errorf("prompt mismatch (-want +got):\n%s", diff)
+		}
+		if got := resultError(result.res); got != tt.wantErr {
+			t.Errorf("error = %q, want %q", got, tt.wantErr)
+		}
+		if match, ok := tt.wantOutput.(matchOutput); ok {
+			match(t, result.res.StructuredContent)
+		} else if diff := cmp.Diff(tt.wantOutput, result.res.StructuredContent); diff != "" {
+			t.Errorf("structured content mismatch (-want +got):\n%s", diff)
+		}
 	}
 
-	if diff := cmp.Diff(tt.wantPrompt, result.prompt); diff != "" {
-		t.Errorf("prompt mismatch (-want +got):\n%s", diff)
+	for _, check := range tt.checks {
+		check(t, result)
 	}
-	if got := resultError(result.res); got != tt.wantErr {
-		t.Errorf("error = %q, want %q", got, tt.wantErr)
-	}
-	if match, ok := tt.wantOutput.(matchOutput); ok {
-		match(t, result.res.StructuredContent)
-	} else if diff := cmp.Diff(tt.wantOutput, result.res.StructuredContent); diff != "" {
-		t.Errorf("structured content mismatch (-want +got):\n%s", diff)
-	}
-
-	runChecks(t, tt.checks, result)
 }
 
 // matchOutput asserts structured content that can't be matched exactly.
 type matchOutput func(t *testing.T, got any)
-
-// runChecks runs a case's extra assertions in order.
-func runChecks(t *testing.T, checks []checkFunc, result toolResult) {
-	t.Helper()
-	for _, check := range checks {
-		check(t, result)
-	}
-}
 
 type runOption func(*runConfig)
 
