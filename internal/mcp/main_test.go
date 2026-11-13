@@ -64,7 +64,9 @@ const testProjectID = "test-project-id"
 //
 // wantErr is the exact text of the error result and wantOutput the exact
 // structured content. Left unset, wantErr asserts the call succeeded and
-// wantOutput asserts it returned no structured content.
+// wantOutput asserts it returned no structured content. Only when the content
+// is inherently nondeterministic (a live server's) may wantOutput hold a
+// matchOutput instead, with a comment saying why.
 type toolTest struct {
 	name   string
 	tool   string
@@ -74,7 +76,7 @@ type toolTest struct {
 	checks []checkFunc // optional extra assertions, run in order after the standard ones
 
 	wantErr    string
-	wantOutput map[string]any
+	wantOutput any // map[string]any, or a matchOutput
 	// wantPrompt is the elicitation the tool is expected to raise, as the
 	// client receives it after the JSON round trip. Left nil, it asserts no
 	// prompt is raised. The user's answer comes from withElicitation.
@@ -140,16 +142,17 @@ func runToolTest(t *testing.T, tt toolTest) {
 	if got := resultError(result.res); got != tt.wantErr {
 		t.Errorf("error = %q, want %q", got, tt.wantErr)
 	}
-	var wantStructured any
-	if tt.wantOutput != nil {
-		wantStructured = tt.wantOutput
-	}
-	if diff := cmp.Diff(wantStructured, result.res.StructuredContent); diff != "" {
+	if match, ok := tt.wantOutput.(matchOutput); ok {
+		match(t, result.res.StructuredContent)
+	} else if diff := cmp.Diff(tt.wantOutput, result.res.StructuredContent); diff != "" {
 		t.Errorf("structured content mismatch (-want +got):\n%s", diff)
 	}
 
 	runChecks(t, tt.checks, result)
 }
+
+// matchOutput asserts structured content that can't be matched exactly.
+type matchOutput func(t *testing.T, got any)
 
 // runChecks runs a case's extra assertions in order.
 func runChecks(t *testing.T, checks []checkFunc, result toolResult) {

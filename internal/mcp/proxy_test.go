@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -340,6 +341,95 @@ func TestDocsProxy(t *testing.T) {
 			checks:      []checkFunc{checkClose()},
 		},
 	})
+}
+
+// TestDocsProxyIntegration runs the docs proxy against the production docs MCP
+// server (pg-aiguide), for agents on the latest and the previous protocol
+// version, to catch an incompatibility as soon as either side changes. It
+// needs no credentials, but skips without them like the rest of the
+// integration tests, so it runs exactly when they do. It asserts only what
+// stays stable as the docs change: that the docs features register and
+// return content.
+func TestDocsProxyIntegration(t *testing.T) {
+	if os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION") == "" || os.Getenv("TIGER_SECRET_KEY_INTEGRATION") == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
+	}
+
+	// Keyword-only search, so the test doesn't depend on the docs server's
+	// embeddings provider.
+	searchArgs := map[string]any{"source": "tiger", "query": "hypertable", "limit": 3, "semanticWeight": 0}
+	// A skill name of "." lists the skills, which stays valid as they change.
+	viewSkillArgs := map[string]any{"skill_name": ".", "path": ""}
+
+	var tests []toolTest
+	for _, version := range []string{"2026-07-28", "2025-11-25"} {
+		opts := []runOption{withConfig(map[string]any{"docs_mcp": true}), withClientProtocolVersion(version)}
+		tests = append(tests,
+			toolTest{
+				name: "searches the docs, agent on " + version,
+				tool: "search_docs",
+				args: searchArgs,
+				opts: opts,
+				// The live docs change, so only their shape can be asserted.
+				wantOutput: matchNonEmpty("results"),
+				checks:     []checkFunc{checkStartupLogs(""), checkGetsAPrompt()},
+			},
+			toolTest{
+				name: "views the skills, agent on " + version,
+				tool: "view_skill",
+				args: viewSkillArgs,
+				opts: opts,
+				// The live skills change, so only their shape can be asserted.
+				wantOutput: matchNonEmpty("content"),
+			},
+		)
+	}
+	runToolTests(t, tests)
+}
+
+// matchNonEmpty asserts structured content whose key holds a non-empty value.
+func matchNonEmpty(key string) matchOutput {
+	return func(t *testing.T, got any) {
+		t.Helper()
+		m, ok := got.(map[string]any)
+		if !ok {
+			t.Fatalf("structured content = %#v, want an object", got)
+		}
+		switch v := m[key].(type) {
+		case string:
+			if v != "" {
+				return
+			}
+		case []any:
+			if len(v) > 0 {
+				return
+			}
+		}
+		t.Errorf("structured content %q = %#v, want a non-empty string or list", key, m[key])
+	}
+}
+
+// checkGetsAPrompt returns a check asserting the first prompt the agent is
+// offered returns messages.
+func checkGetsAPrompt() checkFunc {
+	return func(t *testing.T, result toolResult) {
+		t.Helper()
+		ctx := context.Background()
+		for prompt, err := range result.session.Prompts(ctx, nil) {
+			if err != nil {
+				t.Fatalf("list prompts: %v", err)
+			}
+			res, err := result.session.GetPrompt(ctx, &mcp.GetPromptParams{Name: prompt.Name})
+			if err != nil {
+				t.Fatalf("get prompt %q: %v", prompt.Name, err)
+			}
+			if len(res.Messages) == 0 {
+				t.Errorf("prompt %q returned no messages", prompt.Name)
+			}
+			return
+		}
+		t.Error("no prompts offered")
+	}
 }
 
 // docsFeatures picks what a fake docs MCP server exposes, and therefore which
