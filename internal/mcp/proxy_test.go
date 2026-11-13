@@ -265,9 +265,24 @@ func TestDocsProxyIntegration(t *testing.T) {
 	for _, version := range []string{"2026-07-28", "2025-11-25"} {
 		// The live docs change, so only that there's content can be asserted.
 		tests = append(tests,
-			proxyTest{name: "searches the docs, agent on " + version, agentProtocolVersion: version, request: search, want: matchNonEmpty()},
-			proxyTest{name: "views the skills, agent on " + version, agentProtocolVersion: version, request: viewSkills, want: matchNonEmpty()},
-			proxyTest{name: "gets a prompt, agent on " + version, agentProtocolVersion: version, request: getFirstPrompt(), want: matchNonEmpty()},
+			proxyTest{
+				name:                 "searches the docs, agent on " + version,
+				agentProtocolVersion: version,
+				request:              search,
+				want:                 matchNonEmpty(),
+			},
+			proxyTest{
+				name:                 "views the skills, agent on " + version,
+				agentProtocolVersion: version,
+				request:              viewSkills,
+				want:                 matchNonEmpty(),
+			},
+			proxyTest{
+				name:                 "gets a prompt, agent on " + version,
+				agentProtocolVersion: version,
+				request:              getFirstPrompt(),
+				want:                 matchNonEmpty(),
+			},
 		)
 	}
 	runProxyTests(t, tests)
