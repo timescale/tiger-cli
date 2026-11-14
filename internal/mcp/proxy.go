@@ -12,31 +12,41 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// registerDocsProxy establishes a connection to the remote docs MCP server and
-// registers all tools, resources, resource templates, and prompts exposed by
-// the server. Does not connect if the docs MCP server is disabled in the
-// config or there is no URL in the config.
-func (s *Server) registerDocsProxy(ctx context.Context) {
-	cfg := s.app.GetConfig()
-
+// connectDocsProxy connects to the remote docs MCP server. Returns nil if the
+// docs MCP server is disabled in the config, there is no URL in the config, or
+// the connection fails.
+func connectDocsProxy(ctx context.Context, cfg *config.Config, logger *slog.Logger) *ProxyClient {
 	if !cfg.DocsMCP || cfg.DocsMCPURL == "" {
-		s.logger.Info("Docs MCP proxy is disabled")
-		return
+		logger.Info("Docs MCP proxy is disabled")
+		return nil
 	}
 
 	// Create timeout for establishing proxy (matches Ghost)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	proxyClient, err := NewProxyClient(ctx, cfg.DocsMCPURL, s.logger)
+	proxyClient, err := NewProxyClient(ctx, cfg.DocsMCPURL, logger)
 	if err != nil {
-		s.logger.Error("Failed to connect to docs MCP server",
+		logger.Error("Failed to connect to docs MCP server",
 			slog.String("url", cfg.DocsMCPURL),
 			slog.Any("error", err),
 		)
+		return nil
+	}
+	return proxyClient
+}
+
+// registerDocsProxy registers all tools, resources, resource templates, and
+// prompts exposed by the remote docs MCP server. Does nothing if the proxy
+// isn't connected.
+func (s *Server) registerDocsProxy(ctx context.Context) {
+	proxyClient := s.docsProxyClient
+	if proxyClient == nil {
 		return
 	}
-	s.docsProxyClient = proxyClient
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 
 	// Only list what the remote server advertises. Servers on newer protocol
 	// versions reject unsupported list methods at the HTTP level, which would
@@ -74,10 +84,22 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 	}
 }
 
-// ProxyClient manages connection to a remote MCP server and forwards requests
+// ProxyClient manages connection to a remote MCP server and forwards requests.
+//
+// It calls the remote server as a client in its own right: it negotiates its
+// own protocol version and advertises no capabilities, and it never forwards
+// the agent's _meta. That _meta describes the agent's own connection to Tiger
+// MCP (its protocol version, identity, and capabilities), so forwarding it
+// could select a protocol version the remote server doesn't speak, or promise
+// features the proxy can't relay. Likewise, it doesn't pass the remote server's
+// _meta back to the agent: that describes the remote server's connection to the
+// proxy, including the remote server's identity, so the agent would see a server
+// it never connected to.
+//
+// Input requests the remote server makes anyway (elicitation and the like)
+// are passed back to the agent, whose retry is forwarded with its answers: the
+// proxy has nothing of its own to answer them with.
 type ProxyClient struct {
-	url     string
-	client  *mcp.Client
 	session *mcp.ClientSession
 }
 
@@ -94,6 +116,9 @@ func NewProxyClient(ctx context.Context, url string, logger *slog.Logger) (*Prox
 		Version: config.Version,
 	}, &mcp.ClientOptions{
 		Logger: logger,
+		// Without this, the SDK advertises roots support by default.
+		Capabilities:   &mcp.ClientCapabilities{},
+		MultiRoundTrip: &mcp.MultiRoundTripOptions{Disabled: true},
 	})
 
 	session, err := client.Connect(ctx, transport, nil)
@@ -101,11 +126,7 @@ func NewProxyClient(ctx context.Context, url string, logger *slog.Logger) (*Prox
 		return nil, fmt.Errorf("failed to connect to remote MCP server: %w", err)
 	}
 
-	return &ProxyClient{
-		url:     url,
-		client:  client,
-		session: session,
-	}, nil
+	return &ProxyClient{session: session}, nil
 }
 
 // capabilities returns the capabilities the remote server advertised when the
@@ -117,12 +138,31 @@ func (p *ProxyClient) capabilities() *mcp.ServerCapabilities {
 	return &mcp.ServerCapabilities{}
 }
 
+// createProxyCompletionHandler creates a handler function that forwards
+// completion requests to the remote server. Returns nil, so the server doesn't
+// handle completions, if the proxy isn't connected or the remote server
+// doesn't support them. Tiger MCP has no prompts or resources of its own, so
+// every completion request is for a proxied one.
+func (p *ProxyClient) createProxyCompletionHandler() func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+	if p == nil || p.capabilities().Completions == nil {
+		return nil
+	}
+	return func(ctx context.Context, req *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+		// Call remote completion
+		params := *req.Params
+		params.Meta = nil
+		result, err := p.session.Complete(ctx, &params)
+		if err != nil {
+			return nil, fmt.Errorf("remote completion failed: %w", err)
+		}
+
+		result.Meta = nil
+		return result, nil
+	}
+}
+
 // RegisterTools discovers tools from remote server and registers them as proxy tools
 func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) error {
-	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
-	}
-
 	// Register each remote tool as a proxy tool, following pagination
 	for tool, err := range p.session.Tools(ctx, nil) {
 		if err != nil {
@@ -145,15 +185,12 @@ func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) err
 // createProxyToolHandler creates a handler function that forwards tool calls to the remote server
 func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		if p.session == nil {
-			return nil, fmt.Errorf("not connected to remote MCP server")
-		}
-
 		// Forward the request to remote server with original tool name
 		params := &mcp.CallToolParams{
-			Meta:      req.Params.Meta,
-			Name:      req.Params.Name,
-			Arguments: req.Params.Arguments,
+			Name:           req.Params.Name,
+			Arguments:      req.Params.Arguments,
+			InputResponses: req.Params.InputResponses,
+			RequestState:   req.Params.RequestState,
 		}
 
 		// Call remote tool
@@ -162,6 +199,7 @@ func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 			return nil, fmt.Errorf("remote tool call failed: %w", err)
 		}
 
+		result.Meta = nil
 		return result, nil
 	}
 }
@@ -169,10 +207,6 @@ func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 // RegisterResources discovers resources from remote server and registers them
 // as proxy resources
 func (p *ProxyClient) RegisterResources(ctx context.Context, server *mcp.Server) error {
-	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
-	}
-
 	// Register each remote resource as a proxy resource, following pagination
 	for resource, err := range p.session.Resources(ctx, nil) {
 		if err != nil {
@@ -194,10 +228,6 @@ func (p *ProxyClient) RegisterResources(ctx context.Context, server *mcp.Server)
 
 // RegisterResourceTemplates discovers resource templates from remote server and registers them as proxy resource templates
 func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp.Server) error {
-	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
-	}
-
 	// Register each remote resource template as a proxy resource template, following pagination
 	for resourceTemplate, err := range p.session.ResourceTemplates(ctx, nil) {
 		if err != nil {
@@ -220,26 +250,21 @@ func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp
 // createProxyResourceHandler creates a handler function that forwards resource reads to the remote server
 func (p *ProxyClient) createProxyResourceHandler() mcp.ResourceHandler {
 	return func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
-		if p.session == nil {
-			return nil, fmt.Errorf("not connected to remote MCP server")
-		}
-
 		// Call remote resource
-		result, err := p.session.ReadResource(ctx, req.Params)
+		params := *req.Params
+		params.Meta = nil
+		result, err := p.session.ReadResource(ctx, &params)
 		if err != nil {
 			return nil, fmt.Errorf("remote resource read failed: %w", err)
 		}
 
+		result.Meta = nil
 		return result, nil
 	}
 }
 
 // RegisterPrompts discovers prompts from remote server and registers them as proxy prompts
 func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) error {
-	if p.session == nil {
-		return fmt.Errorf("not connected to remote server")
-	}
-
 	// Register each remote prompt as a proxy prompt, following pagination
 	for prompt, err := range p.session.Prompts(ctx, nil) {
 		if err != nil {
@@ -262,24 +287,24 @@ func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) e
 // createProxyPromptHandler creates a handler function that forwards prompt requests to the remote server
 func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
 	return func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		if p.session == nil {
-			return nil, fmt.Errorf("not connected to remote MCP server")
-		}
-
 		// Call remote prompt
-		result, err := p.session.GetPrompt(ctx, req.Params)
+		params := *req.Params
+		params.Meta = nil
+		result, err := p.session.GetPrompt(ctx, &params)
 		if err != nil {
 			return nil, fmt.Errorf("remote prompt request failed: %w", err)
 		}
 
+		result.Meta = nil
 		return result, nil
 	}
 }
 
-// Close closes the connection to the remote MCP server
+// Close closes the connection to the remote MCP server. A nil ProxyClient,
+// as when the proxy is disabled, has nothing to close.
 func (p *ProxyClient) Close() error {
-	if p != nil && p.session != nil {
-		return p.session.Close()
+	if p == nil {
+		return nil
 	}
-	return nil
+	return p.session.Close()
 }

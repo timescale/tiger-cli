@@ -739,3 +739,12 @@ var validCtx = gomock.Cond(func(x any) bool {
 	ctx, ok := x.(context.Context)
 	return ok && ctx != nil
 })
+
+// requireIntegration skips an integration test unless TIGER_INTEGRATION is
+// set.
+func requireIntegration(t *testing.T) {
+	t.Helper()
+	if os.Getenv("TIGER_INTEGRATION") == "" {
+		t.Skip("Skipping integration test: set TIGER_INTEGRATION=1 to run")
+	}
+}

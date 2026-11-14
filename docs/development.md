@@ -65,7 +65,7 @@ when adding tests.
 
 ## Integration Tests
 
-Integration tests execute real API calls against a Tiger environment to validate end-to-end functionality. These tests require valid credentials and will create/delete actual resources.
+Integration tests execute real API calls against a Tiger environment and other live services to validate end-to-end functionality. They run only when `TIGER_INTEGRATION` is set. Most require valid credentials and will create/delete actual resources.
 
 ### Setup
 
@@ -85,13 +85,14 @@ Integration tests execute real API calls against a Tiger environment to validate
 
 ```bash
 # Load environment variables and run all integration tests
-export $(cat .env | xargs) && go test ./internal/cmd -v -run Integration
+./scripts/test-integration.sh -v
 
 # Run specific integration test
-export $(cat .env | xargs) && go test ./internal/cmd -v -run TestServiceLifecycleIntegration
+./scripts/test-integration.sh -v -run TestServiceLifecycleIntegration
 
-# Integration tests will skip automatically if credentials are not set
-go test ./internal/cmd -v -run Integration
+# Without the script, set TIGER_INTEGRATION yourself. Integration tests skip
+# when it's unset, or when credentials they need are missing.
+export $(cat .env | xargs) && TIGER_INTEGRATION=1 go test ./... -v -run Integration
 ```
 
 ### What Integration Tests Cover
@@ -102,7 +103,8 @@ go test ./internal/cmd -v -run Integration
 - **Database connectivity**: Generate connection strings and execute psql commands
 - **Output formats**: Validate JSON, YAML, and table output formats
 - **Error handling**: Test authentication failures and resource cleanup
-- **Self-upgrade**: With `TIGER_UPGRADE_INTEGRATION=1` set, `TestUpgradeLiveCDNIntegration` builds a dev binary and upgrades it in place against the live release CDN (runs in CI)
+- **Docs MCP proxy**: `TestDocsProxyIntegration` runs Tiger MCP's docs proxy against the production docs MCP server (pg-aiguide), for agents on the latest and previous MCP protocol versions
+- **Self-upgrade**: `TestUpgradeLiveCDNIntegration` builds a dev binary and upgrades it in place against the live release CDN
 
 **Note**: Integration tests create and delete real services, which may incur costs. Use a development environment when possible.
 

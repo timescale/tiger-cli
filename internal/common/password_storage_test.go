@@ -453,7 +453,7 @@ func TestPasswordStorage_DifferentRoles(t *testing.T) {
 }
 
 // Test pgpass storage with a temporary directory
-func TestPgpassStorage_Integration(t *testing.T) {
+func TestPgpassStorage(t *testing.T) {
 	// Create a temporary directory for this test
 	tempDir := t.TempDir()
 

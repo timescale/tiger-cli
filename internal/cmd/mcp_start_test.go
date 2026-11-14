@@ -21,8 +21,10 @@ func TestMCPStartCmd(t *testing.T) {
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	const stdioLog = `INFO Docs MCP proxy is disabled
-INFO server run start
+	// The docs proxy connects before any tools are registered.
+	const docsDisabledLog = `INFO Docs MCP proxy is disabled
+`
+	const stdioLog = `INFO server run start
 INFO server connecting
 INFO server session connected session_id=""
 INFO server session disconnected session_id=""
@@ -34,13 +36,13 @@ ERROR server run cancelled error="context canceled"
 			name:       "start defaults to stdio",
 			args:       []string{"mcp", "start"},
 			opts:       append(noDocsProxy(nil), withContext(cancelled)),
-			wantStderr: matchLog(stdioLog),
+			wantStderr: matchLog(docsDisabledLog + stdioLog),
 		},
 		{
 			name:       "stdio subcommand",
 			args:       []string{"mcp", "start", "stdio"},
 			opts:       append(noDocsProxy(nil), withContext(cancelled)),
-			wantStderr: matchLog(stdioLog),
+			wantStderr: matchLog(docsDisabledLog + stdioLog),
 		},
 		{
 			name:    "start rejects positional args",
@@ -59,7 +61,7 @@ ERROR server run cancelled error="context canceled"
 			name: "read-only mode skips write tools",
 			args: []string{"mcp", "start"},
 			opts: append(noDocsProxy(map[string]any{"read_only": true}), withContext(cancelled)),
-			wantStderr: matchLog(`INFO Skipping write tool in read-only mode tool=service_create
+			wantStderr: matchLog(docsDisabledLog + `INFO Skipping write tool in read-only mode tool=service_create
 INFO Skipping write tool in read-only mode tool=service_fork
 INFO Skipping write tool in read-only mode tool=service_update_password
 INFO Skipping write tool in read-only mode tool=service_start

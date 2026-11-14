@@ -168,20 +168,26 @@ func NewServer(ctx context.Context, app *common.App, logger *slog.Logger, transp
 	cfg := app.GetConfig()
 	logger = ensureLogger(logger)
 
+	// The docs proxy connects first, since whether the server handles
+	// completions depends on whether the docs server does.
+	docsProxyClient := connectDocsProxy(ctx, cfg, logger)
+
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    ServerName,
 		Title:   serverTitle,
 		Version: config.Version,
 	}, &mcp.ServerOptions{
-		Instructions: buildServerInstructions(cfg),
-		Logger:       logger,
+		Instructions:      buildServerInstructions(cfg),
+		Logger:            logger,
+		CompletionHandler: docsProxyClient.createProxyCompletionHandler(),
 	})
 
 	server := &Server{
-		mcpServer: mcpServer,
-		logger:    logger,
-		transport: transport,
-		app:       app,
+		mcpServer:       mcpServer,
+		docsProxyClient: docsProxyClient,
+		logger:          logger,
+		transport:       transport,
+		app:             app,
 	}
 
 	// Register all tools (including proxied docs tools). The read-only mode and
@@ -231,8 +237,6 @@ func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, ex
 	// Submitting feedback mutates no service, so the tool is absent from
 	// readOnlyGatedTools and stays registered in every read-only mode.
 	addTool(s, mode, newFeedbackTool(), s.handleFeedback)
-
-	// TODO: Register more tool groups
 
 	// Register remote docs MCP server proxy
 	s.registerDocsProxy(ctx)

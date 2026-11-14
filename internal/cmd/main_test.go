@@ -788,3 +788,27 @@ func testFlags(t *testing.T, dir string) *pflag.FlagSet {
 	}
 	return flags
 }
+
+// requireIntegration skips an integration test unless TIGER_INTEGRATION is
+// set.
+func requireIntegration(t *testing.T) {
+	t.Helper()
+	if os.Getenv("TIGER_INTEGRATION") == "" {
+		t.Skip("Skipping integration test: set TIGER_INTEGRATION=1 to run")
+	}
+}
+
+// requireIntegrationCreds skips an integration test unless TIGER_INTEGRATION
+// and the integration credentials are set, and returns the credentials. Pull
+// requests from forks don't get CI's credentials, so they still run the
+// integration tests that need none.
+func requireIntegrationCreds(t *testing.T) (publicKey, secretKey string) {
+	t.Helper()
+	requireIntegration(t)
+	publicKey = os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
+	secretKey = os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
+	}
+	return publicKey, secretKey
+}

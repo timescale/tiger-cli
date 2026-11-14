@@ -43,7 +43,7 @@ Use the official product names in all user-facing text (documentation, code comm
 
 ```bash
 go install ./...   # build and install the tiger binary
-go test ./...      # run all tests (integration tests skip without credentials)
+go test ./...      # run all tests (integration tests skip unless TIGER_INTEGRATION is set)
 go generate ./...  # regenerate the API client, mocks, and the CLI reference docs
 ```
 
@@ -51,7 +51,7 @@ You can also run without installing via `go run ./cmd/tiger --help`.
 
 Before committing, run `go tool gofumpt -l -w .`, `go vet ./...`, `go fix -diff ./...`, `go tool staticcheck ./...`, `go tool govulncheck ./...`, and `go test ./...` (gofumpt, staticcheck, and govulncheck are declared as build-time tools in `go.mod`'s `tool` block). Code is formatted with gofumpt, a stricter superset of gofmt, so use it in place of `go fmt` — CI fails on any file it would change.
 
-Integration tests run via `./scripts/test-integration.sh [-v] [-run Pattern] [any go test flags]`, which loads environment variables from `.env`, builds the binary, and defaults to `-run Integration`. Credentials come from `TIGER_PUBLIC_KEY_INTEGRATION`, `TIGER_SECRET_KEY_INTEGRATION`, and `TIGER_API_URL_INTEGRATION`. Optionally, `TIGER_EXISTING_SERVICE_ID_INTEGRATION` tests the database commands against an existing service, and `TIGER_UPGRADE_INTEGRATION` runs the upgrade test against the live release CDN.
+Integration tests run via `./scripts/test-integration.sh [-v] [-run Pattern] [any go test flags]`, which loads environment variables from `.env`, builds the binary, sets `TIGER_INTEGRATION=1`, and defaults to `-run Integration`. Every integration test is named `Test*Integration` and starts with `requireIntegration(t)` (duplicated in each package's `main_test.go`), which skips it unless `TIGER_INTEGRATION` is set, or with `requireIntegrationCreds(t)`, which also skips it unless the credentials are set and returns them. Credentials come from `TIGER_PUBLIC_KEY_INTEGRATION`, `TIGER_SECRET_KEY_INTEGRATION`, and `TIGER_API_URL_INTEGRATION`; some tests need none, like the upgrade test against the live release CDN and `TestDocsProxyIntegration` against the production docs MCP server. Optionally, `TIGER_EXISTING_SERVICE_ID_INTEGRATION` tests the database commands against an existing service. CI always sets `TIGER_INTEGRATION`, so pull requests from forks, which don't get the credentials, still run the integration tests that need none.
 
 ## Dependency Updates
 
@@ -224,7 +224,7 @@ Only the MCP server logs. `newLogger(w)` (`internal/cmd/logger_helper.go`) point
 
 ## MCP Server
 
-The server exposes two kinds of tools: native Tiger tools for service management and database operations (one file per tool), and documentation tools proxied from a remote docs MCP server (`proxy.go`).
+The server exposes two kinds of tools: native Tiger tools for service management and database operations (one file per tool), and documentation tools proxied from a remote docs MCP server (see [Docs Proxy](#docs-proxy)).
 
 ### Server State
 
@@ -275,6 +275,14 @@ The CLI can be used to get around the MCP server's safeguards: `tiger config set
 A tool parameter that reads a file on the server's machine (`db_query`'s `file`) depends on the transport. Only a stdio server is known to share a machine with its client, so under any other transport the tool leaves the parameter out of its schema, which then rejects it. `mcp list`, `mcp get`, and completion describe the stdio server, since that's what a default `tiger mcp start` runs.
 
 Over stdio, reads are confined to the server's working directory — the directory the client launched it in — by going through `os.Root`, which also refuses symlinks that lead out of it. Unlike the CLI's path flags, such a path never has environment variables expanded: it comes from the model, and expansion would let it read the server's environment back out. `readWorkingDirFile` in `db_query.go` is the model.
+
+### Docs Proxy
+
+`proxy.go` connects to the docs MCP server (pg-aiguide, at `docs_mcp_url`) as the server starts, and re-offers whatever the docs server advertises (tools, prompts, resources and resource templates, and completions), forwarding each request to it. If the docs server can't be reached, the server starts without the docs features and logs why. The connection comes before the server is created, because whether the server handles completions is fixed then.
+
+The proxy calls the docs server as a client in its own right (`ProxyClient`): it negotiates its own protocol version, never forwards the agent's `_meta`, which describes the agent's own connection, and advertises no capabilities, so it never promises the docs server a feature it can't relay. Likewise, it doesn't pass the docs server's `_meta` back to the agent, which would show the agent the docs server's identity. Input requests the docs server returns anyway are passed back to the agent rather than answered by the proxy, and the agent's retry is forwarded with its answers.
+
+The proxy isn't a tool, so its tests (`proxy_test.go`) have their own harness rather than `runToolTests`: each `proxyTest` case starts a fake docs server with the given `docsFeatures`, makes one request of Tiger MCP as an agent (`callTool`, `getPrompt`, `readResource`, `complete`, or `listOffered`), and asserts the response the agent gets, compared as JSON, and the methods the docs server received. The runner also asserts that every client the docs server saw was the proxy as a client in its own right, that it received the agent's params unchanged apart from `_meta`, and that Tiger MCP closes cleanly. `TestDocsProxyIntegration` runs on the same harness against the production docs server (see [Build & Test](#build--test)).
 
 ## Read-Only Mode
 

@@ -66,8 +66,9 @@ jobs:
         env:
           TIGER_PUBLIC_KEY_INTEGRATION: ${{ secrets.TIGER_PUBLIC_KEY_INTEGRATION }}
           TIGER_SECRET_KEY_INTEGRATION: ${{ secrets.TIGER_SECRET_KEY_INTEGRATION }}
-          # Runs the live-CDN upgrade test (TestUpgradeLiveCDNIntegration)
-          TIGER_UPGRADE_INTEGRATION: "1"
+          # Runs the integration tests. Pull requests from forks don't get the
+          # secrets above, so they skip the ones that need credentials.
+          TIGER_INTEGRATION: "1"
         # Under -coverpkg, the percentages go test prints are of the whole
         # module, not the package. Writing covdata lets the Coverage step
         # report real per-package figures.

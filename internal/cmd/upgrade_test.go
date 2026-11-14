@@ -324,13 +324,11 @@ func TestUpgradeCmd(t *testing.T) {
 // binary in place with the latest published release, and verifies the
 // resulting binary runs and reports the new version.
 //
-// Gated behind TIGER_UPGRADE_INTEGRATION because it downloads a real release
-// archive over the network. Enabled in the GitHub Actions test workflow so a
-// broken upgrade path is caught before release.
+// It downloads a real release archive over the network, so it runs only with
+// the rest of the integration tests, which CI runs so a broken upgrade path is
+// caught before release.
 func TestUpgradeLiveCDNIntegration(t *testing.T) {
-	if os.Getenv("TIGER_UPGRADE_INTEGRATION") == "" {
-		t.Skip("Skipping live upgrade integration test: set TIGER_UPGRADE_INTEGRATION=1 to run")
-	}
+	requireIntegration(t)
 
 	// Determine the latest published version, the same way install.sh does.
 	client := &http.Client{Timeout: 30 * time.Second}
