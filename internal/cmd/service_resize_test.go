@@ -19,6 +19,20 @@ func TestServiceResizeCmd(t *testing.T) {
 		s.Resources[0].Spec.MemoryGbs = new(8)
 	})
 
+	// resized returns svc as the API answers a resize: at the new size,
+	// including the IOPS it applies.
+	resized := func(svc api.Service, cpuMillis, memoryGBs, iops int) *api.Service {
+		svc.Resources = []api.Resource{{
+			ID: new("resource-1"),
+			Spec: &api.ResourceSpec{
+				CPUMillis: new(cpuMillis),
+				MemoryGbs: new(memoryGBs),
+				Iops:      new(iops),
+			},
+		}}
+		return &svc
+	}
+
 	runCmdTests(t, []cmdTest{
 		{
 			// The fluid platform and IOPS are a preview, so their help text is gated.
@@ -81,10 +95,11 @@ CPU/memory allocation. See the Tiger Data documentation for details. If only
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &svc,
+						JSON202:      resized(svc, 2000, 8, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted: 2 CPU/8 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -155,7 +170,7 @@ The resize is in progress and may take several minutes to complete.
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr:    "failed to resize service: connection refused",
-			wantStderr: "Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...\nError: failed to resize service: connection refused\n",
+			wantStderr: "Resizing service 'test-service' (svc-12345)...\nError: failed to resize service: connection refused\n",
 		},
 		{
 			name: "API error",
@@ -169,7 +184,7 @@ The resize is in progress and may take several minutes to complete.
 					}, nil)
 			},
 			wantErr:    "service not found",
-			wantStderr: "Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...\nError: service not found\n",
+			wantStderr: "Resizing service 'test-service' (svc-12345)...\nError: service not found\n",
 			checks:     []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
@@ -183,7 +198,7 @@ The resize is in progress and may take several minutes to complete.
 					}, nil)
 			},
 			wantErr:    "empty response from API",
-			wantStderr: "Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...\nError: empty response from API\n",
+			wantStderr: "Resizing service 'test-service' (svc-12345)...\nError: empty response from API\n",
 		},
 		{
 			name: "success",
@@ -193,10 +208,11 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &svc,
+						JSON202:      resized(svc, 2000, 8, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted: 2 CPU/8 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -209,10 +225,11 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &svc,
+						JSON202:      resized(svc, 2000, 8, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB...
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted: 2 CPU/8 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -224,10 +241,11 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("4000"), MemoryGbs: new("16")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &svc,
+						JSON202:      resized(svc, 4000, 16, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 4 CPU/16 GB...
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted: 4 CPU/16 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -239,10 +257,11 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("500"), MemoryGbs: new("2")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &svc,
+						JSON202:      resized(svc, 500, 2, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 0.5 CPU/2 GB...
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted: 0.5 CPU/2 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -256,10 +275,11 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("500"), MemoryGbs: new("2")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &svc,
+						JSON202:      resized(svc, 500, 2, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 0.5 CPU/2 GB...
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted: 0.5 CPU/2 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -271,10 +291,11 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &svc,
+						JSON202:      resized(fluidSvc, 2000, 16, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB...
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted: 2 CPU/16 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -289,10 +310,11 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{Iops: new(12000)}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &fluidSvc,
+						JSON202:      resized(fluidSvc, 1000, 8, 12000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 12000 IOPS...
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted: 1 CPU/8 GB, 12000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -305,10 +327,45 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16"), Iops: new(16000)}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &fluidSvc,
+						JSON202:      resized(fluidSvc, 2000, 16, 16000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB, 16000 IOPS...
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted: 2 CPU/16 GB, 16000 IOPS.
+The resize is in progress and may take several minutes to complete.
+`,
+		},
+		{
+			// The IOPS weren't requested, so they come from the response.
+			name: "experimental cpu only reports the baseline iops",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "2"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", fluidSvc)
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      resized(fluidSvc, 2000, 16, 6000),
+					}, nil)
+			},
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted: 2 CPU/16 GB, 6000 IOPS.
+The resize is in progress and may take several minutes to complete.
+`,
+		},
+		{
+			name: "response without resources omits the size",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "2", "--memory", "8"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      new(sampleService(func(s *api.Service) { s.Resources = nil })),
+					}, nil)
+			},
+			wantStderr: `Resizing service 'test-service' (svc-12345)...
+Resize request accepted.
 The resize is in progress and may take several minutes to complete.
 `,
 		},

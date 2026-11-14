@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -109,18 +108,11 @@ other will be automatically configured).` + iopsSectionHelp,
 				CPUMillis: cpuMemoryCfg.CPUMillisString(),
 				MemoryGbs: cpuMemoryCfg.MemoryGBsString(),
 			}
-			var targets []string
-			if cpuMemoryCfg != nil {
-				targets = append(targets, cpuMemoryCfg.String())
-			}
 			if iopsSet {
 				resizeReq.Iops = &iops
-				targets = append(targets, fmt.Sprintf("%d IOPS", iops))
 			}
-			target := strings.Join(targets, ", ")
 
-			// Display resize information
-			cmd.PrintErrf("Resizing service %s to %s...\n", serviceLabel(*resolved), target)
+			cmd.PrintErrf("Resizing service %s...\n", serviceLabel(*resolved))
 
 			// Make API call to resize service
 			resp, err := client.ResizeServiceWithResponse(cmd.Context(), projectID, resolved.ServiceID, resizeReq)
@@ -137,6 +129,14 @@ other will be automatically configured).` + iopsSectionHelp,
 				return fmt.Errorf("empty response from API")
 			}
 
+			// Report the size from the response rather than the request, since
+			// the API fills in what the request left out (e.g. the baseline
+			// IOPS for the new CPU/memory).
+			if size, ok := serviceSize(*resp.JSON202, app.Experimental); ok {
+				cmd.PrintErrf("Resize request accepted: %s.\n", size)
+			} else {
+				cmd.PrintErrln("Resize request accepted.")
+			}
 			cmd.PrintErrln("The resize is in progress and may take several minutes to complete.")
 			return nil
 		},
@@ -154,4 +154,35 @@ other will be automatically configured).` + iopsSectionHelp,
 	registerFlagCompletion(cmd, "memory", memoryCompletion(false, app.Experimental))
 
 	return cmd
+}
+
+// serviceSize formats the size of a service from its first resource, if it has
+// one. IOPS are a preview, so they're included only if experimental is set.
+func serviceSize(service api.Service, experimental bool) (string, bool) {
+	if len(service.Resources) == 0 || service.Resources[0].Spec == nil {
+		return "", false
+	}
+	spec := service.Resources[0].Spec
+
+	// Null CPU and memory indicate a shared-resource service.
+	cpuMemory := common.CPUMemoryConfig{Shared: spec.CPUMillis == nil || spec.MemoryGbs == nil}
+	if !cpuMemory.Shared {
+		cpuMemory.CPUMillis = *spec.CPUMillis
+		cpuMemory.MemoryGBs = *spec.MemoryGbs
+	}
+
+	var iops *int
+	if experimental {
+		iops = spec.Iops
+	}
+	return formatSize(cpuMemory, iops), true
+}
+
+// formatSize formats a CPU/memory allocation and, if non-nil, its provisioned
+// IOPS (e.g. "2 CPU/16 GB, 8000 IOPS").
+func formatSize(cpuMemory common.CPUMemoryConfig, iops *int) string {
+	if iops == nil {
+		return cpuMemory.String()
+	}
+	return fmt.Sprintf("%s, %d IOPS", cpuMemory.String(), *iops)
 }

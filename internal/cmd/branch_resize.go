@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -78,17 +77,11 @@ given without --iops, the IOPS is set to the baseline for the new size.`,
 				CPUMillis: cpuMemoryCfg.CPUMillisString(),
 				MemoryGbs: cpuMemoryCfg.MemoryGBsString(),
 			}
-			var targets []string
-			if cpuMemoryCfg != nil {
-				targets = append(targets, cpuMemoryCfg.String())
-			}
 			if iopsSet {
 				resizeReq.Iops = &iops
-				targets = append(targets, fmt.Sprintf("%d IOPS", iops))
 			}
-			target := strings.Join(targets, ", ")
 
-			cmd.PrintErrf("Resizing branch %s to %s...\n", branchLabel(*resolved), target)
+			cmd.PrintErrf("Resizing branch %s...\n", branchLabel(*resolved))
 
 			resp, err := client.ResizeBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID, resizeReq)
 			if err != nil {
@@ -101,6 +94,15 @@ given without --iops, the IOPS is set to the baseline for the new size.`,
 				return fmt.Errorf("empty response from API")
 			}
 
+			// Report the size from the response rather than the request, since
+			// the API fills in what the request left out (e.g. the baseline
+			// IOPS for the new CPU/memory).
+			branch := resp.JSON202
+			size := formatSize(common.CPUMemoryConfig{
+				CPUMillis: branch.CPUMillis,
+				MemoryGBs: branch.MemoryGbs,
+			}, branch.Iops)
+			cmd.PrintErrf("Resize request accepted: %s.\n", size)
 			cmd.PrintErrln("The resize is in progress and may take several minutes to complete.")
 			return nil
 		},
