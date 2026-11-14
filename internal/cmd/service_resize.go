@@ -112,8 +112,6 @@ other will be automatically configured).` + iopsSectionHelp,
 				resizeReq.Iops = &iops
 			}
 
-			cmd.PrintErrf("Resizing service %s...\n", serviceLabel(*resolved))
-
 			// Make API call to resize service
 			resp, err := client.ResizeServiceWithResponse(cmd.Context(), projectID, resolved.ServiceID, resizeReq)
 			if err != nil {
@@ -133,9 +131,9 @@ other will be automatically configured).` + iopsSectionHelp,
 			// the API fills in what the request left out (e.g. the baseline
 			// IOPS for the new CPU/memory).
 			if size, ok := serviceSize(*resp.JSON202, app.Experimental); ok {
-				cmd.PrintErrf("Resize request accepted: %s.\n", size)
+				cmd.PrintErrf("Resizing service %s to %s.\n", serviceLabel(*resolved), size)
 			} else {
-				cmd.PrintErrln("Resize request accepted.")
+				cmd.PrintErrf("Resizing service %s.\n", serviceLabel(*resolved))
 			}
 			cmd.PrintErrln("The resize is in progress and may take several minutes to complete.")
 			return nil

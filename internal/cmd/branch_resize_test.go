@@ -29,8 +29,7 @@ func TestBranchResizeCmd(t *testing.T) {
 		}
 	}
 	req2000 := api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}
-	acceptedStderr := "Resizing branch 'test-branch' (br-12345)...\n" +
-		"Resize request accepted: 2 CPU/16 GB, 6000 IOPS.\n" +
+	acceptedStderr := "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB, 6000 IOPS.\n" +
 		"The resize is in progress and may take several minutes to complete.\n"
 
 	runCmdTests(t, []cmdTest{
@@ -83,8 +82,6 @@ func TestBranchResizeCmd(t *testing.T) {
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to resize branch: connection refused",
-			wantStderr: "Resizing branch 'test-branch' (br-12345)...\n" +
-				"Error: failed to resize branch: connection refused\n",
 		},
 		{
 			name: "nil response body",
@@ -96,8 +93,6 @@ func TestBranchResizeCmd(t *testing.T) {
 					Return(&api.ResizeBranchResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
 			wantErr: "empty response from API",
-			wantStderr: "Resizing branch 'test-branch' (br-12345)...\n" +
-				"Error: empty response from API\n",
 		},
 		{
 			// CPU and memory are left out, so the API keeps the current ones.
@@ -105,8 +100,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			args: []string{"branch", "resize", "br-12345", "--iops", "16000"},
 			opts: []runOption{withExperimental()},
 			mock: setupResize(api.BranchResizeInput{Iops: new(16000)}, 250, 2, 16000),
-			wantStderr: "Resizing branch 'test-branch' (br-12345)...\n" +
-				"Resize request accepted: 0.25 CPU/2 GB, 16000 IOPS.\n" +
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 0.25 CPU/2 GB, 16000 IOPS.\n" +
 				"The resize is in progress and may take several minutes to complete.\n",
 		},
 		{
@@ -114,8 +108,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			args: []string{"branch", "resize", "br-12345", "--cpu", "2", "--iops", "16000"},
 			opts: []runOption{withExperimental()},
 			mock: setupResize(api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16"), Iops: new(16000)}, 2000, 16, 16000),
-			wantStderr: "Resizing branch 'test-branch' (br-12345)...\n" +
-				"Resize request accepted: 2 CPU/16 GB, 16000 IOPS.\n" +
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB, 16000 IOPS.\n" +
 				"The resize is in progress and may take several minutes to complete.\n",
 		},
 		{
@@ -133,8 +126,7 @@ func TestBranchResizeCmd(t *testing.T) {
 						})),
 					}, nil)
 			},
-			wantStderr: "Resizing branch 'test-branch' (br-12345)...\n" +
-				"Resize request accepted: 2 CPU/16 GB.\n" +
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB.\n" +
 				"The resize is in progress and may take several minutes to complete.\n",
 		},
 		{
@@ -150,8 +142,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			args: []string{"branch", "resize", "br-12345", "--cpu", "0.25"},
 			opts: []runOption{withExperimental()},
 			mock: setupResize(api.BranchResizeInput{CPUMillis: new("250"), MemoryGbs: new("2")}, 250, 2, 3000),
-			wantStderr: "Resizing branch 'test-branch' (br-12345)...\n" +
-				"Resize request accepted: 0.25 CPU/2 GB, 3000 IOPS.\n" +
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 0.25 CPU/2 GB, 3000 IOPS.\n" +
 				"The resize is in progress and may take several minutes to complete.\n",
 		},
 		{

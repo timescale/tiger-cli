@@ -81,8 +81,6 @@ given without --iops, the IOPS is set to the baseline for the new size.`,
 				resizeReq.Iops = &iops
 			}
 
-			cmd.PrintErrf("Resizing branch %s...\n", branchLabel(*resolved))
-
 			resp, err := client.ResizeBranchWithResponse(cmd.Context(), projectID, resolved.ServiceID, resolved.ID, resizeReq)
 			if err != nil {
 				return fmt.Errorf("failed to resize branch: %w", err)
@@ -102,7 +100,7 @@ given without --iops, the IOPS is set to the baseline for the new size.`,
 				CPUMillis: branch.CPUMillis,
 				MemoryGBs: branch.MemoryGbs,
 			}, branch.Iops)
-			cmd.PrintErrf("Resize request accepted: %s.\n", size)
+			cmd.PrintErrf("Resizing branch %s to %s.\n", branchLabel(*resolved), size)
 			cmd.PrintErrln("The resize is in progress and may take several minutes to complete.")
 			return nil
 		},

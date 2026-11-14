@@ -98,8 +98,7 @@ CPU/memory allocation. See the Tiger Data documentation for details. If only
 						JSON202:      resized(svc, 2000, 8, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted: 2 CPU/8 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -169,8 +168,7 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr:    "failed to resize service: connection refused",
-			wantStderr: "Resizing service 'test-service' (svc-12345)...\nError: failed to resize service: connection refused\n",
+			wantErr: "failed to resize service: connection refused",
 		},
 		{
 			name: "API error",
@@ -183,9 +181,8 @@ The resize is in progress and may take several minutes to complete.
 						JSON4XX:      &api.Error{Message: new("service not found")},
 					}, nil)
 			},
-			wantErr:    "service not found",
-			wantStderr: "Resizing service 'test-service' (svc-12345)...\nError: service not found\n",
-			checks:     []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+			wantErr: "service not found",
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",
@@ -197,8 +194,7 @@ The resize is in progress and may take several minutes to complete.
 						HTTPResponse: httpResponse(http.StatusAccepted),
 					}, nil)
 			},
-			wantErr:    "empty response from API",
-			wantStderr: "Resizing service 'test-service' (svc-12345)...\nError: empty response from API\n",
+			wantErr: "empty response from API",
 		},
 		{
 			name: "success",
@@ -211,8 +207,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(svc, 2000, 8, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted: 2 CPU/8 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -228,8 +223,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(svc, 2000, 8, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted: 2 CPU/8 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -244,8 +238,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(svc, 4000, 16, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted: 4 CPU/16 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 4 CPU/16 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -260,8 +253,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(svc, 500, 2, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted: 0.5 CPU/2 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 0.5 CPU/2 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -278,8 +270,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(svc, 500, 2, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted: 0.5 CPU/2 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 0.5 CPU/2 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -294,8 +285,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(fluidSvc, 2000, 16, 3000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted: 2 CPU/16 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -313,8 +303,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(fluidSvc, 1000, 8, 12000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted: 1 CPU/8 GB, 12000 IOPS.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 1 CPU/8 GB, 12000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -330,8 +319,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(fluidSvc, 2000, 16, 16000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted: 2 CPU/16 GB, 16000 IOPS.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB, 16000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -348,8 +336,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(fluidSvc, 2000, 16, 6000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted: 2 CPU/16 GB, 6000 IOPS.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB, 6000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -364,8 +351,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      new(sampleService(func(s *api.Service) { s.Resources = nil })),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345)...
-Resize request accepted.
+			wantStderr: `Resizing service 'test-service' (svc-12345).
 The resize is in progress and may take several minutes to complete.
 `,
 		},
