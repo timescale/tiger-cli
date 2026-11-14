@@ -95,7 +95,7 @@ CPU/memory allocation. See the Tiger Data documentation for details. If only
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      resized(svc, 2000, 8, 3000),
+						JSON202:      resized(svc, 2000, 8, 6000),
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB.
@@ -204,7 +204,7 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      resized(svc, 2000, 8, 3000),
+						JSON202:      resized(svc, 2000, 8, 6000),
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB.
@@ -220,7 +220,7 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      resized(svc, 2000, 8, 3000),
+						JSON202:      resized(svc, 2000, 8, 6000),
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB.
@@ -235,7 +235,7 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("4000"), MemoryGbs: new("16")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      resized(svc, 4000, 16, 3000),
+						JSON202:      resized(svc, 4000, 16, 6000),
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 4 CPU/16 GB.
@@ -250,7 +250,7 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("500"), MemoryGbs: new("2")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      resized(svc, 500, 2, 3000),
+						JSON202:      resized(svc, 500, 2, 4000),
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 0.5 CPU/2 GB.
@@ -267,7 +267,7 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("500"), MemoryGbs: new("2")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      resized(svc, 500, 2, 3000),
+						JSON202:      resized(svc, 500, 2, 4000),
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 0.5 CPU/2 GB.
@@ -282,7 +282,7 @@ The resize is in progress and may take several minutes to complete.
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      resized(fluidSvc, 2000, 16, 3000),
+						JSON202:      resized(fluidSvc, 2000, 16, 6000),
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB.

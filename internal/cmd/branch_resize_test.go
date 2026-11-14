@@ -97,10 +97,10 @@ func TestBranchResizeCmd(t *testing.T) {
 		{
 			// CPU and memory are left out, so the API keeps the current ones.
 			name: "iops only omits cpu and memory",
-			args: []string{"branch", "resize", "br-12345", "--iops", "16000"},
+			args: []string{"branch", "resize", "br-12345", "--iops", "8000"},
 			opts: []runOption{withExperimental()},
-			mock: setupResize(api.BranchResizeInput{Iops: new(16000)}, 250, 2, 16000),
-			wantStderr: "Resizing branch 'test-branch' (br-12345) to 0.25 CPU/2 GB, 16000 IOPS.\n" +
+			mock: setupResize(api.BranchResizeInput{Iops: new(8000)}, 250, 2, 8000),
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 0.25 CPU/2 GB, 8000 IOPS.\n" +
 				"The resize is in progress and may take several minutes to complete.\n",
 		},
 		{
