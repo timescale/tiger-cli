@@ -179,9 +179,9 @@ func TestServiceGetCmd(t *testing.T) {
 │ Memory            │ 8 GB                                                                                        │
 │ Storage           │ 843.5 GB used                                                                               │
 │ Replicas          │ 2                                                                                           │
+│ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Pooler Endpoint   │ svc-12345.project.pooler.tsdb.cloud.timescale.com:6432                                      │
-│ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -201,8 +201,8 @@ func TestServiceGetCmd(t *testing.T) {
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ shared                                                                                      │
 │ Memory            │ shared                                                                                      │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -226,8 +226,8 @@ func TestServiceGetCmd(t *testing.T) {
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 0.25 cores                                                                                  │
 │ Memory            │ 2 GB                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -248,8 +248,8 @@ func TestServiceGetCmd(t *testing.T) {
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ shared                                                                                      │
 │ Memory            │ shared                                                                                      │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -339,8 +339,8 @@ status: READY
 │ Memory            │ 4 GB                                                                                        │
 │ IOPS              │ 6000                                                                                        │
 │ Branches          │ 2                                                                                           │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -470,8 +470,8 @@ status: READY
 │ Region            │ us-east-1                                                                                                   │
 │ CPU               │ 1 core                                                                                                      │
 │ Memory            │ 4 GB                                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                                     │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                                             │
 │ Password          │ super-secret-pw                                                                                             │
 │ Connection String │ postgresql://tsdbadmin:super-secret-pw@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview                   │

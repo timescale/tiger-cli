@@ -191,6 +191,9 @@ func outputServiceTable(output io.Writer, service OutputService) error {
 		table.Append("Branches", fmt.Sprintf("%d", *service.BranchCount))
 	}
 
+	// Timestamps
+	table.Append("Created", service.Created.Format("2006-01-02 15:04:05 MST"))
+
 	// Endpoint information
 	if service.Endpoint != nil && service.Endpoint.Host != nil && service.Endpoint.Port != nil {
 		table.Append("Direct Endpoint", fmt.Sprintf("%s:%d", *service.Endpoint.Host, *service.Endpoint.Port))
@@ -202,9 +205,6 @@ func outputServiceTable(output io.Writer, service OutputService) error {
 			table.Append("Pooler Endpoint", fmt.Sprintf("%s:%d", *pooler.Host, *pooler.Port))
 		}
 	}
-
-	// Timestamps
-	table.Append("Created", service.Created.Format("2006-01-02 15:04:05 MST"))
 
 	// Output password if available
 	if service.Password != "" {

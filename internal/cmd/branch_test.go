@@ -134,9 +134,9 @@ const (
 │ Status            │ READY                                                                                                       │
 │ CPU               │ 0.25 cores                                                                                                  │
 │ Memory            │ 2 GB                                                                                                        │
-│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
 │ Created By        │ Jane Doe (jane.doe@example.com)                                                                             │
 │ Created           │ 2025-01-16 09:00:00 UTC                                                                                     │
+│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
 │ Connection String │ postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

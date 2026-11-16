@@ -512,8 +512,8 @@ Service is being created. Use 'tiger service list' to check status.
 │ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
 │ IOPS              │ 12000                                                                                       │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -687,8 +687,8 @@ const sampleServiceCreateTable = `┌──────────────�
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -705,8 +705,8 @@ const sampleServiceCreateQueuedTable = `┌────────────�
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
-│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview   │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
