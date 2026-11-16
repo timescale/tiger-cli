@@ -89,29 +89,6 @@ func TestBranchListCmd(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
-			name:       "no branches",
-			args:       []string{"branch", "list", "svc-12345"},
-			opts:       []runOption{withExperimental()},
-			mock:       expectList(),
-			wantStderr: "No branches found for service 'test-service' (svc-12345).\n",
-		},
-		{
-			// Structured output is always structured, so an empty list is
-			// still a list rather than a message.
-			name:       "no branches json",
-			args:       []string{"branch", "list", "svc-12345", "-o", "json"},
-			opts:       []runOption{withExperimental()},
-			mock:       expectList(),
-			wantStdout: "[]\n",
-		},
-		{
-			name:       "no branches yaml",
-			args:       []string{"branch", "list", "svc-12345", "-o", "yaml"},
-			opts:       []runOption{withExperimental()},
-			mock:       expectList(),
-			wantStdout: "[]\n",
-		},
-		{
 			name: "table",
 			args: []string{"branch", "list", "svc-12345"},
 			opts: []runOption{withExperimental()},
@@ -125,10 +102,75 @@ func TestBranchListCmd(t *testing.T) {
 `,
 		},
 		{
+			name: "default service from config",
+			args: []string{"branch", "list"},
+			opts: []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			mock: expectList(sampleBranch()),
+			wantStdout: `┌───────────┬─────────────┬────────┬──────────────────┐
+│ BRANCH ID │    NAME     │ STATUS │     CREATED      │
+├───────────┼─────────────┼────────┼──────────────────┤
+│ br-12345  │ test-branch │ READY  │ 2025-01-16 09:00 │
+└───────────┴─────────────┴────────┴──────────────────┘
+`,
+		},
+		{
+			name:       "no branches",
+			args:       []string{"branch", "list", "svc-12345"},
+			opts:       []runOption{withExperimental()},
+			mock:       expectList(),
+			wantStderr: "No branches found for service 'test-service' (svc-12345).\n",
+		},
+		{
 			name: "json",
 			args: []string{"branch", "list", "svc-12345", "-o", "json"},
 			opts: []runOption{withExperimental()},
 			mock: expectList(sampleBranch()),
+			wantStdout: `[
+  {
+    "cpu_millis": 250,
+    "created": "2025-01-16T09:00:00Z",
+    "creator": {
+      "email": "jane.doe@example.com",
+      "id": "42",
+      "name": "Jane Doe"
+    },
+    "endpoint": {
+      "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+      "port": 36956
+    },
+    "id": "br-12345",
+    "memory_gbs": 2,
+    "name": "test-branch",
+    "project_id": "test-project-123",
+    "service_id": "svc-12345",
+    "status": "READY",
+    "service_name": "test-service",
+    "role": "tsdbadmin",
+    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+    "port": 36956,
+    "database": "tsdb",
+    "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
+    "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
+  }
+]
+`,
+		},
+		{
+			// Structured output is always structured, so an empty list is
+			// still a list rather than a message.
+			name:       "no branches json",
+			args:       []string{"branch", "list", "svc-12345", "-o", "json"},
+			opts:       []runOption{withExperimental()},
+			mock:       expectList(),
+			wantStdout: "[]\n",
+		},
+		{
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name: "json without a creator",
+			args: []string{"branch", "list", "svc-12345", "-o", "json"},
+			opts: []runOption{withExperimental()},
+			mock: expectList(sampleBranch(noCreator)),
 			wantStdout: `[
   {
     "cpu_millis": 250,
@@ -155,15 +197,64 @@ func TestBranchListCmd(t *testing.T) {
 `,
 		},
 		{
-			name: "default service from config",
-			args: []string{"branch", "list"},
-			opts: []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			name: "yaml",
+			args: []string{"branch", "list", "svc-12345", "-o", "yaml"},
+			opts: []runOption{withExperimental()},
 			mock: expectList(sampleBranch()),
-			wantStdout: `┌───────────┬─────────────┬────────┬──────────────────┐
-│ BRANCH ID │    NAME     │ STATUS │     CREATED      │
-├───────────┼─────────────┼────────┼──────────────────┤
-│ br-12345  │ test-branch │ READY  │ 2025-01-16 09:00 │
-└───────────┴─────────────┴────────┴──────────────────┘
+			wantStdout: `- connection_string: postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require
+  console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview
+  cpu_millis: 250
+  created: "2025-01-16T09:00:00Z"
+  creator:
+    email: jane.doe@example.com
+    id: "42"
+    name: Jane Doe
+  database: tsdb
+  endpoint:
+    host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
+    port: 36956
+  host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
+  id: br-12345
+  memory_gbs: 2
+  name: test-branch
+  port: 36956
+  project_id: test-project-123
+  role: tsdbadmin
+  service_id: svc-12345
+  service_name: test-service
+  status: READY
+`,
+		},
+		{
+			name:       "no branches yaml",
+			args:       []string{"branch", "list", "svc-12345", "-o", "yaml"},
+			opts:       []runOption{withExperimental()},
+			mock:       expectList(),
+			wantStdout: "[]\n",
+		},
+		{
+			name: "yaml without a creator",
+			args: []string{"branch", "list", "svc-12345", "-o", "yaml"},
+			opts: []runOption{withExperimental()},
+			mock: expectList(sampleBranch(noCreator)),
+			wantStdout: `- connection_string: postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require
+  console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview
+  cpu_millis: 250
+  created: "2025-01-16T09:00:00Z"
+  database: tsdb
+  endpoint:
+    host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
+    port: 36956
+  host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
+  id: br-12345
+  memory_gbs: 2
+  name: test-branch
+  port: 36956
+  project_id: test-project-123
+  role: tsdbadmin
+  service_id: svc-12345
+  service_name: test-service
+  status: READY
 `,
 		},
 	})

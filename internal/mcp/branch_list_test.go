@@ -30,18 +30,18 @@ func TestBranchListTool(t *testing.T) {
 			wantCallErr: `calling "tools/call": unknown tool "branch_list"`,
 		},
 		{
-			name:    "not logged in",
-			tool:    toolBranchList,
-			args:    args,
-			opts:    []runOption{experimental, withNotLoggedIn()},
-			wantErr: notLoggedInMsg,
-		},
-		{
 			name:    "rejects a malformed service ID",
 			tool:    toolBranchList,
 			args:    map[string]any{"service_id": "nope"},
 			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: validating /properties/service_id: pattern: "nope" does not match regular expression "^[a-z0-9]{10}$"`,
+		},
+		{
+			name:    "not logged in",
+			tool:    toolBranchList,
+			args:    args,
+			opts:    []runOption{experimental, withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name: "network error",
@@ -80,6 +80,14 @@ func TestBranchListTool(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
+			name:       "lists the service's branches",
+			tool:       toolBranchList,
+			args:       args,
+			opts:       []runOption{experimental},
+			mock:       expectList(sampleBranch()),
+			wantOutput: map[string]any{"branches": []any{sampleBranchDetail(api.DeployStatusREADY)}},
+		},
+		{
 			name:       "no branches",
 			tool:       toolBranchList,
 			args:       args,
@@ -88,12 +96,22 @@ func TestBranchListTool(t *testing.T) {
 			wantOutput: map[string]any{"branches": []any{}},
 		},
 		{
-			name:       "lists the service's branches",
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name:       "without a creator",
 			tool:       toolBranchList,
 			args:       args,
 			opts:       []runOption{experimental},
-			mock:       expectList(sampleBranch()),
-			wantOutput: map[string]any{"branches": []any{sampleBranchDetail(api.DeployStatusREADY)}},
+			mock:       expectList(sampleBranch(noCreator)),
+			wantOutput: map[string]any{"branches": []any{sampleBranchDetailNoCreator(api.DeployStatusREADY)}},
+		},
+		{
+			name:       "creator without a name",
+			tool:       toolBranchList,
+			args:       args,
+			opts:       []runOption{experimental},
+			mock:       expectList(sampleBranch(namelessCreator)),
+			wantOutput: map[string]any{"branches": []any{sampleBranchDetailNamelessCreator(api.DeployStatusREADY)}},
 		},
 	})
 }

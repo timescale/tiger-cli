@@ -92,6 +92,13 @@ func TestBranchGetCmd(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
+			name:    "with password unavailable",
+			args:    []string{"branch", "get", "br-12345", "--with-password"},
+			opts:    []runOption{withExperimental()},
+			mock:    getSample,
+			wantErr: "password requested but not available for branch br-12345",
+		},
+		{
 			name:       "table",
 			args:       []string{"branch", "get", "br-12345"},
 			opts:       []runOption{withExperimental()},
@@ -99,36 +106,95 @@ func TestBranchGetCmd(t *testing.T) {
 			wantStdout: sampleBranchTable,
 		},
 		{
-			name:       "json",
-			args:       []string{"branch", "get", "br-12345", "-o", "json"},
-			opts:       []runOption{withExperimental()},
-			mock:       getSample,
-			wantStdout: sampleBranchJSON,
+			// The parent's name is the only thing the second fetch adds, so
+			// without it the branch is still shown, by parent ID.
+			name: "parent fetch fails",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantStdout: strings.Replace(sampleBranchTable,
+				"│ Parent Service    │ test-service (svc-12345)  ",
+				"│ Parent Service    │ svc-12345                 ", 1),
+			wantStderr: "Warning: failed to get parent service: failed to fetch service details: connection refused\n",
 		},
 		{
-			name: "yaml",
-			args: []string{"branch", "get", "br-12345", "-o", "yaml"},
-			opts: []runOption{withExperimental()},
+			name: "table with password",
+			args: []string{"branch", "get", "br-12345", "--with-password"},
+			opts: []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
 			mock: getSample,
-			wantStdout: `connection_string: postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require
-console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview
-cpu_millis: 250
-created: "2025-01-16T09:00:00Z"
-database: tsdb
-endpoint:
-  host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
-  port: 36956
-host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
-id: br-12345
-memory_gbs: 2
-name: test-branch
-port: 36956
-project_id: test-project-123
-role: tsdbadmin
-service_id: svc-12345
-service_name: test-service
-status: READY
+			wantStdout: `┌───────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                                         VALUE                                                         │
+├───────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Branch ID         │ br-12345                                                                                                              │
+│ Name              │ test-branch                                                                                                           │
+│ Parent Service    │ test-service (svc-12345)                                                                                              │
+│ Status            │ READY                                                                                                                 │
+│ CPU               │ 0.25 cores                                                                                                            │
+│ Memory            │ 2 GB                                                                                                                  │
+│ Created By        │ Jane Doe (jane.doe@example.com)                                                                                       │
+│ Created           │ 2025-01-16 09:00:00 UTC                                                                                               │
+│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                                       │
+│ Password          │ branch-pw                                                                                                             │
+│ Connection String │ postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview           │
+└───────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
+		},
+		{
+			// No port is guessed, so without one there's no endpoint to show
+			// or connect to.
+			name: "endpoint without a port",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) { b.Endpoint.Port = nil }))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: `┌────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│    PROPERTY    │                                                    VALUE                                                    │
+├────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Branch ID      │ br-12345                                                                                                    │
+│ Name           │ test-branch                                                                                                 │
+│ Parent Service │ test-service (svc-12345)                                                                                    │
+│ Status         │ READY                                                                                                       │
+│ CPU            │ 0.25 cores                                                                                                  │
+│ Memory         │ 2 GB                                                                                                        │
+│ Created By     │ Jane Doe (jane.doe@example.com)                                                                             │
+│ Created        │ 2025-01-16 09:00:00 UTC                                                                                     │
+│ Console URL    │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
+└────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+			wantStderr: "Warning: failed to get connection details: endpoint port not available\n",
+		},
+		{
+			// As for a service, a missing endpoint is warned about rather
+			// than silently leaving out the connection details.
+			name: "endpoint not available",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(branchStatus(api.DeployStatusQUEUED), func(b *api.Branch) { b.Endpoint = nil }))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: `┌────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│    PROPERTY    │                                                    VALUE                                                    │
+├────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Branch ID      │ br-12345                                                                                                    │
+│ Name           │ test-branch                                                                                                 │
+│ Parent Service │ test-service (svc-12345)                                                                                    │
+│ Status         │ QUEUED                                                                                                      │
+│ CPU            │ 0.25 cores                                                                                                  │
+│ Memory         │ 2 GB                                                                                                        │
+│ Created By     │ Jane Doe (jane.doe@example.com)                                                                             │
+│ Created        │ 2025-01-16 09:00:00 UTC                                                                                     │
+│ Console URL    │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
+└────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+			wantStderr: "Warning: failed to get connection details: endpoint not available\n",
 		},
 		{
 			name: "table with metrics",
@@ -146,8 +212,9 @@ status: READY
 │ Memory            │ 2 GB                                                                                                        │
 │ IOPS              │ 16000                                                                                                       │
 │ Storage           │ 1.2 GB changed on this branch (billed)                                                                      │
-│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
+│ Created By        │ Jane Doe (jane.doe@example.com)                                                                             │
 │ Created           │ 2025-01-16 09:00:00 UTC                                                                                     │
+│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
 │ Connection String │ postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -168,6 +235,105 @@ status: READY
 			wantStdout: sampleBranchTable,
 		},
 		{
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name: "table without a creator",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchTableNoCreator,
+		},
+		{
+			name: "table with a creator without a name",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(namelessCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchTableNamelessCreator,
+		},
+		{
+			name:       "json",
+			args:       []string{"branch", "get", "br-12345", "-o", "json"},
+			opts:       []runOption{withExperimental()},
+			mock:       getSample,
+			wantStdout: sampleBranchJSON,
+		},
+		{
+			// The branch has its own password, so its parent's isn't used.
+			name: "json with password",
+			args: []string{"branch", "get", "br-12345", "-o", "json", "--with-password"},
+			opts: []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"), withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw")},
+			mock: getSample,
+			wantStdout: `{
+  "cpu_millis": 250,
+  "created": "2025-01-16T09:00:00Z",
+  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
+  "endpoint": {
+    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+    "port": 36956
+  },
+  "id": "br-12345",
+  "memory_gbs": 2,
+  "name": "test-branch",
+  "project_id": "test-project-123",
+  "service_id": "svc-12345",
+  "status": "READY",
+  "service_name": "test-service",
+  "role": "tsdbadmin",
+  "password": "branch-pw",
+  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+  "port": 36956,
+  "database": "tsdb",
+  "connection_string": "postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
+}
+`,
+		},
+		{
+			// A branch counts as DEV, so only read_only=all makes its
+			// connection string read-only.
+			name: "read-only all makes the connection string read-only",
+			args: []string{"branch", "get", "br-12345", "-o", "json"},
+			opts: []runOption{withExperimental(), withConfig(map[string]any{"read_only": "all"})},
+			mock: getSample,
+			wantStdout: `{
+  "cpu_millis": 250,
+  "created": "2025-01-16T09:00:00Z",
+  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
+  "endpoint": {
+    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+    "port": 36956
+  },
+  "id": "br-12345",
+  "memory_gbs": 2,
+  "name": "test-branch",
+  "project_id": "test-project-123",
+  "service_id": "svc-12345",
+  "status": "READY",
+  "service_name": "test-service",
+  "role": "tsdbadmin",
+  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+  "port": 36956,
+  "database": "tsdb",
+  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require\u0026options=-c%20tsdb_admin.read_only_connection%3Dtrue",
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
+}
+`,
+		},
+		{
 			name: "json with metrics",
 			args: []string{"branch", "get", "br-12345", "-o", "json"},
 			opts: []runOption{withExperimental()},
@@ -175,6 +341,11 @@ status: READY
 			wantStdout: `{
   "cpu_millis": 250,
   "created": "2025-01-16T09:00:00Z",
+  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
   "endpoint": {
     "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
     "port": 36956
@@ -202,20 +373,31 @@ status: READY
 `,
 		},
 		{
-			// The parent's name is the only thing the second fetch adds, so
-			// without it the branch is still shown, by parent ID.
-			name: "parent fetch fails",
-			args: []string{"branch", "get", "br-12345"},
+			name: "json without a creator",
+			args: []string{"branch", "get", "br-12345", "-o", "json"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, "br-12345", sampleBranch())
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
 			},
-			wantStdout: strings.Replace(sampleBranchTable,
-				"│ Parent Service    │ test-service (svc-12345)  ",
-				"│ Parent Service    │ svc-12345                 ", 1),
-			wantStderr: "Warning: failed to get parent service: failed to fetch service details: connection refused\n",
+			wantStdout: sampleBranchJSONNoCreator,
+		},
+		{
+			name:       "yaml",
+			args:       []string{"branch", "get", "br-12345", "-o", "yaml"},
+			opts:       []runOption{withExperimental()},
+			mock:       getSample,
+			wantStdout: sampleBranchYAML,
+		},
+		{
+			name: "yaml without a creator",
+			args: []string{"branch", "get", "br-12345", "-o", "yaml"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchYAMLNoCreator,
 		},
 		{
 			name:       "env",
@@ -225,150 +407,11 @@ status: READY
 			wantStdout: sampleBranchEnv,
 		},
 		{
-			name:       "env with password",
-			args:       []string{"branch", "get", "br-12345", "-o", "env", "--with-password"},
-			opts:       []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
+			name:       "describe alias",
+			args:       []string{"branch", "describe", "br-12345", "-o", "env"},
+			opts:       []runOption{withExperimental()},
 			mock:       getSample,
-			wantStdout: sampleBranchEnv + "PGPASSWORD=branch-pw\n",
-		},
-		{
-			name: "table with password",
-			args: []string{"branch", "get", "br-12345", "--with-password"},
-			opts: []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
-			mock: getSample,
-			wantStdout: `┌───────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│     PROPERTY      │                                                         VALUE                                                         │
-├───────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ Branch ID         │ br-12345                                                                                                              │
-│ Name              │ test-branch                                                                                                           │
-│ Parent Service    │ test-service (svc-12345)                                                                                              │
-│ Status            │ READY                                                                                                                 │
-│ CPU               │ 0.25 cores                                                                                                            │
-│ Memory            │ 2 GB                                                                                                                  │
-│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                                       │
-│ Created           │ 2025-01-16 09:00:00 UTC                                                                                               │
-│ Password          │ branch-pw                                                                                                             │
-│ Connection String │ postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview           │
-└───────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-`,
-		},
-		{
-			// The branch has its own password, so its parent's isn't used.
-			name: "json with password",
-			args: []string{"branch", "get", "br-12345", "-o", "json", "--with-password"},
-			opts: []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"), withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw")},
-			mock: getSample,
-			wantStdout: `{
-  "cpu_millis": 250,
-  "created": "2025-01-16T09:00:00Z",
-  "endpoint": {
-    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
-    "port": 36956
-  },
-  "id": "br-12345",
-  "memory_gbs": 2,
-  "name": "test-branch",
-  "project_id": "test-project-123",
-  "service_id": "svc-12345",
-  "status": "READY",
-  "service_name": "test-service",
-  "role": "tsdbadmin",
-  "password": "branch-pw",
-  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
-  "port": 36956,
-  "database": "tsdb",
-  "connection_string": "postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
-  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
-}
-`,
-		},
-		{
-			name:    "with password unavailable",
-			args:    []string{"branch", "get", "br-12345", "--with-password"},
-			opts:    []runOption{withExperimental()},
-			mock:    getSample,
-			wantErr: "password requested but not available for branch br-12345",
-		},
-		{
-			// A branch counts as DEV, so only read_only=all makes its
-			// connection string read-only.
-			name: "read-only all makes the connection string read-only",
-			args: []string{"branch", "get", "br-12345", "-o", "json"},
-			opts: []runOption{withExperimental(), withConfig(map[string]any{"read_only": "all"})},
-			mock: getSample,
-			wantStdout: `{
-  "cpu_millis": 250,
-  "created": "2025-01-16T09:00:00Z",
-  "endpoint": {
-    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
-    "port": 36956
-  },
-  "id": "br-12345",
-  "memory_gbs": 2,
-  "name": "test-branch",
-  "project_id": "test-project-123",
-  "service_id": "svc-12345",
-  "status": "READY",
-  "service_name": "test-service",
-  "role": "tsdbadmin",
-  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
-  "port": 36956,
-  "database": "tsdb",
-  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require\u0026options=-c%20tsdb_admin.read_only_connection%3Dtrue",
-  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
-}
-`,
-		},
-		{
-			// No port is guessed, so without one there's no endpoint to show
-			// or connect to.
-			name: "endpoint without a port",
-			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) { b.Endpoint.Port = nil }))
-				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
-			},
-			wantStdout: `┌────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│    PROPERTY    │                                                    VALUE                                                    │
-├────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ Branch ID      │ br-12345                                                                                                    │
-│ Name           │ test-branch                                                                                                 │
-│ Parent Service │ test-service (svc-12345)                                                                                    │
-│ Status         │ READY                                                                                                       │
-│ CPU            │ 0.25 cores                                                                                                  │
-│ Memory         │ 2 GB                                                                                                        │
-│ Created        │ 2025-01-16 09:00:00 UTC                                                                                     │
-│ Console URL    │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
-└────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-`,
-			wantStderr: "Warning: failed to get connection details: endpoint port not available\n",
-		},
-		{
-			// As for a service, a missing endpoint is warned about rather
-			// than silently leaving out the connection details.
-			name: "endpoint not available",
-			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, "br-12345", sampleBranch(branchStatus(api.DeployStatusQUEUED), func(b *api.Branch) { b.Endpoint = nil }))
-				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
-			},
-			wantStdout: `┌────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│    PROPERTY    │                                                    VALUE                                                    │
-├────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ Branch ID      │ br-12345                                                                                                    │
-│ Name           │ test-branch                                                                                                 │
-│ Parent Service │ test-service (svc-12345)                                                                                    │
-│ Status         │ QUEUED                                                                                                      │
-│ CPU            │ 0.25 cores                                                                                                  │
-│ Memory         │ 2 GB                                                                                                        │
-│ Created        │ 2025-01-16 09:00:00 UTC                                                                                     │
-│ Console URL    │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
-└────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-`,
-			wantStderr: "Warning: failed to get connection details: endpoint not available\n",
+			wantStdout: sampleBranchEnv,
 		},
 		{
 			name: "by name",
@@ -381,11 +424,11 @@ status: READY
 			wantStdout: sampleBranchEnv,
 		},
 		{
-			name:       "describe alias",
-			args:       []string{"branch", "describe", "br-12345", "-o", "env"},
-			opts:       []runOption{withExperimental()},
+			name:       "env with password",
+			args:       []string{"branch", "get", "br-12345", "-o", "env", "--with-password"},
+			opts:       []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
 			mock:       getSample,
-			wantStdout: sampleBranchEnv,
+			wantStdout: sampleBranchEnv + "PGPASSWORD=branch-pw\n",
 		},
 	})
 }

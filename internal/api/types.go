@@ -1308,6 +1308,9 @@ type Branch struct {
 	// Example: 2026-09-01T09:30:00Z
 	Created time.Time `json:"created"`
 
+	// Creator The user who created the branch.
+	Creator *BranchCreator `json:"creator,omitempty"`
+
 	// Endpoint A network endpoint for connecting to a service.
 	Endpoint *Endpoint `json:"endpoint,omitempty"`
 
@@ -1374,6 +1377,24 @@ type BranchCreate struct {
 	//
 	// Example: my-production-db-pr-412
 	Name *string `json:"name,omitempty"`
+}
+
+// BranchCreator The user who created the branch.
+type BranchCreator struct {
+	// Email The user's email.
+	//
+	// Example: john.doe@example.com
+	Email openapi_types.Email `json:"email"`
+
+	// ID The user ID.
+	//
+	// Example: user123
+	ID string `json:"id"`
+
+	// Name The user's name.
+	//
+	// Example: John Doe
+	Name string `json:"name"`
 }
 
 // BranchLogs The logs for a branch.
@@ -2707,6 +2728,9 @@ type ResolvedBranch struct {
 	//
 	// Example: 2026-09-01T09:30:00Z
 	Created time.Time `json:"created"`
+
+	// Creator The user who created the branch.
+	Creator *BranchCreator `json:"creator,omitempty"`
 
 	// Endpoint A network endpoint for connecting to a service.
 	Endpoint *Endpoint `json:"endpoint,omitempty"`

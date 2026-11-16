@@ -411,6 +411,7 @@ type BranchDetail struct {
 	ServiceID        string        `json:"service_id"`
 	ServiceName      string        `json:"service_name,omitempty"`
 	Status           string        `json:"status"`
+	Creator          *CreatorInfo  `json:"creator,omitempty"`
 	Created          string        `json:"created,omitempty"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
 	Storage          string        `json:"storage,omitempty"`
@@ -430,6 +431,8 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 	schema.Properties["status"].Description = "Branch status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "QUEUED", "CONFIGURING"}
 
+	setCreatorInfoSchemaProperties(schema.Properties["creator"])
+
 	// The branch tools only exist behind the experimental gate, so the IOPS
 	// are always included.
 	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
@@ -442,6 +445,24 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 	schema.Properties["connection_string"].Description = "PostgreSQL connection string (password embedded only if with_password=true)"
 
 	return schema
+}
+
+// CreatorInfo represents the user who created a branch.
+type CreatorInfo struct {
+	ID    string `json:"id"`
+	Name  string `json:"name,omitempty"`
+	Email string `json:"email"`
+}
+
+// setCreatorInfoSchemaProperties enhances the schema of a CreatorInfo property
+// nested inside an output schema.
+func setCreatorInfoSchemaProperties(schema *jsonschema.Schema) {
+	schema.Description = "The user who created the branch (absent if the user is no longer known, e.g. because they were deleted or removed from the project)"
+	schema.Properties["id"].Description = "The user's ID"
+	schema.Properties["name"].Description = "The user's name (absent if the user has not set one)"
+	schema.Properties["name"].Examples = []any{"John Doe"}
+	schema.Properties["email"].Description = "The user's email address"
+	schema.Properties["email"].Examples = []any{"john.doe@example.com"}
 }
 
 // convertToBranchDetail converts an API Branch to MCP BranchDetail. With
@@ -467,6 +488,14 @@ func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch, wi
 
 	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
 		detail.DirectEndpoint = fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port)
+	}
+
+	if branch.Creator != nil {
+		detail.Creator = &CreatorInfo{
+			ID:    branch.Creator.ID,
+			Name:  branch.Creator.Name,
+			Email: string(branch.Creator.Email),
+		}
 	}
 
 	// Setting the password here ensures it's set even if

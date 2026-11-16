@@ -50,6 +50,12 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			wantErr: "unknown flag: --no-set-default",
 		},
 		{
+			name:    "zero wait timeout",
+			args:    []string{"branch", "create", "svc-12345", "--wait-timeout", "0s"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "wait timeout must be positive, got 0s",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"branch", "create", "svc-12345"},
 			opts:    []runOption{withExperimental(), withNotLoggedIn()},
@@ -61,29 +67,6 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			args:    []string{"branch", "create", "svc-12345"},
 			opts:    []runOption{withExperimental(), withConfig(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
-		},
-		{
-			// A branch always counts as DEV, so prod allows branching a PROD
-			// service, as it allows forking one into a DEV fork.
-			name: "read-only prod allows branching a PROD service",
-			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "env"},
-			opts: []runOption{withExperimental(), withConfig(map[string]any{"read_only": "prod"})},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform, envTag("PROD")))
-				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
-					Return(&api.CreateBranchResponse{
-						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &created,
-					}, nil)
-			},
-			wantStdout: sampleBranchEnv,
-			wantStderr: defaultNoWaitStderr,
-		},
-		{
-			name:    "zero wait timeout",
-			args:    []string{"branch", "create", "svc-12345", "--wait-timeout", "0s"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "wait timeout must be positive, got 0s",
 		},
 		{
 			name:    "invalid cpu/memory combination",
@@ -152,6 +135,119 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 				"Error: empty response from API\n",
 		},
 		{
+			name:     "wait timeout",
+			synctest: true,
+			args:     []string{"branch", "create", "svc-12345", "-o", "env"},
+			opts:     []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				setupCreate(baseReq, created)(m)
+				queued := sampleBranch(branchStatus(api.DeployStatusQUEUED))
+				m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
+					Return(&api.GetBranchResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &queued,
+					}, nil).AnyTimes()
+			},
+			wantErr:    "wait timeout reached after 10m0s - branch may still be provisioning",
+			wantStdout: sampleBranchEnv,
+			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
+Branch ID: br-12345
+Password saved to system keyring
+Waiting for branch to be ready (timeout: 10m0s)...
+⢎  Branch status: QUEUED
+Error: wait timeout reached after 10m0s - branch may still be provisioning
+`,
+			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
+		},
+		{
+			name:     "wait polls until ready",
+			synctest: true,
+			args:     []string{"branch", "create", "svc-12345"},
+			opts:     []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				setupCreate(baseReq, created)(m)
+				expectGetBranch(m, sampleBranch())
+			},
+			wantStdout: sampleBranchTable,
+			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
+Branch ID: br-12345
+Password saved to system keyring
+Waiting for branch to be ready (timeout: 10m0s)...
+⢎  Branch status: QUEUED
+Branch is ready.
+Connect with: tiger db psql br-12345
+`,
+		},
+		{
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name: "table without a creator",
+			args: []string{"branch", "create", "svc-12345", "--no-wait"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(noCreator, func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchTableNoCreator,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			name: "table with a creator without a name",
+			args: []string{"branch", "create", "svc-12345", "--no-wait"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(namelessCreator, func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchTableNamelessCreator,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			// The initial password is saved but never output.
+			name: "json",
+			args: []string{"branch", "create", "svc-12345", "-o", "json"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchJSON,
+			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
+Branch ID: br-12345
+Password saved to system keyring
+Waiting for branch to be ready (timeout: 10m0s)...
+Branch is ready.
+Connect with: tiger db psql br-12345
+`,
+		},
+		{
+			name: "json without a creator",
+			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "json"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(noCreator, func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchJSONNoCreator,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			name: "yaml",
+			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "yaml"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchYAML,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			name: "yaml without a creator",
+			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "yaml"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(noCreator, func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchYAMLNoCreator,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
 			// Only service IDs go in the default, so a branch never becomes it.
 			name:       "no-wait saves the password and leaves the default alone",
 			args:       []string{"branch", "create", "svc-12345", "--no-wait", "-o", "env"},
@@ -160,6 +256,96 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			wantStdout: sampleBranchEnv,
 			wantStderr: defaultNoWaitStderr,
 			checks:     []checkFunc{checkStoredPassword("br-12345", "branch-pw"), checkDefaultService("")},
+		},
+		{
+			name:       "service branch is the same command",
+			args:       []string{"service", "branch", "svc-12345", "--no-wait", "-o", "env"},
+			opts:       []runOption{withExperimental()},
+			mock:       setupCreate(baseReq, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
+			checks:     []checkFunc{checkStoredPassword("br-12345", "branch-pw"), checkDefaultService("")},
+		},
+		{
+			// A branch always counts as DEV, so prod allows branching a PROD
+			// service, as it allows forking one into a DEV fork.
+			name: "read-only prod allows branching a PROD service",
+			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "env"},
+			opts: []runOption{withExperimental(), withConfig(map[string]any{"read_only": "prod"})},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform, envTag("PROD")))
+				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
+					Return(&api.CreateBranchResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &created,
+					}, nil)
+			},
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			name: "custom name and compute",
+			args: []string{"branch", "create", "svc-12345", "--name", "ci-4821", "--cpu", "2", "--memory", "16", "--no-wait", "-o", "env"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(api.BranchCreate{
+				Name:      new("ci-4821"),
+				CPUMillis: new(2000),
+				MemoryGbs: new(16),
+			}, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: noWaitStderr("Creating branch 'ci-4821' from service 'test-service' (svc-12345)..."),
+		},
+		{
+			name: "fractional cores",
+			args: []string{"branch", "create", "svc-12345", "--cpu", "0.25", "--no-wait", "-o", "env"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(api.BranchCreate{
+				CPUMillis: new(250),
+				MemoryGbs: new(2),
+			}, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			// Millicores are deprecated but still accepted for backwards
+			// compatibility.
+			name: "deprecated millicores",
+			args: []string{"branch", "create", "svc-12345", "--cpu", "500", "--no-wait", "-o", "env"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(api.BranchCreate{
+				CPUMillis: new(500),
+				MemoryGbs: new(4),
+			}, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			name: "memory alone sets the matching cpu",
+			args: []string{"branch", "create", "svc-12345", "--memory", "4", "--no-wait", "-o", "env"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(api.BranchCreate{
+				CPUMillis: new(500),
+				MemoryGbs: new(4),
+			}, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			name:       "default service from config",
+			args:       []string{"branch", "create", "--no-wait", "-o", "env"},
+			opts:       []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			mock:       setupCreate(baseReq, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
+			checks:     []checkFunc{checkDefaultService("svc-12345")},
+		},
+		{
+			name:       "iops",
+			args:       []string{"branch", "create", "svc-12345", "--iops", "16000", "--no-wait", "-o", "env"},
+			opts:       []runOption{withExperimental()},
+			mock:       setupCreate(api.BranchCreate{Iops: new(16000)}, created),
+			wantStdout: sampleBranchEnv,
+			wantStderr: defaultNoWaitStderr,
 		},
 		{
 			// Nothing to save, so nothing is said about saving.
@@ -218,140 +404,6 @@ Waiting for branch to be ready (timeout: 10m0s)...
 ⢎  Branch status: QUEUED
 Branch is ready.
 `,
-		},
-		{
-			name: "custom name and compute",
-			args: []string{"branch", "create", "svc-12345", "--name", "ci-4821", "--cpu", "2", "--memory", "16", "--no-wait", "-o", "env"},
-			opts: []runOption{withExperimental()},
-			mock: setupCreate(api.BranchCreate{
-				Name:      new("ci-4821"),
-				CPUMillis: new(2000),
-				MemoryGbs: new(16),
-			}, created),
-			wantStdout: sampleBranchEnv,
-			wantStderr: noWaitStderr("Creating branch 'ci-4821' from service 'test-service' (svc-12345)..."),
-		},
-		{
-			name: "fractional cores",
-			args: []string{"branch", "create", "svc-12345", "--cpu", "0.25", "--no-wait", "-o", "env"},
-			opts: []runOption{withExperimental()},
-			mock: setupCreate(api.BranchCreate{
-				CPUMillis: new(250),
-				MemoryGbs: new(2),
-			}, created),
-			wantStdout: sampleBranchEnv,
-			wantStderr: defaultNoWaitStderr,
-		},
-		{
-			// Millicores are deprecated but still accepted for backwards
-			// compatibility.
-			name: "deprecated millicores",
-			args: []string{"branch", "create", "svc-12345", "--cpu", "500", "--no-wait", "-o", "env"},
-			opts: []runOption{withExperimental()},
-			mock: setupCreate(api.BranchCreate{
-				CPUMillis: new(500),
-				MemoryGbs: new(4),
-			}, created),
-			wantStdout: sampleBranchEnv,
-			wantStderr: defaultNoWaitStderr,
-		},
-		{
-			name:       "iops",
-			args:       []string{"branch", "create", "svc-12345", "--iops", "16000", "--no-wait", "-o", "env"},
-			opts:       []runOption{withExperimental()},
-			mock:       setupCreate(api.BranchCreate{Iops: new(16000)}, created),
-			wantStdout: sampleBranchEnv,
-			wantStderr: defaultNoWaitStderr,
-		},
-		{
-			name: "memory alone sets the matching cpu",
-			args: []string{"branch", "create", "svc-12345", "--memory", "4", "--no-wait", "-o", "env"},
-			opts: []runOption{withExperimental()},
-			mock: setupCreate(api.BranchCreate{
-				CPUMillis: new(500),
-				MemoryGbs: new(4),
-			}, created),
-			wantStdout: sampleBranchEnv,
-			wantStderr: defaultNoWaitStderr,
-		},
-		{
-			name:     "wait polls until ready",
-			synctest: true,
-			args:     []string{"branch", "create", "svc-12345"},
-			opts:     []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				setupCreate(baseReq, created)(m)
-				expectGetBranch(m, sampleBranch())
-			},
-			wantStdout: sampleBranchTable,
-			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
-Branch ID: br-12345
-Password saved to system keyring
-Waiting for branch to be ready (timeout: 10m0s)...
-⢎  Branch status: QUEUED
-Branch is ready.
-Connect with: tiger db psql br-12345
-`,
-		},
-		{
-			name:     "wait timeout",
-			synctest: true,
-			args:     []string{"branch", "create", "svc-12345", "-o", "env"},
-			opts:     []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				setupCreate(baseReq, created)(m)
-				queued := sampleBranch(branchStatus(api.DeployStatusQUEUED))
-				m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
-					Return(&api.GetBranchResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      &queued,
-					}, nil).AnyTimes()
-			},
-			wantErr:    "wait timeout reached after 10m0s - branch may still be provisioning",
-			wantStdout: sampleBranchEnv,
-			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
-Branch ID: br-12345
-Password saved to system keyring
-Waiting for branch to be ready (timeout: 10m0s)...
-⢎  Branch status: QUEUED
-Error: wait timeout reached after 10m0s - branch may still be provisioning
-`,
-			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
-		},
-		{
-			// The initial password is saved but never output.
-			name: "json",
-			args: []string{"branch", "create", "svc-12345", "-o", "json"},
-			opts: []runOption{withExperimental()},
-			mock: setupCreate(baseReq, sampleBranch(func(b *api.Branch) {
-				b.InitialPassword = new("branch-pw")
-			})),
-			wantStdout: sampleBranchJSON,
-			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
-Branch ID: br-12345
-Password saved to system keyring
-Waiting for branch to be ready (timeout: 10m0s)...
-Branch is ready.
-Connect with: tiger db psql br-12345
-`,
-		},
-		{
-			name:       "default service from config",
-			args:       []string{"branch", "create", "--no-wait", "-o", "env"},
-			opts:       []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
-			mock:       setupCreate(baseReq, created),
-			wantStdout: sampleBranchEnv,
-			wantStderr: defaultNoWaitStderr,
-			checks:     []checkFunc{checkDefaultService("svc-12345")},
-		},
-		{
-			name:       "service branch is the same command",
-			args:       []string{"service", "branch", "svc-12345", "--no-wait", "-o", "env"},
-			opts:       []runOption{withExperimental()},
-			mock:       setupCreate(baseReq, created),
-			wantStdout: sampleBranchEnv,
-			wantStderr: defaultNoWaitStderr,
-			checks:     []checkFunc{checkStoredPassword("br-12345", "branch-pw"), checkDefaultService("")},
 		},
 	})
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,7 +67,12 @@ func sampleBranch(overrides ...func(*api.Branch)) api.Branch {
 		Status:    api.DeployStatusREADY,
 		CPUMillis: 250,
 		MemoryGbs: 2,
-		Created:   time.Date(2025, 1, 16, 9, 0, 0, 0, time.UTC),
+		Creator: &api.BranchCreator{
+			ID:    "42",
+			Name:  "Jane Doe",
+			Email: "jane.doe@example.com",
+		},
+		Created: time.Date(2025, 1, 16, 9, 0, 0, 0, time.UTC),
 		Endpoint: &api.Endpoint{
 			Host: new("br-12345.test-project-123.branch.tsdb.cloud.timescale.com"),
 			Port: new(36956),
@@ -116,8 +122,8 @@ PGDATABASE=tsdb
 PGUSER=tsdbadmin
 `
 
-// sampleBranchTable and sampleBranchJSON are the table and JSON output of
-// sampleBranch.
+// sampleBranchTable, sampleBranchJSON, and sampleBranchYAML are the table,
+// JSON, and YAML output of sampleBranch.
 const (
 	sampleBranchTable = `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │     PROPERTY      │                                                    VALUE                                                    │
@@ -128,8 +134,9 @@ const (
 │ Status            │ READY                                                                                                       │
 │ CPU               │ 0.25 cores                                                                                                  │
 │ Memory            │ 2 GB                                                                                                        │
-│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
+│ Created By        │ Jane Doe (jane.doe@example.com)                                                                             │
 │ Created           │ 2025-01-16 09:00:00 UTC                                                                                     │
+│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
 │ Connection String │ postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -137,6 +144,11 @@ const (
 	sampleBranchJSON = `{
   "cpu_millis": 250,
   "created": "2025-01-16T09:00:00Z",
+  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
   "endpoint": {
     "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
     "port": 36956
@@ -156,4 +168,55 @@ const (
   "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
 }
 `
+	sampleBranchYAML = `connection_string: postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require
+console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview
+cpu_millis: 250
+created: "2025-01-16T09:00:00Z"
+creator:
+  email: jane.doe@example.com
+  id: "42"
+  name: Jane Doe
+database: tsdb
+endpoint:
+  host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
+  port: 36956
+host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
+id: br-12345
+memory_gbs: 2
+name: test-branch
+port: 36956
+project_id: test-project-123
+role: tsdbadmin
+service_id: svc-12345
+service_name: test-service
+status: READY
+`
 )
+
+// sampleBranchTableNoCreator, sampleBranchJSONNoCreator, and
+// sampleBranchYAMLNoCreator are the table, JSON, and YAML output of
+// sampleBranch when the API returns no creator. sampleBranchTableNamelessCreator
+// is its table output when the creator has no name.
+var (
+	sampleBranchJSONNoCreator = strings.Replace(sampleBranchJSON, `  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
+`, "", 1)
+	sampleBranchYAMLNoCreator = strings.Replace(sampleBranchYAML, `creator:
+  email: jane.doe@example.com
+  id: "42"
+  name: Jane Doe
+`, "", 1)
+	sampleBranchTableNoCreator = strings.Replace(sampleBranchTable,
+		"│ Created By        │ Jane Doe (jane.doe@example.com)                                                                             │\n", "", 1)
+	sampleBranchTableNamelessCreator = strings.Replace(sampleBranchTable,
+		"│ Created By        │ Jane Doe (jane.doe@example.com)  ",
+		"│ Created By        │ jane.doe@example.com             ", 1)
+)
+
+// noCreator and namelessCreator are sampleBranch overrides removing the
+// branch's creator and the creator's name, respectively.
+func noCreator(b *api.Branch)       { b.Creator = nil }
+func namelessCreator(b *api.Branch) { b.Creator.Name = "" }

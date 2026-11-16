@@ -35,18 +35,18 @@ func TestBranchGetTool(t *testing.T) {
 			wantCallErr: `calling "tools/call": unknown tool "branch_get"`,
 		},
 		{
-			name:    "not logged in",
-			tool:    toolBranchGet,
-			args:    args,
-			opts:    []runOption{experimental, withNotLoggedIn()},
-			wantErr: notLoggedInMsg,
-		},
-		{
 			name:    "rejects a malformed branch ID",
 			tool:    toolBranchGet,
 			args:    map[string]any{"branch_id": "nope"},
 			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: validating /properties/branch_id: pattern: "nope" does not match regular expression "^[a-z0-9]{10}$"`,
+		},
+		{
+			name:    "not logged in",
+			tool:    toolBranchGet,
+			args:    args,
+			opts:    []runOption{experimental, withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name: "network error",
@@ -96,32 +96,6 @@ func TestBranchGetTool(t *testing.T) {
 			wantErr: "branch 'br4nch1d9x' not found",
 		},
 		{
-			name:       "success",
-			tool:       toolBranchGet,
-			args:       args,
-			opts:       []runOption{experimental},
-			mock:       getBranch(sampleBranch()),
-			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetail(api.DeployStatusREADY))},
-		},
-		{
-			// The branch has its own password, so its parent's isn't used.
-			name: "with password",
-			tool: toolBranchGet,
-			args: map[string]any{"branch_id": "br4nch1d9x", "with_password": true},
-			opts: []runOption{
-				experimental,
-				withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"),
-				withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw"),
-			},
-			mock: getBranch(sampleBranch()),
-			wantOutput: map[string]any{"branch": func() map[string]any {
-				detail := withServiceName(sampleBranchDetail(api.DeployStatusREADY))
-				detail["password"] = "branch-pw"
-				detail["connection_string"] = "postgresql://tsdbadmin:branch-pw@br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require"
-				return detail
-			}()},
-		},
-		{
 			// Refused before the parent's name is fetched.
 			name: "with password unavailable",
 			tool: toolBranchGet,
@@ -131,6 +105,14 @@ func TestBranchGetTool(t *testing.T) {
 				expectResolveBranch(m, sampleBranch())
 			},
 			wantErr: "requested password but password not available",
+		},
+		{
+			name:       "success",
+			tool:       toolBranchGet,
+			args:       args,
+			opts:       []runOption{experimental},
+			mock:       getBranch(sampleBranch()),
+			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetail(api.DeployStatusREADY))},
 		},
 		{
 			// The IOPS go in resources, as they do for services.
@@ -177,34 +159,6 @@ func TestBranchGetTool(t *testing.T) {
 			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetail(api.DeployStatusREADY))},
 		},
 		{
-			// The parent's name is the only thing the second fetch adds, so
-			// without it the branch is still returned.
-			name: "parent fetch fails",
-			tool: toolBranchGet,
-			args: args,
-			opts: []runOption{experimental},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, sampleBranch())
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-					Return(nil, errors.New("connection refused"))
-			},
-			wantOutput: map[string]any{"branch": sampleBranchDetail(api.DeployStatusREADY)},
-		},
-		{
-			// A branch counts as DEV, so only read_only=all makes its
-			// connection string read-only.
-			name: "read-only all makes the connection string read-only",
-			tool: toolBranchGet,
-			args: args,
-			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "all"})},
-			mock: getBranch(sampleBranch()),
-			wantOutput: map[string]any{"branch": func() map[string]any {
-				detail := withServiceName(sampleBranchDetail(api.DeployStatusREADY))
-				detail["connection_string"] = "postgresql://tsdbadmin@br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require&options=-c%20tsdb_admin.read_only_connection%3Dtrue"
-				return detail
-			}()},
-		},
-		{
 			// No port is guessed, so without one there's no endpoint to show
 			// or connect to.
 			name: "endpoint without a port",
@@ -218,6 +172,7 @@ func TestBranchGetTool(t *testing.T) {
 				"service_id":   "e6ue9697jf",
 				"service_name": "test-service",
 				"status":       "READY",
+				"creator":      map[string]any{"id": "42", "name": "Jane Doe", "email": "jane.doe@example.com"},
 				"created":      "2025-01-16T09:00:00Z",
 				"resources":    map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
 			}},
@@ -236,9 +191,74 @@ func TestBranchGetTool(t *testing.T) {
 				"service_id":   "e6ue9697jf",
 				"service_name": "test-service",
 				"status":       "QUEUED",
+				"creator":      map[string]any{"id": "42", "name": "Jane Doe", "email": "jane.doe@example.com"},
 				"created":      "2025-01-16T09:00:00Z",
 				"resources":    map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
 			}},
+		},
+		{
+			// The API leaves the creator out when the user is no longer
+			// known, e.g. after being deleted.
+			name:       "without a creator",
+			tool:       toolBranchGet,
+			args:       args,
+			opts:       []runOption{experimental},
+			mock:       getBranch(sampleBranch(noCreator)),
+			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetailNoCreator(api.DeployStatusREADY))},
+		},
+		{
+			name:       "creator without a name",
+			tool:       toolBranchGet,
+			args:       args,
+			opts:       []runOption{experimental},
+			mock:       getBranch(sampleBranch(namelessCreator)),
+			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetailNamelessCreator(api.DeployStatusREADY))},
+		},
+		{
+			// The branch has its own password, so its parent's isn't used.
+			name: "with password",
+			tool: toolBranchGet,
+			args: map[string]any{"branch_id": "br4nch1d9x", "with_password": true},
+			opts: []runOption{
+				experimental,
+				withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"),
+				withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw"),
+			},
+			mock: getBranch(sampleBranch()),
+			wantOutput: map[string]any{"branch": func() map[string]any {
+				detail := withServiceName(sampleBranchDetail(api.DeployStatusREADY))
+				detail["password"] = "branch-pw"
+				detail["connection_string"] = "postgresql://tsdbadmin:branch-pw@br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require"
+				return detail
+			}()},
+		},
+		{
+			// A branch counts as DEV, so only read_only=all makes its
+			// connection string read-only.
+			name: "read-only all makes the connection string read-only",
+			tool: toolBranchGet,
+			args: args,
+			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "all"})},
+			mock: getBranch(sampleBranch()),
+			wantOutput: map[string]any{"branch": func() map[string]any {
+				detail := withServiceName(sampleBranchDetail(api.DeployStatusREADY))
+				detail["connection_string"] = "postgresql://tsdbadmin@br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require&options=-c%20tsdb_admin.read_only_connection%3Dtrue"
+				return detail
+			}()},
+		},
+		{
+			// The parent's name is the only thing the second fetch adds, so
+			// without it the branch is still returned.
+			name: "parent fetch fails",
+			tool: toolBranchGet,
+			args: args,
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, sampleBranch())
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantOutput: map[string]any{"branch": sampleBranchDetail(api.DeployStatusREADY)},
 		},
 	})
 }
