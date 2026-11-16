@@ -92,102 +92,18 @@ func TestBranchGetCmd(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
+			name:    "with password unavailable",
+			args:    []string{"branch", "get", "br-12345", "--with-password"},
+			opts:    []runOption{withExperimental()},
+			mock:    getSample,
+			wantErr: "password requested but not available for branch br-12345",
+		},
+		{
 			name:       "table",
 			args:       []string{"branch", "get", "br-12345"},
 			opts:       []runOption{withExperimental()},
 			mock:       getSample,
 			wantStdout: sampleBranchTable,
-		},
-		{
-			name:       "json",
-			args:       []string{"branch", "get", "br-12345", "-o", "json"},
-			opts:       []runOption{withExperimental()},
-			mock:       getSample,
-			wantStdout: sampleBranchJSON,
-		},
-		{
-			name:       "yaml",
-			args:       []string{"branch", "get", "br-12345", "-o", "yaml"},
-			opts:       []runOption{withExperimental()},
-			mock:       getSample,
-			wantStdout: sampleBranchYAML,
-		},
-		{
-			name: "table with metrics",
-			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
-			mock: getWithMetrics,
-			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│     PROPERTY      │                                                    VALUE                                                    │
-├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ Branch ID         │ br-12345                                                                                                    │
-│ Name              │ test-branch                                                                                                 │
-│ Parent Service    │ test-service (svc-12345)                                                                                    │
-│ Status            │ READY                                                                                                       │
-│ CPU               │ 0.25 cores                                                                                                  │
-│ Memory            │ 2 GB                                                                                                        │
-│ IOPS              │ 16000                                                                                                       │
-│ Storage           │ 1.2 GB changed on this branch (billed)                                                                      │
-│ Created By        │ Jane Doe (jane.doe@example.com)                                                                             │
-│ Created           │ 2025-01-16 09:00:00 UTC                                                                                     │
-│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
-│ Connection String │ postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
-│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
-└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-`,
-		},
-		{
-			// The API doesn't report a branch's storage yet, so there's no row
-			// for it until it does.
-			name: "table with metrics but no storage",
-			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) {
-					b.Metrics = &api.BranchMetrics{CPUMillicores: new(120), MemoryMb: new(512)}
-				}))
-				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
-			},
-			wantStdout: sampleBranchTable,
-		},
-		{
-			name: "json with metrics",
-			args: []string{"branch", "get", "br-12345", "-o", "json"},
-			opts: []runOption{withExperimental()},
-			mock: getWithMetrics,
-			wantStdout: `{
-  "cpu_millis": 250,
-  "created": "2025-01-16T09:00:00Z",
-  "creator": {
-    "email": "jane.doe@example.com",
-    "id": "42",
-    "name": "Jane Doe"
-  },
-  "endpoint": {
-    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
-    "port": 36956
-  },
-  "id": "br-12345",
-  "iops": 16000,
-  "memory_gbs": 2,
-  "metrics": {
-    "cpu_millicores": 120,
-    "memory_mb": 512,
-    "storage_mb": 1229
-  },
-  "name": "test-branch",
-  "project_id": "test-project-123",
-  "service_id": "svc-12345",
-  "status": "READY",
-  "service_name": "test-service",
-  "role": "tsdbadmin",
-  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
-  "port": 36956,
-  "database": "tsdb",
-  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
-  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
-}
-`,
 		},
 		{
 			// The parent's name is the only thing the second fetch adds, so
@@ -204,62 +120,6 @@ func TestBranchGetCmd(t *testing.T) {
 				"│ Parent Service    │ test-service (svc-12345)  ",
 				"│ Parent Service    │ svc-12345                 ", 1),
 			wantStderr: "Warning: failed to get parent service: failed to fetch service details: connection refused\n",
-		},
-		{
-			// The API leaves the creator out when the user is no longer known,
-			// e.g. after being deleted.
-			name: "table without a creator",
-			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
-				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
-			},
-			wantStdout: sampleBranchTableNoCreator,
-		},
-		{
-			name: "table with a creator without a name",
-			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, "br-12345", sampleBranch(namelessCreator))
-				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
-			},
-			wantStdout: sampleBranchTableNamelessCreator,
-		},
-		{
-			name: "json without a creator",
-			args: []string{"branch", "get", "br-12345", "-o", "json"},
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
-				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
-			},
-			wantStdout: sampleBranchJSONNoCreator,
-		},
-		{
-			name: "yaml without a creator",
-			args: []string{"branch", "get", "br-12345", "-o", "yaml"},
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
-				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
-			},
-			wantStdout: sampleBranchYAMLNoCreator,
-		},
-		{
-			name:       "env",
-			args:       []string{"branch", "get", "br-12345", "-o", "env"},
-			opts:       []runOption{withExperimental()},
-			mock:       getSample,
-			wantStdout: sampleBranchEnv,
-		},
-		{
-			name:       "env with password",
-			args:       []string{"branch", "get", "br-12345", "-o", "env", "--with-password"},
-			opts:       []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
-			mock:       getSample,
-			wantStdout: sampleBranchEnv + "PGPASSWORD=branch-pw\n",
 		},
 		{
 			name: "table with password",
@@ -282,83 +142,6 @@ func TestBranchGetCmd(t *testing.T) {
 │ Connection String │ postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview           │
 └───────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-`,
-		},
-		{
-			// The branch has its own password, so its parent's isn't used.
-			name: "json with password",
-			args: []string{"branch", "get", "br-12345", "-o", "json", "--with-password"},
-			opts: []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"), withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw")},
-			mock: getSample,
-			wantStdout: `{
-  "cpu_millis": 250,
-  "created": "2025-01-16T09:00:00Z",
-  "creator": {
-    "email": "jane.doe@example.com",
-    "id": "42",
-    "name": "Jane Doe"
-  },
-  "endpoint": {
-    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
-    "port": 36956
-  },
-  "id": "br-12345",
-  "memory_gbs": 2,
-  "name": "test-branch",
-  "project_id": "test-project-123",
-  "service_id": "svc-12345",
-  "status": "READY",
-  "service_name": "test-service",
-  "role": "tsdbadmin",
-  "password": "branch-pw",
-  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
-  "port": 36956,
-  "database": "tsdb",
-  "connection_string": "postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
-  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
-}
-`,
-		},
-		{
-			name:    "with password unavailable",
-			args:    []string{"branch", "get", "br-12345", "--with-password"},
-			opts:    []runOption{withExperimental()},
-			mock:    getSample,
-			wantErr: "password requested but not available for branch br-12345",
-		},
-		{
-			// A branch counts as DEV, so only read_only=all makes its
-			// connection string read-only.
-			name: "read-only all makes the connection string read-only",
-			args: []string{"branch", "get", "br-12345", "-o", "json"},
-			opts: []runOption{withExperimental(), withConfig(map[string]any{"read_only": "all"})},
-			mock: getSample,
-			wantStdout: `{
-  "cpu_millis": 250,
-  "created": "2025-01-16T09:00:00Z",
-  "creator": {
-    "email": "jane.doe@example.com",
-    "id": "42",
-    "name": "Jane Doe"
-  },
-  "endpoint": {
-    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
-    "port": 36956
-  },
-  "id": "br-12345",
-  "memory_gbs": 2,
-  "name": "test-branch",
-  "project_id": "test-project-123",
-  "service_id": "svc-12345",
-  "status": "READY",
-  "service_name": "test-service",
-  "role": "tsdbadmin",
-  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
-  "port": 36956,
-  "database": "tsdb",
-  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require\u0026options=-c%20tsdb_admin.read_only_connection%3Dtrue",
-  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
-}
 `,
 		},
 		{
@@ -414,6 +197,223 @@ func TestBranchGetCmd(t *testing.T) {
 			wantStderr: "Warning: failed to get connection details: endpoint not available\n",
 		},
 		{
+			name: "table with metrics",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: getWithMetrics,
+			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                                    VALUE                                                    │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Branch ID         │ br-12345                                                                                                    │
+│ Name              │ test-branch                                                                                                 │
+│ Parent Service    │ test-service (svc-12345)                                                                                    │
+│ Status            │ READY                                                                                                       │
+│ CPU               │ 0.25 cores                                                                                                  │
+│ Memory            │ 2 GB                                                                                                        │
+│ IOPS              │ 16000                                                                                                       │
+│ Storage           │ 1.2 GB changed on this branch (billed)                                                                      │
+│ Created By        │ Jane Doe (jane.doe@example.com)                                                                             │
+│ Created           │ 2025-01-16 09:00:00 UTC                                                                                     │
+│ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
+│ Connection String │ postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
+│ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
+└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+		},
+		{
+			// The API doesn't report a branch's storage yet, so there's no row
+			// for it until it does.
+			name: "table with metrics but no storage",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) {
+					b.Metrics = &api.BranchMetrics{CPUMillicores: new(120), MemoryMb: new(512)}
+				}))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchTable,
+		},
+		{
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name: "table without a creator",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchTableNoCreator,
+		},
+		{
+			name: "table with a creator without a name",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(namelessCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchTableNamelessCreator,
+		},
+		{
+			name:       "json",
+			args:       []string{"branch", "get", "br-12345", "-o", "json"},
+			opts:       []runOption{withExperimental()},
+			mock:       getSample,
+			wantStdout: sampleBranchJSON,
+		},
+		{
+			// The branch has its own password, so its parent's isn't used.
+			name: "json with password",
+			args: []string{"branch", "get", "br-12345", "-o", "json", "--with-password"},
+			opts: []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"), withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw")},
+			mock: getSample,
+			wantStdout: `{
+  "cpu_millis": 250,
+  "created": "2025-01-16T09:00:00Z",
+  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
+  "endpoint": {
+    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+    "port": 36956
+  },
+  "id": "br-12345",
+  "memory_gbs": 2,
+  "name": "test-branch",
+  "project_id": "test-project-123",
+  "service_id": "svc-12345",
+  "status": "READY",
+  "service_name": "test-service",
+  "role": "tsdbadmin",
+  "password": "branch-pw",
+  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+  "port": 36956,
+  "database": "tsdb",
+  "connection_string": "postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
+}
+`,
+		},
+		{
+			// A branch counts as DEV, so only read_only=all makes its
+			// connection string read-only.
+			name: "read-only all makes the connection string read-only",
+			args: []string{"branch", "get", "br-12345", "-o", "json"},
+			opts: []runOption{withExperimental(), withConfig(map[string]any{"read_only": "all"})},
+			mock: getSample,
+			wantStdout: `{
+  "cpu_millis": 250,
+  "created": "2025-01-16T09:00:00Z",
+  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
+  "endpoint": {
+    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+    "port": 36956
+  },
+  "id": "br-12345",
+  "memory_gbs": 2,
+  "name": "test-branch",
+  "project_id": "test-project-123",
+  "service_id": "svc-12345",
+  "status": "READY",
+  "service_name": "test-service",
+  "role": "tsdbadmin",
+  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+  "port": 36956,
+  "database": "tsdb",
+  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require\u0026options=-c%20tsdb_admin.read_only_connection%3Dtrue",
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
+}
+`,
+		},
+		{
+			name: "json with metrics",
+			args: []string{"branch", "get", "br-12345", "-o", "json"},
+			opts: []runOption{withExperimental()},
+			mock: getWithMetrics,
+			wantStdout: `{
+  "cpu_millis": 250,
+  "created": "2025-01-16T09:00:00Z",
+  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
+  "endpoint": {
+    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+    "port": 36956
+  },
+  "id": "br-12345",
+  "iops": 16000,
+  "memory_gbs": 2,
+  "metrics": {
+    "cpu_millicores": 120,
+    "memory_mb": 512,
+    "storage_mb": 1229
+  },
+  "name": "test-branch",
+  "project_id": "test-project-123",
+  "service_id": "svc-12345",
+  "status": "READY",
+  "service_name": "test-service",
+  "role": "tsdbadmin",
+  "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+  "port": 36956,
+  "database": "tsdb",
+  "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
+  "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
+}
+`,
+		},
+		{
+			name: "json without a creator",
+			args: []string{"branch", "get", "br-12345", "-o", "json"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchJSONNoCreator,
+		},
+		{
+			name:       "yaml",
+			args:       []string{"branch", "get", "br-12345", "-o", "yaml"},
+			opts:       []runOption{withExperimental()},
+			mock:       getSample,
+			wantStdout: sampleBranchYAML,
+		},
+		{
+			name: "yaml without a creator",
+			args: []string{"branch", "get", "br-12345", "-o", "yaml"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchYAMLNoCreator,
+		},
+		{
+			name:       "env",
+			args:       []string{"branch", "get", "br-12345", "-o", "env"},
+			opts:       []runOption{withExperimental()},
+			mock:       getSample,
+			wantStdout: sampleBranchEnv,
+		},
+		{
+			name:       "describe alias",
+			args:       []string{"branch", "describe", "br-12345", "-o", "env"},
+			opts:       []runOption{withExperimental()},
+			mock:       getSample,
+			wantStdout: sampleBranchEnv,
+		},
+		{
 			name: "by name",
 			args: []string{"branch", "get", "test-branch", "-o", "env"},
 			opts: []runOption{withExperimental()},
@@ -424,11 +424,11 @@ func TestBranchGetCmd(t *testing.T) {
 			wantStdout: sampleBranchEnv,
 		},
 		{
-			name:       "describe alias",
-			args:       []string{"branch", "describe", "br-12345", "-o", "env"},
-			opts:       []runOption{withExperimental()},
+			name:       "env with password",
+			args:       []string{"branch", "get", "br-12345", "-o", "env", "--with-password"},
+			opts:       []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
 			mock:       getSample,
-			wantStdout: sampleBranchEnv,
+			wantStdout: sampleBranchEnv + "PGPASSWORD=branch-pw\n",
 		},
 	})
 }

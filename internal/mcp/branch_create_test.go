@@ -46,13 +46,6 @@ func TestBranchCreateTool(t *testing.T) {
 			wantCallErr: `calling "tools/call": unknown tool "branch_create"`,
 		},
 		{
-			name:    "not logged in",
-			tool:    toolBranchCreate,
-			args:    args,
-			opts:    []runOption{experimental, withNotLoggedIn()},
-			wantErr: notLoggedInMsg,
-		},
-		{
 			name:    "rejects a combination a branch can't have",
 			tool:    toolBranchCreate,
 			args:    map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "1 CPU/4 GB"},
@@ -60,25 +53,18 @@ func TestBranchCreateTool(t *testing.T) {
 			wantErr: `validating "arguments": validating root: validating /properties/cpu_memory: enum: 1 CPU/4 GB does not equal any of: [0.25 CPU/2 GB 0.5 CPU/4 GB 1 CPU/8 GB 2 CPU/16 GB 4 CPU/32 GB 8 CPU/64 GB 16 CPU/128 GB 32 CPU/256 GB]`,
 		},
 		{
+			name:    "not logged in",
+			tool:    toolBranchCreate,
+			args:    args,
+			opts:    []runOption{experimental, withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
+		},
+		{
 			name:    "read-only all refuses without an API call",
 			tool:    toolBranchCreate,
 			args:    args,
 			opts:    []runOption{experimental, withConfigAfterStart(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
-		},
-		{
-			// A branch always counts as DEV, so prod allows branching even a
-			// PROD service, without looking up the service's tag.
-			name: "read-only prod allows branching",
-			tool: toolBranchCreate,
-			args: args,
-			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
-			mock: expectCreate(baseReq, created),
-			wantOutput: map[string]any{
-				"branch":           sampleBranchDetail(api.DeployStatusQUEUED),
-				"message":          acceptedMsg,
-				"password_storage": storedPassword,
-			},
 		},
 		{
 			name: "network error",
@@ -131,56 +117,17 @@ func TestBranchCreateTool(t *testing.T) {
 			checks: []checkFunc{checkStoredPassword("br4nch1d9x", "branch-pw"), checkDefaultService("")},
 		},
 		{
-			// A storage failure isn't fatal: the branch exists either way, so
-			// the tool reports the failure rather than erroring.
-			name: "reports a password storage failure",
+			// A branch always counts as DEV, so prod allows branching even a
+			// PROD service, without looking up the service's tag.
+			name: "read-only prod allows branching",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental, withKeyringError(errors.New("keyring is locked"))},
+			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
 			mock: expectCreate(baseReq, created),
 			wantOutput: map[string]any{
-				"branch":  sampleBranchDetail(api.DeployStatusQUEUED),
-				"message": acceptedMsg,
-				"password_storage": map[string]any{
-					"success": false,
-					"method":  "keyring",
-					"message": "Failed to save password to keyring: keyring is locked",
-				},
-			},
-		},
-		{
-			name: "no initial password",
-			tool: toolBranchCreate,
-			args: args,
-			opts: []runOption{experimental},
-			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED))),
-			wantOutput: map[string]any{
-				"branch":  sampleBranchDetail(api.DeployStatusQUEUED),
-				"message": acceptedMsg,
-			},
-		},
-		{
-			// The API leaves the creator out when the user is no longer known,
-			// e.g. after being deleted.
-			name: "without a creator",
-			tool: toolBranchCreate,
-			args: args,
-			opts: []runOption{experimental},
-			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED), noCreator)),
-			wantOutput: map[string]any{
-				"branch":  sampleBranchDetailNoCreator(api.DeployStatusQUEUED),
-				"message": acceptedMsg,
-			},
-		},
-		{
-			name: "creator without a name",
-			tool: toolBranchCreate,
-			args: args,
-			opts: []runOption{experimental},
-			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED), namelessCreator)),
-			wantOutput: map[string]any{
-				"branch":  sampleBranchDetailNamelessCreator(api.DeployStatusQUEUED),
-				"message": acceptedMsg,
+				"branch":           sampleBranchDetail(api.DeployStatusQUEUED),
+				"message":          acceptedMsg,
+				"password_storage": storedPassword,
 			},
 		},
 		{
@@ -212,6 +159,51 @@ func TestBranchCreateTool(t *testing.T) {
 			},
 		},
 		{
+			// A storage failure isn't fatal: the branch exists either way, so
+			// the tool reports the failure rather than erroring.
+			name: "reports a password storage failure",
+			tool: toolBranchCreate,
+			args: args,
+			opts: []runOption{experimental, withKeyringError(errors.New("keyring is locked"))},
+			mock: expectCreate(baseReq, created),
+			wantOutput: map[string]any{
+				"branch":  sampleBranchDetail(api.DeployStatusQUEUED),
+				"message": acceptedMsg,
+				"password_storage": map[string]any{
+					"success": false,
+					"method":  "keyring",
+					"message": "Failed to save password to keyring: keyring is locked",
+				},
+			},
+		},
+		{
+			name: "no initial password",
+			tool: toolBranchCreate,
+			args: args,
+			opts: []runOption{experimental},
+			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED))),
+			wantOutput: map[string]any{
+				"branch":  sampleBranchDetail(api.DeployStatusQUEUED),
+				"message": acceptedMsg,
+			},
+		},
+		{
+			name:     "wait polls until ready",
+			synctest: true,
+			tool:     toolBranchCreate,
+			args:     map[string]any{"service_id": "e6ue9697jf", "wait": true},
+			opts:     []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectCreate(baseReq, created)(m)
+				expectGetBranch(m, sampleBranch())
+			},
+			wantOutput: map[string]any{
+				"branch":           sampleBranchDetail(api.DeployStatusREADY),
+				"message":          "Branch is ready.",
+				"password_storage": storedPassword,
+			},
+		},
+		{
 			// The polls never carry the password, so waiting must keep the
 			// create response's.
 			name:     "with password survives the wait",
@@ -236,6 +228,30 @@ func TestBranchCreateTool(t *testing.T) {
 					"method":  "none",
 					"message": "Password not saved (--password-storage=none). Make sure to store it securely.",
 				},
+			},
+		},
+		{
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name: "without a creator",
+			tool: toolBranchCreate,
+			args: args,
+			opts: []runOption{experimental},
+			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED), noCreator)),
+			wantOutput: map[string]any{
+				"branch":  sampleBranchDetailNoCreator(api.DeployStatusQUEUED),
+				"message": acceptedMsg,
+			},
+		},
+		{
+			name: "creator without a name",
+			tool: toolBranchCreate,
+			args: args,
+			opts: []runOption{experimental},
+			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED), namelessCreator)),
+			wantOutput: map[string]any{
+				"branch":  sampleBranchDetailNamelessCreator(api.DeployStatusQUEUED),
+				"message": acceptedMsg,
 			},
 		},
 		{
@@ -266,22 +282,6 @@ func TestBranchCreateTool(t *testing.T) {
 					"method":  "none",
 					"message": "Password not saved (--password-storage=none). Make sure to store it securely.",
 				},
-			},
-		},
-		{
-			name:     "wait polls until ready",
-			synctest: true,
-			tool:     toolBranchCreate,
-			args:     map[string]any{"service_id": "e6ue9697jf", "wait": true},
-			opts:     []runOption{experimental},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectCreate(baseReq, created)(m)
-				expectGetBranch(m, sampleBranch())
-			},
-			wantOutput: map[string]any{
-				"branch":           sampleBranchDetail(api.DeployStatusREADY),
-				"message":          "Branch is ready.",
-				"password_storage": storedPassword,
 			},
 		},
 	})
