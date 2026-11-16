@@ -11,10 +11,16 @@ import (
 )
 
 func TestBranchResizeCmd(t *testing.T) {
-	setupResize := func(req api.BranchResizeInput, status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
+	// setupResize answers the resize with the branch at the new size,
+	// including the IOPS the API applies.
+	setupResize := func(req api.BranchResizeInput, cpuMillis, memoryGBs, iops int) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			expectResolveBranch(m, "br-12345", sampleBranch())
-			branch := sampleBranch(branchStatus(status))
+			branch := sampleBranch(branchStatus(api.DeployStatusCONFIGURING), func(b *api.Branch) {
+				b.CPUMillis = cpuMillis
+				b.MemoryGbs = memoryGBs
+				b.Iops = new(iops)
+			})
 			m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", req).
 				Return(&api.ResizeBranchResponse{
 					HTTPResponse: httpResponse(http.StatusAccepted),
@@ -23,7 +29,7 @@ func TestBranchResizeCmd(t *testing.T) {
 		}
 	}
 	req2000 := api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}
-	acceptedStderr := "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
+	acceptedStderr := "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB, 6000 IOPS.\n" +
 		"The resize is in progress and may take several minutes to complete.\n"
 
 	runCmdTests(t, []cmdTest{
@@ -63,7 +69,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			name:       "read-only prod allows",
 			args:       []string{"branch", "resize", "br-12345", "--cpu", "2"},
 			opts:       []runOption{withExperimental(), withConfig(map[string]any{"read_only": "prod"})},
-			mock:       setupResize(req2000, api.DeployStatusCONFIGURING),
+			mock:       setupResize(req2000, 2000, 16, 6000),
 			wantStderr: acceptedStderr,
 		},
 		{
@@ -76,8 +82,6 @@ func TestBranchResizeCmd(t *testing.T) {
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to resize branch: connection refused",
-			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
-				"Error: failed to resize branch: connection refused\n",
 		},
 		{
 			name: "nil response body",
@@ -89,39 +93,56 @@ func TestBranchResizeCmd(t *testing.T) {
 					Return(&api.ResizeBranchResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
 			wantErr: "empty response from API",
-			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB...\n" +
-				"Error: empty response from API\n",
 		},
 		{
 			// CPU and memory are left out, so the API keeps the current ones.
 			name: "iops only omits cpu and memory",
-			args: []string{"branch", "resize", "br-12345", "--iops", "16000"},
+			args: []string{"branch", "resize", "br-12345", "--iops", "8000"},
 			opts: []runOption{withExperimental()},
-			mock: setupResize(api.BranchResizeInput{Iops: new(16000)}, api.DeployStatusCONFIGURING),
-			wantStderr: "Resizing branch 'test-branch' (br-12345) to 16000 IOPS...\n" +
+			mock: setupResize(api.BranchResizeInput{Iops: new(8000)}, 250, 2, 8000),
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 0.25 CPU/2 GB, 8000 IOPS.\n" +
 				"The resize is in progress and may take several minutes to complete.\n",
 		},
 		{
 			name: "cpu and iops",
 			args: []string{"branch", "resize", "br-12345", "--cpu", "2", "--iops", "16000"},
 			opts: []runOption{withExperimental()},
-			mock: setupResize(api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16"), Iops: new(16000)}, api.DeployStatusCONFIGURING),
-			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB, 16000 IOPS...\n" +
+			mock: setupResize(api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16"), Iops: new(16000)}, 2000, 16, 16000),
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB, 16000 IOPS.\n" +
 				"The resize is in progress and may take several minutes to complete.\n",
 		},
 		{
+			name: "response without iops omits them",
+			args: []string{"branch", "resize", "br-12345", "--cpu", "2"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch())
+				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345", req2000).
+					Return(&api.ResizeBranchResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202: new(sampleBranch(func(b *api.Branch) {
+							b.CPUMillis = 2000
+							b.MemoryGbs = 16
+						})),
+					}, nil)
+			},
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 2 CPU/16 GB.\n" +
+				"The resize is in progress and may take several minutes to complete.\n",
+		},
+		{
+			// The IOPS weren't requested, so they come from the response.
 			name:       "memory only auto-configures cpu",
 			args:       []string{"branch", "resize", "br-12345", "--memory", "16"},
 			opts:       []runOption{withExperimental()},
-			mock:       setupResize(req2000, api.DeployStatusCONFIGURING),
+			mock:       setupResize(req2000, 2000, 16, 6000),
 			wantStderr: acceptedStderr,
 		},
 		{
 			name: "fractional cores",
 			args: []string{"branch", "resize", "br-12345", "--cpu", "0.25"},
 			opts: []runOption{withExperimental()},
-			mock: setupResize(api.BranchResizeInput{CPUMillis: new("250"), MemoryGbs: new("2")}, api.DeployStatusCONFIGURING),
-			wantStderr: "Resizing branch 'test-branch' (br-12345) to 0.25 CPU/2 GB...\n" +
+			mock: setupResize(api.BranchResizeInput{CPUMillis: new("250"), MemoryGbs: new("2")}, 250, 2, 3000),
+			wantStderr: "Resizing branch 'test-branch' (br-12345) to 0.25 CPU/2 GB, 3000 IOPS.\n" +
 				"The resize is in progress and may take several minutes to complete.\n",
 		},
 		{
@@ -130,7 +151,7 @@ func TestBranchResizeCmd(t *testing.T) {
 			name:       "deprecated millicores",
 			args:       []string{"branch", "resize", "br-12345", "--cpu", "2000"},
 			opts:       []runOption{withExperimental()},
-			mock:       setupResize(req2000, api.DeployStatusCONFIGURING),
+			mock:       setupResize(req2000, 2000, 16, 6000),
 			wantStderr: acceptedStderr,
 		},
 	})
