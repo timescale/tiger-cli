@@ -106,33 +106,11 @@ func TestBranchGetCmd(t *testing.T) {
 			wantStdout: sampleBranchJSON,
 		},
 		{
-			name: "yaml",
-			args: []string{"branch", "get", "br-12345", "-o", "yaml"},
-			opts: []runOption{withExperimental()},
-			mock: getSample,
-			wantStdout: `connection_string: postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require
-console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview
-cpu_millis: 250
-created: "2025-01-16T09:00:00Z"
-creator:
-  email: jane.doe@example.com
-  id: "42"
-  name: Jane Doe
-database: tsdb
-endpoint:
-  host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
-  port: 36956
-host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
-id: br-12345
-memory_gbs: 2
-name: test-branch
-port: 36956
-project_id: test-project-123
-role: tsdbadmin
-service_id: svc-12345
-service_name: test-service
-status: READY
-`,
+			name:       "yaml",
+			args:       []string{"branch", "get", "br-12345", "-o", "yaml"},
+			opts:       []runOption{withExperimental()},
+			mock:       getSample,
+			wantStdout: sampleBranchYAML,
 		},
 		{
 			name: "table with metrics",
@@ -230,7 +208,7 @@ status: READY
 		{
 			// The API leaves the creator out when the user is no longer known,
 			// e.g. after being deleted.
-			name: "without a creator",
+			name: "table without a creator",
 			args: []string{"branch", "get", "br-12345"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -240,7 +218,7 @@ status: READY
 			wantStdout: sampleBranchTableNoCreator,
 		},
 		{
-			name: "creator without a name",
+			name: "table with a creator without a name",
 			args: []string{"branch", "get", "br-12345"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -248,6 +226,26 @@ status: READY
 				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
 			},
 			wantStdout: sampleBranchTableNamelessCreator,
+		},
+		{
+			name: "json without a creator",
+			args: []string{"branch", "get", "br-12345", "-o", "json"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchJSONNoCreator,
+		},
+		{
+			name: "yaml without a creator",
+			args: []string{"branch", "get", "br-12345", "-o", "yaml"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchYAMLNoCreator,
 		},
 		{
 			name:       "env",

@@ -336,9 +336,19 @@ Connect with: tiger db psql br-12345
 `,
 		},
 		{
+			name: "yaml",
+			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "yaml"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchYAML,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
 			// The API leaves the creator out when the user is no longer known,
 			// e.g. after being deleted.
-			name: "without a creator",
+			name: "table without a creator",
 			args: []string{"branch", "create", "svc-12345", "--no-wait"},
 			opts: []runOption{withExperimental()},
 			mock: setupCreate(baseReq, sampleBranch(noCreator, func(b *api.Branch) {
@@ -348,13 +358,33 @@ Connect with: tiger db psql br-12345
 			wantStderr: defaultNoWaitStderr,
 		},
 		{
-			name: "creator without a name",
+			name: "table with a creator without a name",
 			args: []string{"branch", "create", "svc-12345", "--no-wait"},
 			opts: []runOption{withExperimental()},
 			mock: setupCreate(baseReq, sampleBranch(namelessCreator, func(b *api.Branch) {
 				b.InitialPassword = new("branch-pw")
 			})),
 			wantStdout: sampleBranchTableNamelessCreator,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			name: "json without a creator",
+			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "json"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(noCreator, func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchJSONNoCreator,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			name: "yaml without a creator",
+			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "yaml"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(noCreator, func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchYAMLNoCreator,
 			wantStderr: defaultNoWaitStderr,
 		},
 		{
