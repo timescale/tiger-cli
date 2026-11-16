@@ -177,6 +177,24 @@ func TestBranchGetTool(t *testing.T) {
 			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetail(api.DeployStatusREADY))},
 		},
 		{
+			// The API leaves the creator out when the user is no longer
+			// known, e.g. after being deleted.
+			name:       "without a creator",
+			tool:       toolBranchGet,
+			args:       args,
+			opts:       []runOption{experimental},
+			mock:       getBranch(sampleBranch(noCreator)),
+			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetailNoCreator(api.DeployStatusREADY))},
+		},
+		{
+			name:       "creator without a name",
+			tool:       toolBranchGet,
+			args:       args,
+			opts:       []runOption{experimental},
+			mock:       getBranch(sampleBranch(namelessCreator)),
+			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetailNamelessCreator(api.DeployStatusREADY))},
+		},
+		{
 			// The parent's name is the only thing the second fetch adds, so
 			// without it the branch is still returned.
 			name: "parent fetch fails",
@@ -218,6 +236,7 @@ func TestBranchGetTool(t *testing.T) {
 				"service_id":   "e6ue9697jf",
 				"service_name": "test-service",
 				"status":       "READY",
+				"creator":      map[string]any{"id": "42", "name": "Jane Doe", "email": "jane.doe@example.com"},
 				"created":      "2025-01-16T09:00:00Z",
 				"resources":    map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
 			}},
@@ -236,6 +255,7 @@ func TestBranchGetTool(t *testing.T) {
 				"service_id":   "e6ue9697jf",
 				"service_name": "test-service",
 				"status":       "QUEUED",
+				"creator":      map[string]any{"id": "42", "name": "Jane Doe", "email": "jane.doe@example.com"},
 				"created":      "2025-01-16T09:00:00Z",
 				"resources":    map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
 			}},

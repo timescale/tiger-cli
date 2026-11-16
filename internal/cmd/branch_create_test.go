@@ -336,6 +336,28 @@ Connect with: tiger db psql br-12345
 `,
 		},
 		{
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name: "without a creator",
+			args: []string{"branch", "create", "svc-12345", "--no-wait"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(noCreator, func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchTableNoCreator,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
+			name: "creator without a name",
+			args: []string{"branch", "create", "svc-12345", "--no-wait"},
+			opts: []runOption{withExperimental()},
+			mock: setupCreate(baseReq, sampleBranch(namelessCreator, func(b *api.Branch) {
+				b.InitialPassword = new("branch-pw")
+			})),
+			wantStdout: sampleBranchTableNamelessCreator,
+			wantStderr: defaultNoWaitStderr,
+		},
+		{
 			name:       "default service from config",
 			args:       []string{"branch", "create", "--no-wait", "-o", "env"},
 			opts:       []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},

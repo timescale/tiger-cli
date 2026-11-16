@@ -114,6 +114,10 @@ func TestBranchGetCmd(t *testing.T) {
 console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview
 cpu_millis: 250
 created: "2025-01-16T09:00:00Z"
+creator:
+  email: jane.doe@example.com
+  id: "42"
+  name: Jane Doe
 database: tsdb
 endpoint:
   host: br-12345.test-project-123.branch.tsdb.cloud.timescale.com
@@ -147,6 +151,7 @@ status: READY
 │ IOPS              │ 16000                                                                                                       │
 │ Storage           │ 1.2 GB changed on this branch (billed)                                                                      │
 │ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                             │
+│ Created By        │ Jane Doe (jane.doe@example.com)                                                                             │
 │ Created           │ 2025-01-16 09:00:00 UTC                                                                                     │
 │ Connection String │ postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
@@ -175,6 +180,11 @@ status: READY
 			wantStdout: `{
   "cpu_millis": 250,
   "created": "2025-01-16T09:00:00Z",
+  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
   "endpoint": {
     "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
     "port": 36956
@@ -218,6 +228,28 @@ status: READY
 			wantStderr: "Warning: failed to get parent service: failed to fetch service details: connection refused\n",
 		},
 		{
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name: "without a creator",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchTableNoCreator,
+		},
+		{
+			name: "creator without a name",
+			args: []string{"branch", "get", "br-12345"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveBranch(m, "br-12345", sampleBranch(namelessCreator))
+				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantStdout: sampleBranchTableNamelessCreator,
+		},
+		{
 			name:       "env",
 			args:       []string{"branch", "get", "br-12345", "-o", "env"},
 			opts:       []runOption{withExperimental()},
@@ -246,6 +278,7 @@ status: READY
 │ CPU               │ 0.25 cores                                                                                                            │
 │ Memory            │ 2 GB                                                                                                                  │
 │ Direct Endpoint   │ br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956                                                       │
+│ Created By        │ Jane Doe (jane.doe@example.com)                                                                                       │
 │ Created           │ 2025-01-16 09:00:00 UTC                                                                                               │
 │ Password          │ branch-pw                                                                                                             │
 │ Connection String │ postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require │
@@ -262,6 +295,11 @@ status: READY
 			wantStdout: `{
   "cpu_millis": 250,
   "created": "2025-01-16T09:00:00Z",
+  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
   "endpoint": {
     "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
     "port": 36956
@@ -300,6 +338,11 @@ status: READY
 			wantStdout: `{
   "cpu_millis": 250,
   "created": "2025-01-16T09:00:00Z",
+  "creator": {
+    "email": "jane.doe@example.com",
+    "id": "42",
+    "name": "Jane Doe"
+  },
   "endpoint": {
     "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
     "port": 36956
@@ -339,6 +382,7 @@ status: READY
 │ Status         │ READY                                                                                                       │
 │ CPU            │ 0.25 cores                                                                                                  │
 │ Memory         │ 2 GB                                                                                                        │
+│ Created By     │ Jane Doe (jane.doe@example.com)                                                                             │
 │ Created        │ 2025-01-16 09:00:00 UTC                                                                                     │
 │ Console URL    │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
 └────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -364,6 +408,7 @@ status: READY
 │ Status         │ QUEUED                                                                                                      │
 │ CPU            │ 0.25 cores                                                                                                  │
 │ Memory         │ 2 GB                                                                                                        │
+│ Created By     │ Jane Doe (jane.doe@example.com)                                                                             │
 │ Created        │ 2025-01-16 09:00:00 UTC                                                                                     │
 │ Console URL    │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview │
 └────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

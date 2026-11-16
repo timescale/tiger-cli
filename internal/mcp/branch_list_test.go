@@ -95,5 +95,23 @@ func TestBranchListTool(t *testing.T) {
 			mock:       expectList(sampleBranch()),
 			wantOutput: map[string]any{"branches": []any{sampleBranchDetail(api.DeployStatusREADY)}},
 		},
+		{
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name:       "without a creator",
+			tool:       toolBranchList,
+			args:       args,
+			opts:       []runOption{experimental},
+			mock:       expectList(sampleBranch(noCreator)),
+			wantOutput: map[string]any{"branches": []any{sampleBranchDetailNoCreator(api.DeployStatusREADY)}},
+		},
+		{
+			name:       "creator without a name",
+			tool:       toolBranchList,
+			args:       args,
+			opts:       []runOption{experimental},
+			mock:       expectList(sampleBranch(namelessCreator)),
+			wantOutput: map[string]any{"branches": []any{sampleBranchDetailNamelessCreator(api.DeployStatusREADY)}},
+		},
 	})
 }

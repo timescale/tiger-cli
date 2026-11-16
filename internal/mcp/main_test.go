@@ -616,7 +616,12 @@ func sampleBranch(overrides ...func(*api.Branch)) api.Branch {
 		Status:    api.DeployStatusREADY,
 		CPUMillis: 250,
 		MemoryGbs: 2,
-		Created:   time.Date(2025, 1, 16, 9, 0, 0, 0, time.UTC),
+		Creator: &api.BranchCreator{
+			ID:    "42",
+			Name:  "Jane Doe",
+			Email: "jane.doe@example.com",
+		},
+		Created: time.Date(2025, 1, 16, 9, 0, 0, 0, time.UTC),
 		Endpoint: &api.Endpoint{
 			Host: new("br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com"),
 			Port: new(36956),
@@ -636,12 +641,33 @@ func sampleBranchDetail(status api.DeployStatus) map[string]any {
 		"name":              "test-branch",
 		"service_id":        "e6ue9697jf",
 		"status":            string(status),
+		"creator":           map[string]any{"id": "42", "name": "Jane Doe", "email": "jane.doe@example.com"},
 		"created":           "2025-01-16T09:00:00Z",
 		"resources":         map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
 		"direct_endpoint":   "br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956",
 		"connection_string": "postgresql://tsdbadmin@br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
 	}
 }
+
+// sampleBranchDetailNoCreator and sampleBranchDetailNamelessCreator are the
+// BranchDetail output of sampleBranch, with the given status, when the API
+// returns no creator, and a creator without a name, respectively.
+func sampleBranchDetailNoCreator(status api.DeployStatus) map[string]any {
+	detail := sampleBranchDetail(status)
+	delete(detail, "creator")
+	return detail
+}
+
+func sampleBranchDetailNamelessCreator(status api.DeployStatus) map[string]any {
+	detail := sampleBranchDetail(status)
+	detail["creator"] = map[string]any{"id": "42", "email": "jane.doe@example.com"}
+	return detail
+}
+
+// noCreator and namelessCreator are sampleBranch overrides removing the
+// branch's creator and the creator's name, respectively.
+func noCreator(b *api.Branch)       { b.Creator = nil }
+func namelessCreator(b *api.Branch) { b.Creator.Name = "" }
 
 // branchStatus returns a sampleBranch override setting the branch's status.
 func branchStatus(status api.DeployStatus) func(*api.Branch) {

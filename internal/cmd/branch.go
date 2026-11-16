@@ -126,6 +126,13 @@ func outputBranchTable(output io.Writer, branch OutputBranch) error {
 	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
 		table.Append("Direct Endpoint", fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port))
 	}
+	if creator := branch.Creator; creator != nil {
+		createdBy := string(creator.Email)
+		if creator.Name != "" {
+			createdBy = fmt.Sprintf("%s (%s)", creator.Name, creator.Email)
+		}
+		table.Append("Created By", createdBy)
+	}
 	table.Append("Created", branch.Created.Format("2006-01-02 15:04:05 MST"))
 	if branch.Password != "" {
 		table.Append("Password", branch.Password)

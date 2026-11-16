@@ -160,6 +160,30 @@ func TestBranchCreateTool(t *testing.T) {
 			},
 		},
 		{
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name: "without a creator",
+			tool: toolBranchCreate,
+			args: args,
+			opts: []runOption{experimental},
+			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED), noCreator)),
+			wantOutput: map[string]any{
+				"branch":  sampleBranchDetailNoCreator(api.DeployStatusQUEUED),
+				"message": acceptedMsg,
+			},
+		},
+		{
+			name: "creator without a name",
+			tool: toolBranchCreate,
+			args: args,
+			opts: []runOption{experimental},
+			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED), namelessCreator)),
+			wantOutput: map[string]any{
+				"branch":  sampleBranchDetailNamelessCreator(api.DeployStatusQUEUED),
+				"message": acceptedMsg,
+			},
+		},
+		{
 			name: "custom name and compute",
 			tool: toolBranchCreate,
 			args: map[string]any{"service_id": "e6ue9697jf", "name": "ci-4821", "cpu_memory": "2 CPU/16 GB"},
@@ -231,6 +255,7 @@ func TestBranchCreateTool(t *testing.T) {
 					"name":       "test-branch",
 					"service_id": "e6ue9697jf",
 					"status":     "QUEUED",
+					"creator":    map[string]any{"id": "42", "name": "Jane Doe", "email": "jane.doe@example.com"},
 					"created":    "2025-01-16T09:00:00Z",
 					"resources":  map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
 					"password":   "branch-pw",

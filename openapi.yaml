@@ -2931,6 +2931,8 @@ components:
           format: date-time
           description: Creation timestamp.
           example: "2026-09-01T09:30:00Z"
+        creator:
+          $ref: '#/components/schemas/BranchCreator'
         initial_password:
           type: string
           description: The initial password for the branch.
@@ -2960,6 +2962,28 @@ components:
             - $ref: '#/components/schemas/BranchMetrics'
         endpoint:
           $ref: '#/components/schemas/Endpoint'
+    BranchCreator:
+      x-tigerdata-preview: true
+      type: object
+      description: The user who created the branch.
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: string
+          description: The user ID.
+          example: "user123"
+        name:
+          type: string
+          description: The user's name.
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          description: The user's email.
+          example: "john.doe@example.com"
     BranchMetrics:
       x-tigerdata-preview: true
       type: object

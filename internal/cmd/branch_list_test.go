@@ -133,6 +133,43 @@ func TestBranchListCmd(t *testing.T) {
   {
     "cpu_millis": 250,
     "created": "2025-01-16T09:00:00Z",
+    "creator": {
+      "email": "jane.doe@example.com",
+      "id": "42",
+      "name": "Jane Doe"
+    },
+    "endpoint": {
+      "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+      "port": 36956
+    },
+    "id": "br-12345",
+    "memory_gbs": 2,
+    "name": "test-branch",
+    "project_id": "test-project-123",
+    "service_id": "svc-12345",
+    "status": "READY",
+    "service_name": "test-service",
+    "role": "tsdbadmin",
+    "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
+    "port": 36956,
+    "database": "tsdb",
+    "connection_string": "postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
+    "console_url": "https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview"
+  }
+]
+`,
+		},
+		{
+			// The API leaves the creator out when the user is no longer known,
+			// e.g. after being deleted.
+			name: "json without a creator",
+			args: []string{"branch", "list", "svc-12345", "-o", "json"},
+			opts: []runOption{withExperimental()},
+			mock: expectList(sampleBranch(noCreator)),
+			wantStdout: `[
+  {
+    "cpu_millis": 250,
+    "created": "2025-01-16T09:00:00Z",
     "endpoint": {
       "host": "br-12345.test-project-123.branch.tsdb.cloud.timescale.com",
       "port": 36956
