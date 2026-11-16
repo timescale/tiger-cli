@@ -2953,8 +2953,34 @@ components:
           type: integer
           description: Provisioned IOPS for the storage volume.
           example: 3000
+        metrics:
+          x-tigerdata-preview: true
+          description: Resource usage metrics for the branch.
+          allOf:
+            - $ref: '#/components/schemas/BranchMetrics'
         endpoint:
           $ref: '#/components/schemas/Endpoint'
+    BranchMetrics:
+      x-tigerdata-preview: true
+      type: object
+      nullable: true
+      description: Resource usage metrics for the branch.
+      properties:
+        memory_mb:
+          type: integer
+          nullable: true
+          description: Memory usage in megabytes.
+          example: 512
+        storage_mb:
+          type: integer
+          nullable: true
+          description: Storage usage in megabytes.
+          example: 1024
+        cpu_millicores:
+          type: integer
+          nullable: true
+          description: CPU usage in millicores.
+          example: 250
     ResolveType:
       x-tigerdata-internal: true
       type: string
@@ -3214,10 +3240,17 @@ components:
           nullable: true
           description: Storage usage in megabytes.
           example: 1024
-        milli_cpu:
+        cpu_millicores:
           type: integer
           nullable: true
           description: CPU usage in millicores.
+          example: 250
+        milli_cpu:
+          deprecated: true
+          x-deprecated-reason: Use `cpu_millicores` instead.
+          type: integer
+          nullable: true
+          description: Deprecated. Use `cpu_millicores` instead.
           example: 250
     SetHAReplicaInput:
       type: object

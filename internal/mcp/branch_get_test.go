@@ -146,6 +146,37 @@ func TestBranchGetTool(t *testing.T) {
 			}()},
 		},
 		{
+			// Of the metrics, only the storage is returned.
+			name: "returns the storage",
+			tool: toolBranchGet,
+			args: args,
+			opts: []runOption{experimental},
+			mock: getBranch(sampleBranch(func(b *api.Branch) {
+				b.Metrics = &api.BranchMetrics{
+					CPUMillicores: new(120),
+					MemoryMb:      new(512),
+					StorageMb:     new(1229),
+				}
+			})),
+			wantOutput: map[string]any{"branch": func() map[string]any {
+				detail := withServiceName(sampleBranchDetail(api.DeployStatusREADY))
+				detail["storage"] = "1.2 GB"
+				return detail
+			}()},
+		},
+		{
+			// The API doesn't report a branch's storage yet, so there's no
+			// storage until it does.
+			name: "metrics without storage",
+			tool: toolBranchGet,
+			args: args,
+			opts: []runOption{experimental},
+			mock: getBranch(sampleBranch(func(b *api.Branch) {
+				b.Metrics = &api.BranchMetrics{CPUMillicores: new(120), MemoryMb: new(512)}
+			})),
+			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetail(api.DeployStatusREADY))},
+		},
+		{
 			// The parent's name is the only thing the second fetch adds, so
 			// without it the branch is still returned.
 			name: "parent fetch fails",

@@ -120,6 +120,9 @@ func outputBranchTable(output io.Writer, branch OutputBranch) error {
 	if branch.Iops != nil {
 		table.Append("IOPS", fmt.Sprintf("%d", *branch.Iops))
 	}
+	if branch.Metrics != nil && branch.Metrics.StorageMb != nil {
+		table.Append("Storage", util.FormatStorageMB(*branch.Metrics.StorageMb)+" changed on this branch (billed)")
+	}
 	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
 		table.Append("Direct Endpoint", fmt.Sprintf("%s:%d", *branch.Endpoint.Host, *branch.Endpoint.Port))
 	}

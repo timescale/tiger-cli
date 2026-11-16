@@ -43,6 +43,7 @@ type ServiceInfo struct {
 	Created     string        `json:"created,omitempty"`
 	Environment string        `json:"environment"`
 	Resources   *ResourceInfo `json:"resources,omitempty"`
+	Storage     string        `json:"storage,omitempty"`
 }
 
 func (ServiceInfo) Schema(experimental bool) *jsonschema.Schema {
@@ -60,6 +61,7 @@ func (ServiceInfo) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["environment"].Description = "Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."
 
 	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
+	setServiceStorageSchemaProperties(schema)
 
 	return schema
 }
@@ -69,7 +71,7 @@ func newServiceListTool(experimental bool) *mcp.Tool {
 		Name:  toolServiceList,
 		Title: "List Database Services",
 		Description: "List all database services in your Tiger Cloud project. " +
-			"Returns services with status, type, region, and resource allocation.",
+			"Returns services with status, type, region, resource allocation, and storage usage.",
 		InputSchema:  ServiceListInput{}.Schema(),
 		OutputSchema: ServiceListOutput{}.Schema(experimental),
 		Annotations: &mcp.ToolAnnotations{
@@ -136,6 +138,7 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 	}
 
 	info.Resources = convertToResourceInfo(service, s.app.Experimental)
+	info.Storage = convertToServiceStorage(service)
 
 	return info
 }

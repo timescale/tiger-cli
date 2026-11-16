@@ -176,6 +176,10 @@ func outputServiceTable(output io.Writer, service OutputService) error {
 		}
 	}
 
+	if service.Metrics != nil && service.Metrics.StorageMb != nil {
+		table.Append("Storage", util.FormatStorageMB(*service.Metrics.StorageMb)+" used")
+	}
+
 	// High availability replicas
 	if service.HaReplicas != nil {
 		if service.HaReplicas.ReplicaCount != nil {
