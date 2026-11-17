@@ -89,15 +89,11 @@ Return Codes:
 				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", timeout))
 			}
 
-			connConfig, err := details.ConnConfig()
+			// --timeout replaces PGCONNECT_TIMEOUT, as pg_isready's -t does.
+			connConfig, err := details.ConnConfigWithTimeout(timeout)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
-			// --timeout replaces PGCONNECT_TIMEOUT, as pg_isready's -t does.
-			// That includes the dial limit ParseConfig derives from the env
-			// var, so it goes back to pgx's default dialer.
-			connConfig.ConnectTimeout = timeout
-			connConfig.DialFunc = (&net.Dialer{}).DialContext
 
 			// Test the connection
 			return testDatabaseConnection(cmd.Context(), connConfig, timeout, cmd)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"time"
@@ -139,17 +140,37 @@ func (d *ConnectionDetails) String() string {
 }
 
 // ConnConfig parses the details into a pgx config whose connection attempts
-// are bounded per address by ConnectTimeout. Every pgx connection the CLI and
-// MCP server make goes through it.
+// are bounded per address by ConnectTimeout, or by PGCONNECT_TIMEOUT when the
+// user sets it. Every pgx connection the CLI and MCP server make goes through
+// it or ConnConfigWithTimeout.
 func (d *ConnectionDetails) ConnConfig() (*pgx.ConnConfig, error) {
+	connConfig, err := d.parseConnConfig()
+	if err != nil {
+		return nil, err
+	}
+	// When the env var is set, ParseConfig has already applied it (including
+	// 0 for no limit, as in libpq).
+	if _, ok := os.LookupEnv(ConnectTimeoutEnvVar); !ok {
+		withConnectTimeout(connConfig, ConnectTimeout)
+	}
+	return connConfig, nil
+}
+
+// ConnConfigWithTimeout is ConnConfig with an explicit per-address timeout,
+// which overrides PGCONNECT_TIMEOUT. A timeout of 0 means no limit.
+func (d *ConnectionDetails) ConnConfigWithTimeout(timeout time.Duration) (*pgx.ConnConfig, error) {
+	connConfig, err := d.parseConnConfig()
+	if err != nil {
+		return nil, err
+	}
+	withConnectTimeout(connConfig, timeout)
+	return connConfig, nil
+}
+
+func (d *ConnectionDetails) parseConnConfig() (*pgx.ConnConfig, error) {
 	connConfig, err := pgx.ParseConfig(d.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse connection string: %w", err)
-	}
-	// pgx has already applied the env var if it's set, including 0 for no
-	// limit, as libpq does.
-	if _, ok := os.LookupEnv(ConnectTimeoutEnvVar); !ok {
-		connConfig.ConnectTimeout = ConnectTimeout
 	}
 	return connConfig, nil
 }
@@ -209,4 +230,15 @@ func connectReadOnly(ctx context.Context, cfg *config.Config, target *Connection
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	return conn, nil
+}
+
+// withConnectTimeout bounds each address's connection attempt the way pgx's
+// ParseConfig does for connect_timeout: the per-address context
+// (ConnectTimeout) and a dialer with the same Timeout. It's done by hand
+// because connect_timeout only takes whole seconds. Setting both also replaces
+// whatever ParseConfig derived from PGCONNECT_TIMEOUT, so the two never
+// disagree.
+func withConnectTimeout(c *pgx.ConnConfig, timeout time.Duration) {
+	c.ConnectTimeout = timeout
+	c.DialFunc = (&net.Dialer{Timeout: timeout}).DialContext
 }

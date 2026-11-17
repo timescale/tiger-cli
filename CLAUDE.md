@@ -208,7 +208,7 @@ Interactive menus and spinners use BubbleTea v2 (`charm.land/bubbletea/v2`). Alw
 - Return errors from `RunE`; never call `os.Exit` in a command. For specific exit codes, wrap with `common.ExitWithCode`, and map API errors to exit codes with `common.ExitWithErrorFromStatusCode`. The exit codes are defined in `internal/common/errors.go`, and `main.go` honors a `common.ExitCodeError` anywhere in the error chain.
 - After checking an API response's status code, nil-check the parsed body (`resp.JSON200`, etc.) before using it — a nil body indicates a bug and should return `errors.New("empty response from API")`.
 - Operations that connect to a database should check `ConnectionTarget.CheckReady` first and translate `common.ErrPaused`/`common.ErrNotReady` into actionable messages.
-- Open every pgx connection from `ConnectionDetails.ConnConfig`, which bounds the attempt to each address separately (`common.ConnectTimeout`), and give a psql child the same bound through `PGCONNECT_TIMEOUT` (`buildPsqlCommand`). A host can resolve to several addresses, and a single deadline across all of them would be spent on the first one that doesn't answer.
+- Open every pgx connection from `ConnectionDetails.ConnConfig` (or `ConnConfigWithTimeout`, for a command that takes its own timeout), which bounds the attempt to each address separately (`common.ConnectTimeout`), and give a psql child the same bound through `PGCONNECT_TIMEOUT` (`buildPsqlCommand`). A host can resolve to several addresses, and a single deadline across all of them would be spent on the first one that doesn't answer.
 
 ## HTTP Requests
 
