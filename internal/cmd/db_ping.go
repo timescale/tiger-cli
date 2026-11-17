@@ -89,8 +89,18 @@ Return Codes:
 				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", timeout))
 			}
 
+			connConfig, err := details.ConnConfig()
+			if err != nil {
+				return common.ExitWithCode(common.ExitInvalidParameters, err)
+			}
+			// --timeout replaces PGCONNECT_TIMEOUT, as pg_isready's -t does.
+			// That includes the dial limit ParseConfig derives from the env
+			// var, so it goes back to pgx's default dialer.
+			connConfig.ConnectTimeout = timeout
+			connConfig.DialFunc = (&net.Dialer{}).DialContext
+
 			// Test the connection
-			return testDatabaseConnection(cmd.Context(), details, timeout, cmd)
+			return testDatabaseConnection(cmd.Context(), connConfig, timeout, cmd)
 		},
 	}
 
@@ -103,24 +113,13 @@ Return Codes:
 }
 
 // testDatabaseConnection tests the database connection and returns appropriate
-// exit codes. The timeout bounds the connection attempt to each address, then
-// the ping.
-func testDatabaseConnection(ctx context.Context, details *common.ConnectionDetails, timeout time.Duration, cmd *cobra.Command) error {
+// exit codes. connConfig bounds the connection attempt to each address, and
+// timeout then bounds the ping (it's also named in the timeout messages).
+func testDatabaseConnection(ctx context.Context, connConfig *pgx.ConnConfig, timeout time.Duration, cmd *cobra.Command) error {
 	// Every failure below is reported here, so don't let cobra print it again.
 	cmd.SilenceErrors = true
 
-	connConfig, err := details.ConnConfig()
-	if err != nil {
-		cmd.PrintErrf("Connection failed: %v\n", err)
-		return common.ExitWithCode(common.ExitInvalidParameters, err)
-	}
-	// --timeout replaces PGCONNECT_TIMEOUT, as pg_isready's -t does. That
-	// includes the dial limit ParseConfig derives from the env var, so it
-	// goes back to pgx's default dialer.
-	connConfig.ConnectTimeout = timeout
-	connConfig.DialFunc = (&net.Dialer{}).DialContext
-
-	// The details include the password, if one is available.
+	// The config includes the password, if one is available.
 	conn, err := pgx.ConnectConfig(ctx, connConfig)
 	if err != nil {
 		// Determine the appropriate exit code based on error type
