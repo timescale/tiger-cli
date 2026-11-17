@@ -109,8 +109,7 @@ Return Codes:
 }
 
 // testDatabaseConnection tests the database connection and returns appropriate
-// exit codes. connConfig bounds the connection attempt to each address, and
-// timeout then bounds the ping (it's also named in the timeout messages).
+// exit codes.
 func testDatabaseConnection(ctx context.Context, connConfig *pgx.ConnConfig, timeout time.Duration, cmd *cobra.Command) error {
 	// Every failure below is reported here, so don't let cobra print it again.
 	cmd.SilenceErrors = true
