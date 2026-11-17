@@ -139,7 +139,11 @@ PostgreSQL Configuration Parameters That May Be Set:
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			conn, err := pgx.Connect(ctx, details.String())
+			connConfig, err := details.ConnConfig()
+			if err != nil {
+				return err
+			}
+			conn, err := pgx.ConnectConfig(ctx, connConfig)
 			if err != nil {
 				return fmt.Errorf("failed to connect to database: %w", err)
 			}

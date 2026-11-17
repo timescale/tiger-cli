@@ -29,7 +29,10 @@ The service can be given by ID or name as an argument, or will use the default
 service from your configuration. This command tests if the database is accepting
 connections and returns appropriate exit codes following pg_isready conventions.
 
-You can also pass a read replica set ID to test connectivity to that replica.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to test connectivity to that branch.") + `
+You can also pass a read replica set ID to test connectivity to that replica.
+
+Like pg_isready's -t option, --timeout applies to each address the host
+resolves to, so an address that doesn't answer falls through to the next.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to test connectivity to that branch.") + `
 
 Return Codes:
   0: Server is accepting connections normally
@@ -87,37 +90,42 @@ Return Codes:
 			}
 
 			// Test the connection
-			return testDatabaseConnection(cmd.Context(), details.String(), timeout, cmd)
+			return testDatabaseConnection(cmd.Context(), details, timeout, cmd)
 		},
 	}
 
 	// Add flags for db ping command
-	cmd.Flags().DurationVarP(&timeout, "timeout", "t", 3*time.Second, "Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "t", common.ConnectTimeout, "Timeout for connecting to each address (e.g., 30s, 5m, 1h). Use 0 for no timeout")
 	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
 	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
 
 	return cmd
 }
 
-// testDatabaseConnection tests the database connection and returns appropriate exit codes
-func testDatabaseConnection(ctx context.Context, connectionString string, timeout time.Duration, cmd *cobra.Command) error {
+// testDatabaseConnection tests the database connection and returns appropriate
+// exit codes. The timeout bounds the connection attempt to each address, then
+// the ping.
+func testDatabaseConnection(ctx context.Context, details *common.ConnectionDetails, timeout time.Duration, cmd *cobra.Command) error {
 	// Every failure below is reported here, so don't let cobra print it again.
 	cmd.SilenceErrors = true
 
-	// Create context with timeout if specified
-	var cancel context.CancelFunc
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
+	connConfig, err := details.ConnConfig()
+	if err != nil {
+		cmd.PrintErrf("Connection failed: %v\n", err)
+		return common.ExitWithCode(common.ExitInvalidParameters, err)
 	}
+	// --timeout replaces PGCONNECT_TIMEOUT, as pg_isready's -t does. That
+	// includes the dial limit ParseConfig derives from the env var, so it
+	// goes back to pgx's default dialer.
+	connConfig.ConnectTimeout = timeout
+	connConfig.DialFunc = (&net.Dialer{}).DialContext
 
-	// Attempt to connect to the database
-	// The connection string already includes the password (if available) thanks to PasswordOptional mode
-	conn, err := pgx.Connect(ctx, connectionString)
+	// The details include the password, if one is available.
+	conn, err := pgx.ConnectConfig(ctx, connConfig)
 	if err != nil {
 		// Determine the appropriate exit code based on error type
 		if isConnectionTimeout(err) {
-			cmd.PrintErrf("Connection timeout after %v\n", timeout)
+			cmd.PrintErrf("Connection timeout after %v per address\n", timeout)
 			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
 		}
 
@@ -131,6 +139,12 @@ func testDatabaseConnection(ctx context.Context, connectionString string, timeou
 		return common.ExitWithCode(2, err) // No response to connection attempt
 	}
 	defer conn.Close(ctx)
+
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
 	// Test the connection with a simple ping
 	err = conn.Ping(ctx)

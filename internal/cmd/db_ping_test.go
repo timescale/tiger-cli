@@ -145,7 +145,26 @@ func TestDbPingCmd(t *testing.T) {
 					t.Errorf("error = %q, want it to name the unreachable host", got)
 				}
 			}),
-			wantStderr: "Connection timeout after 250ms\n",
+			wantStderr: "Connection timeout after 250ms per address\n",
+			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
+		},
+		{
+			// PGCONNECT_TIMEOUT=0 means no limit, so the dial would hang if
+			// --timeout didn't replace it.
+			name: "--timeout replaces PGCONNECT_TIMEOUT",
+			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
+					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
+				}))
+			},
+			opts: []runOption{withEnv(common.ConnectTimeoutEnvVar, "0")},
+			wantErr: matchFunc(func(t *testing.T, got string) {
+				if !strings.Contains(got, "192.0.2.1") {
+					t.Errorf("error = %q, want it to name the unreachable host", got)
+				}
+			}),
+			wantStderr: "Connection timeout after 250ms per address\n",
 			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
