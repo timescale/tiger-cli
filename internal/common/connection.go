@@ -175,6 +175,17 @@ func (d *ConnectionDetails) parseConnConfig() (*pgx.ConnConfig, error) {
 	return connConfig, nil
 }
 
+// withConnectTimeout bounds each address's connection attempt the way pgx's
+// ParseConfig does for connect_timeout: the per-address context
+// (ConnectTimeout) and a dialer with the same Timeout. It's done by hand
+// because connect_timeout only takes whole seconds. Setting both also replaces
+// whatever ParseConfig derived from PGCONNECT_TIMEOUT, so the two never
+// disagree.
+func withConnectTimeout(c *pgx.ConnConfig, timeout time.Duration) {
+	c.ConnectTimeout = timeout
+	c.DialFunc = (&net.Dialer{Timeout: timeout}).DialContext
+}
+
 // GetPassword fetches the password stored for the target from the configured
 // password storage mechanism. It returns an error if it fails to find the
 // password.
@@ -230,15 +241,4 @@ func connectReadOnly(ctx context.Context, cfg *config.Config, target *Connection
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	return conn, nil
-}
-
-// withConnectTimeout bounds each address's connection attempt the way pgx's
-// ParseConfig does for connect_timeout: the per-address context
-// (ConnectTimeout) and a dialer with the same Timeout. It's done by hand
-// because connect_timeout only takes whole seconds. Setting both also replaces
-// whatever ParseConfig derived from PGCONNECT_TIMEOUT, so the two never
-// disagree.
-func withConnectTimeout(c *pgx.ConnConfig, timeout time.Duration) {
-	c.ConnectTimeout = timeout
-	c.DialFunc = (&net.Dialer{Timeout: timeout}).DialContext
 }
