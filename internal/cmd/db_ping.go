@@ -29,10 +29,10 @@ The service can be given by ID or name as an argument, or will use the default
 service from your configuration. This command tests if the database is accepting
 connections and returns appropriate exit codes following pg_isready conventions.
 
-You can also pass a read replica set ID to test connectivity to that replica.
+You can also pass a read replica set ID to test connectivity to that replica.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to test connectivity to that branch.") + `
 
 Like pg_isready's -t option, --timeout applies to each address the host
-resolves to, so an address that doesn't answer falls through to the next.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to test connectivity to that branch.") + `
+resolves to, so an address that doesn't answer falls through to the next.
 
 Return Codes:
   0: Server is accepting connections normally
