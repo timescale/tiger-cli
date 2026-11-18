@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zalando/go-keyring"
 
@@ -327,6 +328,67 @@ func TestConnectionDetailsString_EncodesSpecialCharPassword(t *testing.T) {
 	}
 	if pw, _ := u.User.Password(); pw != details.Password {
 		t.Errorf("password did not round-trip: got %q, want %q", pw, details.Password)
+	}
+}
+
+// TestConnectionDetailsConnConfig is a helper-level test because the behavior
+// it protects can't be reached from a command or tool. The per-address bound
+// only matters when one of a host's addresses drops packets, and a test can't
+// produce that without a real network. pgx itself applies ConnectTimeout to
+// each address separately, so the parsed config is the part we own and the
+// part this test checks.
+func TestConnectionDetailsConnConfig(t *testing.T) {
+	details := &ConnectionDetails{
+		Role:     "tsdbadmin",
+		Host:     "host.example.com",
+		Port:     5432,
+		Database: "tsdb",
+	}
+
+	tests := []struct {
+		name        string
+		env         *string // nil leaves PGCONNECT_TIMEOUT unset
+		wantTimeout time.Duration
+	}{
+		{
+			name:        "defaults to ConnectTimeout",
+			wantTimeout: ConnectTimeout,
+		},
+		{
+			// pgx ignores an empty value, and so does ConnConfig.
+			name:        "treats an empty PGCONNECT_TIMEOUT as unset",
+			env:         new(""),
+			wantTimeout: ConnectTimeout,
+		},
+		{
+			name:        "leaves PGCONNECT_TIMEOUT to pgx",
+			env:         new("12"),
+			wantTimeout: 12 * time.Second,
+		},
+		{
+			name:        "leaves PGCONNECT_TIMEOUT=0 (no limit) to pgx",
+			env:         new("0"),
+			wantTimeout: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				t.Setenv(ConnectTimeoutEnvVar, *tt.env)
+			}
+
+			connConfig, err := details.ConnConfig()
+			if err != nil {
+				t.Fatalf("ConnConfig() error = %v", err)
+			}
+			if connConfig.ConnectTimeout != tt.wantTimeout {
+				t.Errorf("ConnectTimeout = %v, want %v", connConfig.ConnectTimeout, tt.wantTimeout)
+			}
+			if connConfig.Host != details.Host || connConfig.Port != uint16(details.Port) || connConfig.User != details.Role || connConfig.Database != details.Database {
+				t.Errorf("config doesn't match details: host=%q port=%d user=%q database=%q", connConfig.Host, connConfig.Port, connConfig.User, connConfig.Database)
+			}
+		})
 	}
 }
 

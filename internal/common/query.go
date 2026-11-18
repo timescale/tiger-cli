@@ -83,9 +83,9 @@ var ExecuteQuery = func(ctx context.Context, cfg *config.Config, target *Connect
 		return nil, err
 	}
 
-	connConfig, err := pgx.ParseConfig(details.String())
+	connConfig, err := details.ConnConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse connection string: %w", err)
+		return nil, err
 	}
 
 	// Choose the query execution mode based on whether parameters are present.

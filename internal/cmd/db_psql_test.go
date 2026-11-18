@@ -387,15 +387,50 @@ func TestBuildPsqlCommand(t *testing.T) {
 		}
 	})
 
+	// psql bounds each address by PGCONNECT_TIMEOUT, so the CLI's default is
+	// passed only when the user hasn't set their own. Environ() is the
+	// environment psql actually gets, after os/exec drops duplicate entries.
+	t.Run("PGCONNECT_TIMEOUT defaults to ConnectTimeout", func(t *testing.T) {
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
+		if got := envValues(psqlCmd.Environ(), common.ConnectTimeoutEnvVar); !slices.Equal(got, []string{"5"}) {
+			t.Errorf("expected %s=5 once in env, got %v", common.ConnectTimeoutEnvVar, got)
+		}
+	})
+
+	t.Run("empty PGCONNECT_TIMEOUT is replaced", func(t *testing.T) {
+		t.Setenv(common.ConnectTimeoutEnvVar, "")
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
+		if got := envValues(psqlCmd.Environ(), common.ConnectTimeoutEnvVar); !slices.Equal(got, []string{"5"}) {
+			t.Errorf("expected %s=5 once in env, got %v", common.ConnectTimeoutEnvVar, got)
+		}
+	})
+
+	t.Run("user's PGCONNECT_TIMEOUT is kept", func(t *testing.T) {
+		t.Setenv(common.ConnectTimeoutEnvVar, "12")
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
+		if got := envValues(psqlCmd.Environ(), common.ConnectTimeoutEnvVar); !slices.Equal(got, []string{"12"}) {
+			t.Errorf("expected only the user's %s=12 in env, got %v", common.ConnectTimeoutEnvVar, got)
+		}
+	})
+
 	t.Run("pgpass storage sets no PGPASSWORD", func(t *testing.T) {
 		// psql reads ~/.pgpass itself, so the env var must stay unset.
 		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
-		for _, env := range psqlCmd.Env {
-			if strings.HasPrefix(env, "PGPASSWORD=") {
-				t.Errorf("expected no PGPASSWORD for pgpass storage, got %s", env)
-			}
+		if got := envValues(psqlCmd.Env, "PGPASSWORD"); len(got) != 0 {
+			t.Errorf("expected no PGPASSWORD for pgpass storage, got %v", got)
 		}
 	})
+}
+
+// envValues returns every value env assigns to key, in order.
+func envValues(env []string, key string) []string {
+	var values []string
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, key+"="); ok {
+			values = append(values, v)
+		}
+	}
+	return values
 }
 
 // TestLaunchPsql covers the launch failure path at the helper level, with a

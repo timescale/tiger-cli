@@ -135,15 +135,20 @@ PostgreSQL Configuration Parameters That May Be Set:
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
 
-			// Connect to database
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
-			conn, err := pgx.Connect(ctx, details.String())
+			// Connect to database. ConnConfig bounds the attempt to each
+			// address, so the deadline below covers only creating the role.
+			connConfig, err := details.ConnConfig()
+			if err != nil {
+				return err
+			}
+			conn, err := pgx.ConnectConfig(cmd.Context(), connConfig)
 			if err != nil {
 				return fmt.Errorf("failed to connect to database: %w", err)
 			}
-			defer conn.Close(ctx)
+			defer conn.Close(cmd.Context())
+
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+			defer cancel()
 
 			// Create the role with all options in a transaction
 			if err := createRoleWithOptions(ctx, conn, name, rolePassword, readOnly, statementTimeout, from); err != nil {

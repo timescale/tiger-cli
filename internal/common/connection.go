@@ -5,12 +5,27 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 )
+
+// ConnectTimeout bounds the connection attempt to each address a host resolves
+// to. A host can resolve to several addresses, and bounding each one lets a
+// connection fall through to an address that answers, instead of spending its
+// whole deadline on one that doesn't. The bound covers the full handshake (TCP,
+// TLS, and authentication), so it leaves room for distant or lossy clients.
+const ConnectTimeout = 5 * time.Second
+
+// ConnectTimeoutEnvVar is the libpq (and pgx) environment variable for the
+// per-address connect timeout. A value the user sets wins over ConnectTimeout.
+const ConnectTimeoutEnvVar = "PGCONNECT_TIMEOUT"
 
 // hasPooler reports whether a connection pooler exposes an endpoint.
 func hasPooler(pooler *api.ConnectionPooler) bool {
@@ -111,10 +126,38 @@ func GetConnectionDetails(cfg *config.Config, target *ConnectionTarget, opts Con
 
 // String creates a PostgreSQL connection string from service details
 func (d *ConnectionDetails) String() string {
-	query := "sslmode=require"
-	if d.readOnly {
-		query += "&" + readOnlyConnectionOption
+	return d.connString()
+}
+
+// ConnConfig parses the details into a pgx config whose connection attempts
+// are bounded per address: by PGCONNECT_TIMEOUT when the user sets it, and by
+// ConnectTimeout otherwise. Every pgx connection the CLI and MCP server make
+// goes through it.
+func (d *ConnectionDetails) ConnConfig() (*pgx.ConnConfig, error) {
+	if connectTimeoutEnvSet() {
+		return parseConnConfig(d.connString())
 	}
+	return parseConnConfig(d.connString("connect_timeout=" + connectTimeoutSeconds(ConnectTimeout)))
+}
+
+// ConnectTimeoutEnv returns the PGCONNECT_TIMEOUT entry that gives a psql
+// child the per-address bound ConnConfig uses, or ok=false when the user's own
+// value applies.
+func ConnectTimeoutEnv() (entry string, ok bool) {
+	if connectTimeoutEnvSet() {
+		return "", false
+	}
+	return ConnectTimeoutEnvVar + "=" + connectTimeoutSeconds(ConnectTimeout), true
+}
+
+// connString builds the connection string, with any extra (already encoded)
+// query parameters appended.
+func (d *ConnectionDetails) connString(extraParams ...string) string {
+	params := []string{"sslmode=require"}
+	if d.readOnly {
+		params = append(params, readOnlyConnectionOption)
+	}
+	params = append(params, extraParams...)
 
 	// url.User* percent-encodes the role/password so URL-special characters (e.g.
 	// in a manually entered password) don't break connection-string parsing.
@@ -122,7 +165,27 @@ func (d *ConnectionDetails) String() string {
 	if d.Password != "" {
 		userinfo = url.UserPassword(d.Role, d.Password)
 	}
-	return fmt.Sprintf("postgresql://%s@%s:%d/%s?%s", userinfo, d.Host, d.Port, d.Database, query)
+	return fmt.Sprintf("postgresql://%s@%s:%d/%s?%s", userinfo, d.Host, d.Port, d.Database, strings.Join(params, "&"))
+}
+
+func parseConnConfig(connString string) (*pgx.ConnConfig, error) {
+	connConfig, err := pgx.ParseConfig(connString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse connection string: %w", err)
+	}
+	return connConfig, nil
+}
+
+// connectTimeoutEnvSet reports whether the user's PGCONNECT_TIMEOUT applies,
+// by the same test pgx uses: it's set and non-empty.
+func connectTimeoutEnvSet() bool {
+	return os.Getenv(ConnectTimeoutEnvVar) != ""
+}
+
+// connectTimeoutSeconds formats a whole-second timeout the way
+// connect_timeout and PGCONNECT_TIMEOUT take it.
+func connectTimeoutSeconds(timeout time.Duration) string {
+	return strconv.FormatInt(int64(timeout/time.Second), 10)
 }
 
 // GetPassword fetches the password stored for the target from the configured
@@ -168,9 +231,9 @@ func connectReadOnly(ctx context.Context, cfg *config.Config, target *Connection
 		return nil, err
 	}
 
-	connConfig, err := pgx.ParseConfig(details.String())
+	connConfig, err := details.ConnConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse connection string: %w", err)
+		return nil, err
 	}
 	// Callers run parameterless statements, so the simple protocol fits.
 	connConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol

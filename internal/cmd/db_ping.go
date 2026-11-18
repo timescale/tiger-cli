@@ -31,6 +31,11 @@ connections and returns appropriate exit codes following pg_isready conventions.
 
 You can also pass a read replica set ID to test connectivity to that replica.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to test connectivity to that branch.") + `
 
+--timeout limits the whole check. The host can resolve to several addresses,
+and each gets up to ` + common.ConnectTimeout.String() + ` (or PGCONNECT_TIMEOUT, if set) before the check
+moves on to the next, so a --timeout shorter than that limits the first
+address too.
+
 Return Codes:
   0: Server is accepting connections normally
   1: Server is rejecting connections (e.g., during startup)
@@ -86,74 +91,66 @@ Return Codes:
 				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", timeout))
 			}
 
+			connConfig, err := details.ConnConfig()
+			if err != nil {
+				return common.ExitWithCode(common.ExitInvalidParameters, err)
+			}
+
+			ctx := cmd.Context()
+			if timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, timeout)
+				defer cancel()
+			}
+
 			// Test the connection
-			return testDatabaseConnection(cmd.Context(), details.String(), timeout, cmd)
+			return testDatabaseConnection(ctx, connConfig, cmd)
 		},
 	}
 
 	// Add flags for db ping command
-	cmd.Flags().DurationVarP(&timeout, "timeout", "t", 3*time.Second, "Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "t", 30*time.Second, "Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout")
 	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
 	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
 
 	return cmd
 }
 
-// testDatabaseConnection tests the database connection and returns appropriate exit codes
-func testDatabaseConnection(ctx context.Context, connectionString string, timeout time.Duration, cmd *cobra.Command) error {
-	// Every failure below is reported here, so don't let cobra print it again.
-	cmd.SilenceErrors = true
-
-	// Create context with timeout if specified
-	var cancel context.CancelFunc
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-
-	// Attempt to connect to the database
-	// The connection string already includes the password (if available) thanks to PasswordOptional mode
-	conn, err := pgx.Connect(ctx, connectionString)
+// testDatabaseConnection tests the database connection and returns appropriate
+// exit codes.
+func testDatabaseConnection(ctx context.Context, connConfig *pgx.ConnConfig, cmd *cobra.Command) error {
+	// The config includes the password, if one is available.
+	conn, err := pgx.ConnectConfig(ctx, connConfig)
 	if err != nil {
-		// Determine the appropriate exit code based on error type
-		if isConnectionTimeout(err) {
-			cmd.PrintErrf("Connection timeout after %v\n", timeout)
-			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
-		}
-
-		// Check if it's a connection rejection vs unreachable
-		if isConnectionRejected(err) {
-			cmd.PrintErrf("Connection rejected: %v\n", err)
-			return common.ExitWithCode(common.ExitGeneralError, err) // Server is rejecting connections
-		}
-
-		cmd.PrintErrf("Connection failed: %v\n", err)
-		return common.ExitWithCode(2, err) // No response to connection attempt
+		return connectionFailure(err)
 	}
 	defer conn.Close(ctx)
 
 	// Test the connection with a simple ping
-	err = conn.Ping(ctx)
-	if err != nil {
-		// Determine the appropriate exit code based on error type
-		if isConnectionTimeout(err) {
-			cmd.PrintErrf("Connection timeout after %v\n", timeout)
-			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
-		}
-
-		// Check if it's a connection rejection vs unreachable
-		if isConnectionRejected(err) {
-			cmd.PrintErrf("Connection rejected: %v\n", err)
-			return common.ExitWithCode(common.ExitGeneralError, err) // Server is rejecting connections
-		}
-
-		cmd.PrintErrf("Connection failed: %v\n", err)
-		return common.ExitWithCode(2, err) // No response to connection attempt
+	if err := conn.Ping(ctx); err != nil {
+		return connectionFailure(err)
 	}
 
 	// Connection successful
 	cmd.Printf("Connection successful\n")
 	return nil // Server is accepting connections normally
+}
+
+// connectionFailure wraps the error from a failed connection or ping with its
+// exit code. pgx joins every address's failure into one error, so a server
+// reply anywhere in it decides: it shows the server is reachable, whatever
+// happened at the other addresses.
+func connectionFailure(err error) error {
+	if _, ok := errors.AsType[*pgconn.PgError](err); ok {
+		if isConnectionRejected(err) {
+			return common.ExitWithCode(common.ExitGeneralError, fmt.Errorf("server is rejecting connections: %w", err))
+		}
+		return common.ExitWithCode(2, err) // Server replied with an error
+	}
+	if isConnectionTimeout(err) {
+		return common.ExitWithCode(common.ExitTimeout, fmt.Errorf("connection timed out: %w", err))
+	}
+	return common.ExitWithCode(2, err) // No response to connection attempt
 }
 
 // isConnectionTimeout checks if the error is due to the connection timeout:
@@ -176,10 +173,12 @@ func isConnectionRejected(err error) bool {
 	// This occurs when the server is running but cannot accept new connections
 	// (e.g., during startup, shutdown, or when max_connections is reached).
 
-	// Check if this is a PostgreSQL error with the specific error code
-	if pgxErr, ok := err.(*pgconn.PgError); ok {
+	// Check if this is a PostgreSQL error with the specific error code. pgx
+	// returns a connect failure wrapped in a *pgconn.ConnectError, so look
+	// through the chain.
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		// ERRCODE_CANNOT_CONNECT_NOW is 57P03
-		return pgxErr.Code == "57P03"
+		return pgErr.Code == "57P03"
 	}
 
 	// All other errors (authentication, authorization, network issues, etc.)

@@ -12,6 +12,11 @@ connections and returns appropriate exit codes following pg_isready conventions.
 
 You can also pass a read replica set ID to test connectivity to that replica.
 
+--timeout limits the whole check. The host can resolve to several addresses,
+and each gets up to 5s (or PGCONNECT_TIMEOUT, if set) before the check
+moves on to the next, so a --timeout shorter than that limits the first
+address too.
+
 Return Codes:
   0: Server is accepting connections normally
   1: Server is rejecting connections (e.g., during startup)
@@ -47,7 +52,7 @@ tiger db ping [name-or-id] [flags]
   -h, --help               help for ping
       --pooled             Use connection pooling
       --role string        Database role/username (default "tsdbadmin")
-  -t, --timeout duration   Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout (default 3s)
+  -t, --timeout duration   Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout (default 30s)
 ```
 
 ### Options inherited from parent commands

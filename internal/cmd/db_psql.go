@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/jackc/pgx/v5"
@@ -473,12 +472,14 @@ func testConnectionWithPassword(ctx context.Context, details *common.ConnectionD
 	// copy details with provided password
 	copyDetails := *details
 	copyDetails.Password = password
-	connStr := copyDetails.String()
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	conn, err := pgx.Connect(ctx, connStr)
+	// No overall deadline: ConnConfig bounds each address, and one deadline
+	// across them all would cut off the fallback to the next address.
+	connConfig, err := copyDetails.ConnConfig()
+	if err != nil {
+		return err
+	}
+	conn, err := pgx.ConnectConfig(ctx, connConfig)
 	if err != nil {
 		return err
 	}
@@ -656,9 +657,17 @@ func buildPsqlCommand(cfg *config.Config, details *common.ConnectionDetails, psq
 	psqlCmd.Stdout = util.TryUnwrapFile(cmd.OutOrStdout())
 	psqlCmd.Stderr = util.TryUnwrapFile(cmd.ErrOrStderr())
 
+	psqlCmd.Env = os.Environ()
+	// libpq bounds each address separately, as ConnConfig does for pgx. The
+	// entry is appended, and os/exec keeps the last of duplicate entries, so
+	// it replaces an empty PGCONNECT_TIMEOUT.
+	if entry, ok := common.ConnectTimeoutEnv(); ok {
+		psqlCmd.Env = append(psqlCmd.Env, entry)
+	}
+
 	// Use provided password directly if available
 	if password != "" {
-		psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
+		psqlCmd.Env = append(psqlCmd.Env, "PGPASSWORD="+password)
 	} else {
 		storage := common.GetPasswordStorage(cfg)
 		// Only set PGPASSWORD for keyring storage method
@@ -666,7 +675,7 @@ func buildPsqlCommand(cfg *config.Config, details *common.ConnectionDetails, psq
 		if _, isKeyring := storage.(*common.KeyringStorage); isKeyring {
 			if storedPassword, err := storage.Get(credentials, details.Role); err == nil && storedPassword != "" {
 				// Set PGPASSWORD environment variable for psql when using keyring
-				psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+storedPassword)
+				psqlCmd.Env = append(psqlCmd.Env, "PGPASSWORD="+storedPassword)
 			}
 			// Note: If keyring password retrieval fails, we let psql try without it
 			// This allows fallback to other authentication methods

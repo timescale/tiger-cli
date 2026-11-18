@@ -29,37 +29,12 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
+	"github.com/timescale/tiger-cli/internal/testutil"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
 func TestMain(m *testing.M) {
-	// Backstop: replace the system keyring with an in-memory mock so that even
-	// a test that forgets to reset can never read, write, or delete real
-	// credentials or passwords. Per-test isolation comes from the fresh
-	// keyring.MockInit() in runCommand and in tests that use the keyring
-	// directly.
-	keyring.MockInit()
-
-	// Scrub inherited TIGER_* env vars (e.g. from the developer's shell or a
-	// sourced .env file) so tests run with a consistent baseline. Integration
-	// test credentials (TIGER_*_INTEGRATION) are deliberately preserved. Tests
-	// that need an env var set opt in with withEnv.
-	for _, kv := range os.Environ() {
-		key, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(key, "TIGER_") && !strings.HasSuffix(key, "_INTEGRATION") {
-			os.Unsetenv(key)
-		}
-	}
-
-	// Pin the local timezone to UTC so output that renders local times is
-	// deterministic. This must happen here, while the process is still
-	// single-goroutine: mutating time.Local mid-run (as a per-test option
-	// once did) races with any background goroutine that calls time.Now —
-	// e.g. an idle HTTP transport read-loop left over from an earlier test's
-	// httptest traffic.
-	time.Local = time.UTC
-
-	os.Exit(m.Run())
+	testutil.Main(m)
 }
 
 // testProjectID is the project ID the injected client factory reports.
