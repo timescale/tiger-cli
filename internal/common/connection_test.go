@@ -3,7 +3,6 @@ package common
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -338,8 +337,7 @@ func TestConnectionDetailsString_EncodesSpecialCharPassword(t *testing.T) {
 // only matters when one of a host's addresses drops packets, and a test can't
 // produce that without a real network. pgx itself applies ConnectTimeout to
 // each address separately, so the parsed config is the part we own and the
-// part this test checks. The cases set or unset PGCONNECT_TIMEOUT
-// explicitly, so the developer's environment doesn't leak in.
+// part this test checks.
 func TestConnectionDetailsConnConfig(t *testing.T) {
 	details := &ConnectionDetails{
 		Role:     "tsdbadmin",
@@ -396,11 +394,8 @@ func TestConnectionDetailsConnConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv(ConnectTimeoutEnvVar, "") // restores the original value afterwards
 			if tt.env != nil {
 				t.Setenv(ConnectTimeoutEnvVar, *tt.env)
-			} else if err := os.Unsetenv(ConnectTimeoutEnvVar); err != nil {
-				t.Fatalf("failed to unset %s: %v", ConnectTimeoutEnvVar, err)
 			}
 
 			connConfig, err := tt.build(details)

@@ -390,10 +390,6 @@ func TestBuildPsqlCommand(t *testing.T) {
 	// psql bounds each address by PGCONNECT_TIMEOUT, so the CLI's default is
 	// passed only when the user hasn't set their own.
 	t.Run("PGCONNECT_TIMEOUT defaults to ConnectTimeout", func(t *testing.T) {
-		t.Setenv(common.ConnectTimeoutEnvVar, "") // restores the original value afterwards
-		if err := os.Unsetenv(common.ConnectTimeoutEnvVar); err != nil {
-			t.Fatalf("failed to unset %s: %v", common.ConnectTimeoutEnvVar, err)
-		}
 		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
 		if got := envValues(psqlCmd.Env, common.ConnectTimeoutEnvVar); !slices.Equal(got, []string{"5"}) {
 			t.Errorf("expected %s=5 once in env, got %v", common.ConnectTimeoutEnvVar, got)
