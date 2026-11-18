@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 
@@ -20,6 +22,12 @@ import (
 func TestDbPingCmd(t *testing.T) {
 	setupGet := func(m *mocks.MockClientWithResponsesInterface) {
 		expectResolveTarget(m, "svc-12345", sampleService())
+	}
+	silentPort := startSilentServer(t, 2*time.Second)
+	setupSilent := func(m *mocks.MockClientWithResponsesInterface) {
+		expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
+			s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(silentPort)}
+		}))
 	}
 
 	runCmdTests(t, []cmdTest{
@@ -129,38 +137,31 @@ func TestDbPingCmd(t *testing.T) {
 			checks: []checkFunc{checkExitCode(2)},
 		},
 		{
-			// 192.0.2.0/24 (TEST-NET-1) is non-routable, so the dial hangs
-			// until the --timeout deadline fires; pgx's error text is
-			// environment-dependent.
+			// The silent server never replies and closes the connection after
+			// 2s, so the attempt ends as a timeout only if the --timeout
+			// deadline fires first; pgx's error text is environment-dependent.
 			name: "connection timeout",
 			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
-					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
-				}))
-			},
+			mock: setupSilent,
 			wantErr: matchFunc(func(t *testing.T, got string) {
-				if !strings.HasPrefix(got, "connection timed out: ") || !strings.Contains(got, "192.0.2.1") {
-					t.Errorf("error = %q, want a timeout naming the unreachable host", got)
+				if !strings.HasPrefix(got, "connection timed out: ") || !strings.Contains(got, "127.0.0.1") {
+					t.Errorf("error = %q, want a timeout naming the silent server", got)
 				}
 			}),
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
-			// PGCONNECT_TIMEOUT=0 removes the per-address limit, so only
-			// --timeout ends the dial; pgx's error text is
+			// PGCONNECT_TIMEOUT=0 removes the per-address limit, so only the
+			// --timeout deadline can end the attempt as a timeout before the
+			// silent server closes the connection; pgx's error text is
 			// environment-dependent.
 			name: "--timeout bounds the check with no per-address limit",
 			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
-					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
-				}))
-			},
+			mock: setupSilent,
 			opts: []runOption{withEnv(common.ConnectTimeoutEnvVar, "0")},
 			wantErr: matchFunc(func(t *testing.T, got string) {
-				if !strings.HasPrefix(got, "connection timed out: ") || !strings.Contains(got, "192.0.2.1") {
-					t.Errorf("error = %q, want a timeout naming the unreachable host", got)
+				if !strings.HasPrefix(got, "connection timed out: ") || !strings.Contains(got, "127.0.0.1") {
+					t.Errorf("error = %q, want a timeout naming the silent server", got)
 				}
 			}),
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
@@ -338,4 +339,47 @@ func TestIsConnectionRejected(t *testing.T) {
 			}
 		})
 	}
+}
+
+// startSilentServer starts a TCP server on loopback that accepts connections,
+// never sends anything, and closes each one after holdFor. A client waiting on
+// it times out only by its own deadline, and a client with no deadline sees
+// the connection closed after holdFor rather than hanging. It returns the
+// server's port.
+func startSilentServer(t *testing.T, holdFor time.Duration) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to start the silent server: %v", err)
+	}
+
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	t.Cleanup(func() {
+		close(done)
+		if err := ln.Close(); err != nil {
+			t.Errorf("failed to close the silent server: %v", err)
+		}
+		wg.Wait()
+	})
+
+	wg.Go(func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return // the listener was closed
+			}
+			wg.Go(func() {
+				select {
+				case <-time.After(holdFor):
+				case <-done:
+				}
+				if err := conn.Close(); err != nil {
+					t.Errorf("failed to close a silent server connection: %v", err)
+				}
+			})
+		}
+	})
+
+	return ln.Addr().(*net.TCPAddr).Port
 }
