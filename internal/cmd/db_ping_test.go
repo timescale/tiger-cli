@@ -150,7 +150,8 @@ func TestDbPingCmd(t *testing.T) {
 		},
 		{
 			// PGCONNECT_TIMEOUT=0 means no limit, so the dial would hang if
-			// --timeout didn't replace it.
+			// --timeout didn't replace it; pgx's error text is
+			// environment-dependent.
 			name: "--timeout replaces PGCONNECT_TIMEOUT",
 			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
