@@ -132,24 +132,12 @@ func (d *ConnectionDetails) String() string {
 // ConnConfig parses the details into a pgx config whose connection attempts
 // are bounded per address: by PGCONNECT_TIMEOUT when the user sets it, and by
 // ConnectTimeout otherwise. Every pgx connection the CLI and MCP server make
-// goes through it or ConnConfigWithTimeout.
+// goes through it.
 func (d *ConnectionDetails) ConnConfig() (*pgx.ConnConfig, error) {
 	if connectTimeoutEnvSet() {
 		return parseConnConfig(d.connString())
 	}
-	return d.ConnConfigWithTimeout(ConnectTimeout)
-}
-
-// ConnConfigWithTimeout is ConnConfig with an explicit per-address timeout,
-// which overrides PGCONNECT_TIMEOUT. The timeout must be a whole number of
-// seconds, since that's all connect_timeout takes; 0 means no limit.
-func (d *ConnectionDetails) ConnConfigWithTimeout(timeout time.Duration) (*pgx.ConnConfig, error) {
-	if timeout < 0 || timeout%time.Second != 0 {
-		return nil, fmt.Errorf("connect timeout must be a whole, non-negative number of seconds, got %v", timeout)
-	}
-	// A connect_timeout in the connection string outranks PGCONNECT_TIMEOUT,
-	// so pgx never parses the env var.
-	return parseConnConfig(d.connString("connect_timeout=" + connectTimeoutSeconds(timeout)))
+	return parseConnConfig(d.connString("connect_timeout=" + connectTimeoutSeconds(ConnectTimeout)))
 }
 
 // ConnectTimeoutEnv returns the PGCONNECT_TIMEOUT entry that gives a psql

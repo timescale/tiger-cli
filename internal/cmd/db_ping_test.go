@@ -112,13 +112,6 @@ func TestDbPingCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
-			name:    "timeout not in whole seconds",
-			args:    []string{"db", "ping", "svc-12345", "--timeout", "1500ms"},
-			mock:    setupGet,
-			wantErr: "timeout must be a whole number of seconds, got 1.5s",
-			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
-		},
-		{
 			// The dial is refused instantly; pgx's error text is
 			// environment-dependent, hence the non-exact matches.
 			name: "unreachable server",
@@ -141,7 +134,7 @@ func TestDbPingCmd(t *testing.T) {
 			// until the --timeout deadline fires; pgx's error text is
 			// environment-dependent.
 			name: "connection timeout",
-			args: []string{"db", "ping", "svc-12345", "--timeout", "1s"},
+			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
@@ -152,15 +145,15 @@ func TestDbPingCmd(t *testing.T) {
 					t.Errorf("error = %q, want it to name the unreachable host", got)
 				}
 			}),
-			wantStderr: "Connection timeout after 1s per address\n",
+			wantStderr: "Connection timeout\n",
 			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
-			// PGCONNECT_TIMEOUT=0 means no limit, so the dial would hang if
-			// --timeout didn't replace it; pgx's error text is
+			// PGCONNECT_TIMEOUT=0 removes the per-address limit, so only
+			// --timeout ends the dial; pgx's error text is
 			// environment-dependent.
-			name: "--timeout replaces PGCONNECT_TIMEOUT",
-			args: []string{"db", "ping", "svc-12345", "--timeout", "1s"},
+			name: "--timeout bounds the check with no per-address limit",
+			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
@@ -172,7 +165,7 @@ func TestDbPingCmd(t *testing.T) {
 					t.Errorf("error = %q, want it to name the unreachable host", got)
 				}
 			}),
-			wantStderr: "Connection timeout after 1s per address\n",
+			wantStderr: "Connection timeout\n",
 			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
@@ -207,6 +200,13 @@ func TestIsConnectionTimeout(t *testing.T) {
 			// net error, without context.DeadlineExceeded in the chain.
 			name: "network timeout",
 			err:  fmt.Errorf("failed to connect: %w", &net.OpError{Op: "dial", Err: os.ErrDeadlineExceeded}),
+			want: true,
+		},
+		{
+			// How a DNS lookup that ran out of time surfaces, inside pgx's
+			// "hostname resolving error".
+			name: "DNS lookup timeout",
+			err:  fmt.Errorf("hostname resolving error: %w", &net.DNSError{Err: "i/o timeout", Name: "host.example.com", IsTimeout: true}),
 			want: true,
 		},
 		{

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/zalando/go-keyring"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -345,70 +344,30 @@ func TestConnectionDetailsConnConfig(t *testing.T) {
 		Port:     5432,
 		Database: "tsdb",
 	}
-	connConfig := func(d *ConnectionDetails) (*pgx.ConnConfig, error) { return d.ConnConfig() }
-	withTimeout := func(timeout time.Duration) func(*ConnectionDetails) (*pgx.ConnConfig, error) {
-		return func(d *ConnectionDetails) (*pgx.ConnConfig, error) { return d.ConnConfigWithTimeout(timeout) }
-	}
 
 	tests := []struct {
 		name        string
-		build       func(*ConnectionDetails) (*pgx.ConnConfig, error)
 		env         *string // nil leaves PGCONNECT_TIMEOUT unset
-		wantErr     string
 		wantTimeout time.Duration
 	}{
 		{
-			name:    "ConnConfigWithTimeout rejects a fractional timeout",
-			build:   withTimeout(1500 * time.Millisecond),
-			wantErr: "connect timeout must be a whole, non-negative number of seconds, got 1.5s",
-		},
-		{
-			name:        "ConnConfig defaults to ConnectTimeout",
-			build:       connConfig,
+			name:        "defaults to ConnectTimeout",
 			wantTimeout: ConnectTimeout,
 		},
 		{
 			// pgx ignores an empty value, and so does ConnConfig.
-			name:        "ConnConfig treats an empty PGCONNECT_TIMEOUT as unset",
-			build:       connConfig,
+			name:        "treats an empty PGCONNECT_TIMEOUT as unset",
 			env:         new(""),
 			wantTimeout: ConnectTimeout,
 		},
 		{
-			name:        "ConnConfig leaves PGCONNECT_TIMEOUT to pgx",
-			build:       connConfig,
+			name:        "leaves PGCONNECT_TIMEOUT to pgx",
 			env:         new("12"),
 			wantTimeout: 12 * time.Second,
 		},
 		{
-			name:        "ConnConfig leaves PGCONNECT_TIMEOUT=0 (no limit) to pgx",
-			build:       connConfig,
+			name:        "leaves PGCONNECT_TIMEOUT=0 (no limit) to pgx",
 			env:         new("0"),
-			wantTimeout: 0,
-		},
-		{
-			name:        "ConnConfigWithTimeout sets the timeout",
-			build:       withTimeout(3 * time.Second),
-			wantTimeout: 3 * time.Second,
-		},
-		{
-			name:        "ConnConfigWithTimeout overrides PGCONNECT_TIMEOUT",
-			build:       withTimeout(3 * time.Second),
-			env:         new("30"),
-			wantTimeout: 3 * time.Second,
-		},
-		{
-			// pgx would reject -1 if it parsed it, but the override means it
-			// never does.
-			name:        "ConnConfigWithTimeout ignores an invalid PGCONNECT_TIMEOUT",
-			build:       withTimeout(3 * time.Second),
-			env:         new("-1"),
-			wantTimeout: 3 * time.Second,
-		},
-		{
-			name:        "ConnConfigWithTimeout of 0 means no limit",
-			build:       withTimeout(0),
-			env:         new("12"),
 			wantTimeout: 0,
 		},
 	}
@@ -419,15 +378,9 @@ func TestConnectionDetailsConnConfig(t *testing.T) {
 				t.Setenv(ConnectTimeoutEnvVar, *tt.env)
 			}
 
-			connConfig, err := tt.build(details)
-			if tt.wantErr != "" {
-				if err == nil || err.Error() != tt.wantErr {
-					t.Fatalf("error = %v, want %q", err, tt.wantErr)
-				}
-				return
-			}
+			connConfig, err := details.ConnConfig()
 			if err != nil {
-				t.Fatalf("building the config: %v", err)
+				t.Fatalf("ConnConfig() error = %v", err)
 			}
 			if connConfig.ConnectTimeout != tt.wantTimeout {
 				t.Errorf("ConnectTimeout = %v, want %v", connConfig.ConnectTimeout, tt.wantTimeout)
