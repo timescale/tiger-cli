@@ -119,50 +119,38 @@ Return Codes:
 // testDatabaseConnection tests the database connection and returns appropriate
 // exit codes.
 func testDatabaseConnection(ctx context.Context, connConfig *pgx.ConnConfig, cmd *cobra.Command) error {
-	// Every failure below is reported here, so don't let cobra print it again.
-	cmd.SilenceErrors = true
-
 	// The config includes the password, if one is available.
 	conn, err := pgx.ConnectConfig(ctx, connConfig)
 	if err != nil {
-		// Determine the appropriate exit code based on error type
-		if isConnectionTimeout(err) {
-			cmd.PrintErrln("Connection timeout")
-			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
-		}
-
-		// Check if it's a connection rejection vs unreachable
-		if isConnectionRejected(err) {
-			cmd.PrintErrf("Connection rejected: %v\n", err)
-			return common.ExitWithCode(common.ExitGeneralError, err) // Server is rejecting connections
-		}
-
-		cmd.PrintErrf("Connection failed: %v\n", err)
-		return common.ExitWithCode(2, err) // No response to connection attempt
+		return connectionFailure(err)
 	}
 	defer conn.Close(ctx)
 
 	// Test the connection with a simple ping
 	if err := conn.Ping(ctx); err != nil {
-		// Determine the appropriate exit code based on error type
-		if isConnectionTimeout(err) {
-			cmd.PrintErrln("Connection timeout")
-			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
-		}
-
-		// Check if it's a connection rejection vs unreachable
-		if isConnectionRejected(err) {
-			cmd.PrintErrf("Connection rejected: %v\n", err)
-			return common.ExitWithCode(common.ExitGeneralError, err) // Server is rejecting connections
-		}
-
-		cmd.PrintErrf("Connection failed: %v\n", err)
-		return common.ExitWithCode(2, err) // No response to connection attempt
+		return connectionFailure(err)
 	}
 
 	// Connection successful
 	cmd.Printf("Connection successful\n")
 	return nil // Server is accepting connections normally
+}
+
+// connectionFailure wraps the error from a failed connection or ping with its
+// exit code. pgx joins every address's failure into one error, so a server
+// reply anywhere in it decides: it shows the server is reachable, whatever
+// happened at the other addresses.
+func connectionFailure(err error) error {
+	if _, ok := errors.AsType[*pgconn.PgError](err); ok {
+		if isConnectionRejected(err) {
+			return common.ExitWithCode(common.ExitGeneralError, fmt.Errorf("server is rejecting connections: %w", err))
+		}
+		return common.ExitWithCode(2, err) // Server replied with an error
+	}
+	if isConnectionTimeout(err) {
+		return common.ExitWithCode(common.ExitTimeout, fmt.Errorf("connection timed out: %w", err))
+	}
+	return common.ExitWithCode(2, err) // No response to connection attempt
 }
 
 // isConnectionTimeout checks if the error is due to the connection timeout:

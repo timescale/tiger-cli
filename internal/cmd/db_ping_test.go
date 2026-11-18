@@ -126,8 +126,7 @@ func TestDbPingCmd(t *testing.T) {
 					t.Errorf("error = %q, want it to name the unreachable host", got)
 				}
 			}),
-			wantStderr: matchPrefix("Connection failed: "),
-			checks:     []checkFunc{checkExitCode(2)},
+			checks: []checkFunc{checkExitCode(2)},
 		},
 		{
 			// 192.0.2.0/24 (TEST-NET-1) is non-routable, so the dial hangs
@@ -141,12 +140,11 @@ func TestDbPingCmd(t *testing.T) {
 				}))
 			},
 			wantErr: matchFunc(func(t *testing.T, got string) {
-				if !strings.Contains(got, "192.0.2.1") {
-					t.Errorf("error = %q, want it to name the unreachable host", got)
+				if !strings.HasPrefix(got, "connection timed out: ") || !strings.Contains(got, "192.0.2.1") {
+					t.Errorf("error = %q, want a timeout naming the unreachable host", got)
 				}
 			}),
-			wantStderr: "Connection timeout\n",
-			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
+			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
 			// PGCONNECT_TIMEOUT=0 removes the per-address limit, so only
@@ -161,12 +159,11 @@ func TestDbPingCmd(t *testing.T) {
 			},
 			opts: []runOption{withEnv(common.ConnectTimeoutEnvVar, "0")},
 			wantErr: matchFunc(func(t *testing.T, got string) {
-				if !strings.Contains(got, "192.0.2.1") {
-					t.Errorf("error = %q, want it to name the unreachable host", got)
+				if !strings.HasPrefix(got, "connection timed out: ") || !strings.Contains(got, "192.0.2.1") {
+					t.Errorf("error = %q, want a timeout naming the unreachable host", got)
 				}
 			}),
-			wantStderr: "Connection timeout\n",
-			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
+			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
 			// Branches are a preview, so the help mentions them only behind
@@ -178,6 +175,67 @@ func TestDbPingCmd(t *testing.T) {
 			wantStdout: matchHelp("You can also pass a branch, by ID or name, to test connectivity to that branch."),
 		},
 	})
+}
+
+// TestConnectionFailure stays at helper level: the errors pgx joins across a
+// host's addresses only arise with several servers failing in different ways
+// at once, so they're built here with errors.Join, as pgx builds them.
+func TestConnectionFailure(t *testing.T) {
+	timeout := fmt.Errorf("192.0.2.1:5432: %w", context.DeadlineExceeded)
+	starting := &pgconn.PgError{Severity: "FATAL", Code: "57P03", Message: "the database system is starting up"}
+	badPassword := &pgconn.PgError{Severity: "FATAL", Code: "28P01", Message: "password authentication failed for user \"tsdbadmin\""}
+
+	tests := []struct {
+		name         string
+		err          error
+		wantMessage  string
+		wantExitCode int
+	}{
+		{
+			name:         "rejection",
+			err:          fmt.Errorf("failed to connect: %w", starting),
+			wantMessage:  "server is rejecting connections: failed to connect: FATAL: the database system is starting up (SQLSTATE 57P03)",
+			wantExitCode: common.ExitGeneralError,
+		},
+		{
+			name:         "rejection beats a timeout at another address",
+			err:          errors.Join(timeout, starting),
+			wantMessage:  "server is rejecting connections: 192.0.2.1:5432: context deadline exceeded\nFATAL: the database system is starting up (SQLSTATE 57P03)",
+			wantExitCode: common.ExitGeneralError,
+		},
+		{
+			// Not a timeout, though one address did time out.
+			name:         "other server reply beats a timeout at another address",
+			err:          errors.Join(timeout, badPassword),
+			wantMessage:  "192.0.2.1:5432: context deadline exceeded\nFATAL: password authentication failed for user \"tsdbadmin\" (SQLSTATE 28P01)",
+			wantExitCode: 2,
+		},
+		{
+			name:         "timeouts only",
+			err:          errors.Join(timeout, fmt.Errorf("192.0.2.2:5432: %w", context.DeadlineExceeded)),
+			wantMessage:  "connection timed out: 192.0.2.1:5432: context deadline exceeded\n192.0.2.2:5432: context deadline exceeded",
+			wantExitCode: common.ExitTimeout,
+		},
+		{
+			name:         "no response",
+			err:          errors.New("dial tcp 127.0.0.1:1: connect: connection refused"),
+			wantMessage:  "dial tcp 127.0.0.1:1: connect: connection refused",
+			wantExitCode: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := connectionFailure(tt.err)
+			var exitErr common.ExitCodeError
+			if !errors.As(err, &exitErr) {
+				t.Fatalf("connectionFailure() = %v, want an exit code error", err)
+			}
+			if err.Error() != tt.wantMessage || exitErr.ExitCode() != tt.wantExitCode {
+				t.Errorf("connectionFailure() = (%q, exit %d), want (%q, exit %d)", err.Error(), exitErr.ExitCode(), tt.wantMessage, tt.wantExitCode)
+			}
+		})
+	}
 }
 
 // TestIsConnectionTimeout stays at helper level: which error shape a deadline
