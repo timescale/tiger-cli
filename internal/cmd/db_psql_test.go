@@ -388,10 +388,19 @@ func TestBuildPsqlCommand(t *testing.T) {
 	})
 
 	// psql bounds each address by PGCONNECT_TIMEOUT, so the CLI's default is
-	// passed only when the user hasn't set their own.
+	// passed only when the user hasn't set their own. Environ() is the
+	// environment psql actually gets, after os/exec drops duplicate entries.
 	t.Run("PGCONNECT_TIMEOUT defaults to ConnectTimeout", func(t *testing.T) {
 		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
-		if got := envValues(psqlCmd.Env, common.ConnectTimeoutEnvVar); !slices.Equal(got, []string{"5"}) {
+		if got := envValues(psqlCmd.Environ(), common.ConnectTimeoutEnvVar); !slices.Equal(got, []string{"5"}) {
+			t.Errorf("expected %s=5 once in env, got %v", common.ConnectTimeoutEnvVar, got)
+		}
+	})
+
+	t.Run("empty PGCONNECT_TIMEOUT is replaced", func(t *testing.T) {
+		t.Setenv(common.ConnectTimeoutEnvVar, "")
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
+		if got := envValues(psqlCmd.Environ(), common.ConnectTimeoutEnvVar); !slices.Equal(got, []string{"5"}) {
 			t.Errorf("expected %s=5 once in env, got %v", common.ConnectTimeoutEnvVar, got)
 		}
 	})
@@ -399,7 +408,7 @@ func TestBuildPsqlCommand(t *testing.T) {
 	t.Run("user's PGCONNECT_TIMEOUT is kept", func(t *testing.T) {
 		t.Setenv(common.ConnectTimeoutEnvVar, "12")
 		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
-		if got := envValues(psqlCmd.Env, common.ConnectTimeoutEnvVar); !slices.Equal(got, []string{"12"}) {
+		if got := envValues(psqlCmd.Environ(), common.ConnectTimeoutEnvVar); !slices.Equal(got, []string{"12"}) {
 			t.Errorf("expected only the user's %s=12 in env, got %v", common.ConnectTimeoutEnvVar, got)
 		}
 	})

@@ -112,6 +112,13 @@ func TestDbPingCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
+			name:    "timeout not in whole seconds",
+			args:    []string{"db", "ping", "svc-12345", "--timeout", "1500ms"},
+			mock:    setupGet,
+			wantErr: "timeout must be a whole number of seconds, got 1.5s",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
 			// The dial is refused instantly; pgx's error text is
 			// environment-dependent, hence the non-exact matches.
 			name: "unreachable server",
@@ -134,7 +141,7 @@ func TestDbPingCmd(t *testing.T) {
 			// until the --timeout deadline fires; pgx's error text is
 			// environment-dependent.
 			name: "connection timeout",
-			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
+			args: []string{"db", "ping", "svc-12345", "--timeout", "1s"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
@@ -145,7 +152,7 @@ func TestDbPingCmd(t *testing.T) {
 					t.Errorf("error = %q, want it to name the unreachable host", got)
 				}
 			}),
-			wantStderr: "Connection timeout after 250ms per address\n",
+			wantStderr: "Connection timeout after 1s per address\n",
 			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
@@ -153,7 +160,7 @@ func TestDbPingCmd(t *testing.T) {
 			// --timeout didn't replace it; pgx's error text is
 			// environment-dependent.
 			name: "--timeout replaces PGCONNECT_TIMEOUT",
-			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
+			args: []string{"db", "ping", "svc-12345", "--timeout", "1s"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
@@ -165,7 +172,7 @@ func TestDbPingCmd(t *testing.T) {
 					t.Errorf("error = %q, want it to name the unreachable host", got)
 				}
 			}),
-			wantStderr: "Connection timeout after 250ms per address\n",
+			wantStderr: "Connection timeout after 1s per address\n",
 			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{

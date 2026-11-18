@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -125,10 +126,50 @@ func GetConnectionDetails(cfg *config.Config, target *ConnectionTarget, opts Con
 
 // String creates a PostgreSQL connection string from service details
 func (d *ConnectionDetails) String() string {
-	query := "sslmode=require"
-	if d.readOnly {
-		query += "&" + readOnlyConnectionOption
+	return d.connString()
+}
+
+// ConnConfig parses the details into a pgx config whose connection attempts
+// are bounded per address: by PGCONNECT_TIMEOUT when the user sets it, and by
+// ConnectTimeout otherwise. Every pgx connection the CLI and MCP server make
+// goes through it or ConnConfigWithTimeout.
+func (d *ConnectionDetails) ConnConfig() (*pgx.ConnConfig, error) {
+	if connectTimeoutEnvSet() {
+		return parseConnConfig(d.connString())
 	}
+	return d.ConnConfigWithTimeout(ConnectTimeout)
+}
+
+// ConnConfigWithTimeout is ConnConfig with an explicit per-address timeout,
+// which overrides PGCONNECT_TIMEOUT. The timeout must be a whole number of
+// seconds, since that's all connect_timeout takes; 0 means no limit.
+func (d *ConnectionDetails) ConnConfigWithTimeout(timeout time.Duration) (*pgx.ConnConfig, error) {
+	if timeout < 0 || timeout%time.Second != 0 {
+		return nil, fmt.Errorf("connect timeout must be a whole, non-negative number of seconds, got %v", timeout)
+	}
+	// A connect_timeout in the connection string outranks PGCONNECT_TIMEOUT,
+	// so pgx never parses the env var.
+	return parseConnConfig(d.connString("connect_timeout=" + connectTimeoutSeconds(timeout)))
+}
+
+// ConnectTimeoutEnv returns the PGCONNECT_TIMEOUT entry that gives a psql
+// child the per-address bound ConnConfig uses, or ok=false when the user's own
+// value applies.
+func ConnectTimeoutEnv() (entry string, ok bool) {
+	if connectTimeoutEnvSet() {
+		return "", false
+	}
+	return ConnectTimeoutEnvVar + "=" + connectTimeoutSeconds(ConnectTimeout), true
+}
+
+// connString builds the connection string, with any extra (already encoded)
+// query parameters appended.
+func (d *ConnectionDetails) connString(extraParams ...string) string {
+	params := []string{"sslmode=require"}
+	if d.readOnly {
+		params = append(params, readOnlyConnectionOption)
+	}
+	params = append(params, extraParams...)
 
 	// url.User* percent-encodes the role/password so URL-special characters (e.g.
 	// in a manually entered password) don't break connection-string parsing.
@@ -136,54 +177,27 @@ func (d *ConnectionDetails) String() string {
 	if d.Password != "" {
 		userinfo = url.UserPassword(d.Role, d.Password)
 	}
-	return fmt.Sprintf("postgresql://%s@%s:%d/%s?%s", userinfo, d.Host, d.Port, d.Database, query)
+	return fmt.Sprintf("postgresql://%s@%s:%d/%s?%s", userinfo, d.Host, d.Port, d.Database, strings.Join(params, "&"))
 }
 
-// ConnConfig parses the details into a pgx config whose connection attempts
-// are bounded per address by ConnectTimeout, or by PGCONNECT_TIMEOUT when the
-// user sets it. Every pgx connection the CLI and MCP server make goes through
-// it or ConnConfigWithTimeout.
-func (d *ConnectionDetails) ConnConfig() (*pgx.ConnConfig, error) {
-	connConfig, err := d.parseConnConfig()
-	if err != nil {
-		return nil, err
-	}
-	// When the env var is set, ParseConfig has already applied it (including
-	// 0 for no limit, as in libpq).
-	if _, ok := os.LookupEnv(ConnectTimeoutEnvVar); !ok {
-		withConnectTimeout(connConfig, ConnectTimeout)
-	}
-	return connConfig, nil
-}
-
-// ConnConfigWithTimeout is ConnConfig with an explicit per-address timeout,
-// which overrides PGCONNECT_TIMEOUT. A timeout of 0 means no limit.
-func (d *ConnectionDetails) ConnConfigWithTimeout(timeout time.Duration) (*pgx.ConnConfig, error) {
-	connConfig, err := d.parseConnConfig()
-	if err != nil {
-		return nil, err
-	}
-	withConnectTimeout(connConfig, timeout)
-	return connConfig, nil
-}
-
-func (d *ConnectionDetails) parseConnConfig() (*pgx.ConnConfig, error) {
-	connConfig, err := pgx.ParseConfig(d.String())
+func parseConnConfig(connString string) (*pgx.ConnConfig, error) {
+	connConfig, err := pgx.ParseConfig(connString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse connection string: %w", err)
 	}
 	return connConfig, nil
 }
 
-// withConnectTimeout bounds each address's connection attempt the way pgx's
-// ParseConfig does for connect_timeout: the per-address context
-// (ConnectTimeout) and a dialer with the same Timeout. It's done by hand
-// because connect_timeout only takes whole seconds. Setting both also replaces
-// whatever ParseConfig derived from PGCONNECT_TIMEOUT, so the two never
-// disagree.
-func withConnectTimeout(c *pgx.ConnConfig, timeout time.Duration) {
-	c.ConnectTimeout = timeout
-	c.DialFunc = (&net.Dialer{Timeout: timeout}).DialContext
+// connectTimeoutEnvSet reports whether the user's PGCONNECT_TIMEOUT applies,
+// by the same test pgx uses: it's set and non-empty.
+func connectTimeoutEnvSet() bool {
+	return os.Getenv(ConnectTimeoutEnvVar) != ""
+}
+
+// connectTimeoutSeconds formats a whole-second timeout the way
+// connect_timeout and PGCONNECT_TIMEOUT take it.
+func connectTimeoutSeconds(timeout time.Duration) string {
+	return strconv.FormatInt(int64(timeout/time.Second), 10)
 }
 
 // GetPassword fetches the password stored for the target from the configured

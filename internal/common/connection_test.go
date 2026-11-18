@@ -354,35 +354,56 @@ func TestConnectionDetailsConnConfig(t *testing.T) {
 		name        string
 		build       func(*ConnectionDetails) (*pgx.ConnConfig, error)
 		env         *string // nil leaves PGCONNECT_TIMEOUT unset
+		wantErr     string
 		wantTimeout time.Duration
 	}{
+		{
+			name:    "ConnConfigWithTimeout rejects a fractional timeout",
+			build:   withTimeout(1500 * time.Millisecond),
+			wantErr: "connect timeout must be a whole, non-negative number of seconds, got 1.5s",
+		},
 		{
 			name:        "ConnConfig defaults to ConnectTimeout",
 			build:       connConfig,
 			wantTimeout: ConnectTimeout,
 		},
 		{
-			name:        "ConnConfig keeps PGCONNECT_TIMEOUT",
+			// pgx ignores an empty value, and so does ConnConfig.
+			name:        "ConnConfig treats an empty PGCONNECT_TIMEOUT as unset",
+			build:       connConfig,
+			env:         new(""),
+			wantTimeout: ConnectTimeout,
+		},
+		{
+			name:        "ConnConfig leaves PGCONNECT_TIMEOUT to pgx",
 			build:       connConfig,
 			env:         new("12"),
 			wantTimeout: 12 * time.Second,
 		},
 		{
-			name:        "ConnConfig keeps PGCONNECT_TIMEOUT=0 as no limit",
+			name:        "ConnConfig leaves PGCONNECT_TIMEOUT=0 (no limit) to pgx",
 			build:       connConfig,
 			env:         new("0"),
 			wantTimeout: 0,
 		},
 		{
 			name:        "ConnConfigWithTimeout sets the timeout",
-			build:       withTimeout(1500 * time.Millisecond),
-			wantTimeout: 1500 * time.Millisecond,
+			build:       withTimeout(3 * time.Second),
+			wantTimeout: 3 * time.Second,
 		},
 		{
 			name:        "ConnConfigWithTimeout overrides PGCONNECT_TIMEOUT",
-			build:       withTimeout(250 * time.Millisecond),
+			build:       withTimeout(3 * time.Second),
 			env:         new("30"),
-			wantTimeout: 250 * time.Millisecond,
+			wantTimeout: 3 * time.Second,
+		},
+		{
+			// pgx would reject -1 if it parsed it, but the override means it
+			// never does.
+			name:        "ConnConfigWithTimeout ignores an invalid PGCONNECT_TIMEOUT",
+			build:       withTimeout(3 * time.Second),
+			env:         new("-1"),
+			wantTimeout: 3 * time.Second,
 		},
 		{
 			name:        "ConnConfigWithTimeout of 0 means no limit",
@@ -399,6 +420,12 @@ func TestConnectionDetailsConnConfig(t *testing.T) {
 			}
 
 			connConfig, err := tt.build(details)
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Fatalf("error = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("building the config: %v", err)
 			}

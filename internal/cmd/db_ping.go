@@ -89,6 +89,9 @@ Return Codes:
 			if timeout < 0 {
 				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", timeout))
 			}
+			if timeout%time.Second != 0 {
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be a whole number of seconds, got %v", timeout))
+			}
 
 			// --timeout replaces PGCONNECT_TIMEOUT, as pg_isready's -t does.
 			connConfig, err := details.ConnConfigWithTimeout(timeout)
@@ -102,7 +105,7 @@ Return Codes:
 	}
 
 	// Add flags for db ping command
-	cmd.Flags().DurationVarP(&timeout, "timeout", "t", common.ConnectTimeout, "Timeout for connecting to each address, and for the check once connected (e.g., 30s, 5m, 1h). Use 0 for no timeout")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "t", common.ConnectTimeout, "Timeout for connecting to each address, and for the check once connected, in whole seconds (e.g., 30s, 5m, 1h). Use 0 for no timeout")
 	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
 	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
 

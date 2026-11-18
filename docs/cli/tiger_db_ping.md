@@ -51,7 +51,7 @@ tiger db ping [name-or-id] [flags]
   -h, --help               help for ping
       --pooled             Use connection pooling
       --role string        Database role/username (default "tsdbadmin")
-  -t, --timeout duration   Timeout for connecting to each address, and for the check once connected (e.g., 30s, 5m, 1h). Use 0 for no timeout (default 5s)
+  -t, --timeout duration   Timeout for connecting to each address, and for the check once connected, in whole seconds (e.g., 30s, 5m, 1h). Use 0 for no timeout (default 5s)
 ```
 
 ### Options inherited from parent commands

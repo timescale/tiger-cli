@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/jackc/pgx/v5"
@@ -659,9 +658,11 @@ func buildPsqlCommand(cfg *config.Config, details *common.ConnectionDetails, psq
 	psqlCmd.Stderr = util.TryUnwrapFile(cmd.ErrOrStderr())
 
 	psqlCmd.Env = os.Environ()
-	// libpq bounds each address separately, as ConnConfig does for pgx.
-	if _, ok := os.LookupEnv(common.ConnectTimeoutEnvVar); !ok {
-		psqlCmd.Env = append(psqlCmd.Env, fmt.Sprintf("%s=%d", common.ConnectTimeoutEnvVar, int(common.ConnectTimeout/time.Second)))
+	// libpq bounds each address separately, as ConnConfig does for pgx. The
+	// entry is appended, and os/exec keeps the last of duplicate entries, so
+	// it replaces an empty PGCONNECT_TIMEOUT.
+	if entry, ok := common.ConnectTimeoutEnv(); ok {
+		psqlCmd.Env = append(psqlCmd.Env, entry)
 	}
 
 	// Use provided password directly if available
