@@ -411,10 +411,8 @@ func TestBuildPsqlCommand(t *testing.T) {
 	t.Run("pgpass storage sets no PGPASSWORD", func(t *testing.T) {
 		// psql reads ~/.pgpass itself, so the env var must stay unset.
 		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, common.PasswordTarget{}, discardCmd())
-		for _, env := range psqlCmd.Env {
-			if strings.HasPrefix(env, "PGPASSWORD=") {
-				t.Errorf("expected no PGPASSWORD for pgpass storage, got %s", env)
-			}
+		if got := envValues(psqlCmd.Env, "PGPASSWORD"); len(got) != 0 {
+			t.Errorf("expected no PGPASSWORD for pgpass storage, got %v", got)
 		}
 	})
 }
