@@ -96,7 +96,7 @@ Return Codes:
 			}
 
 			// Test the connection
-			return testDatabaseConnection(cmd.Context(), connConfig, timeout, cmd)
+			return testDatabaseConnection(cmd.Context(), connConfig, cmd)
 		},
 	}
 
@@ -110,9 +110,10 @@ Return Codes:
 
 // testDatabaseConnection tests the database connection and returns appropriate
 // exit codes.
-func testDatabaseConnection(ctx context.Context, connConfig *pgx.ConnConfig, timeout time.Duration, cmd *cobra.Command) error {
+func testDatabaseConnection(ctx context.Context, connConfig *pgx.ConnConfig, cmd *cobra.Command) error {
 	// Every failure below is reported here, so don't let cobra print it again.
 	cmd.SilenceErrors = true
+	timeout := connConfig.ConnectTimeout
 
 	// The config includes the password, if one is available.
 	conn, err := pgx.ConnectConfig(ctx, connConfig)
