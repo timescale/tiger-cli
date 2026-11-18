@@ -33,6 +33,7 @@ You can also pass a read replica set ID to test connectivity to that replica.` +
 
 Like pg_isready's -t option, --timeout applies to each address the host
 resolves to, so an address that doesn't answer falls through to the next.
+Once connected, the check that the database responds gets its own --timeout.
 
 Return Codes:
   0: Server is accepting connections normally
@@ -101,7 +102,7 @@ Return Codes:
 	}
 
 	// Add flags for db ping command
-	cmd.Flags().DurationVarP(&timeout, "timeout", "t", common.ConnectTimeout, "Timeout for connecting to each address (e.g., 30s, 5m, 1h). Use 0 for no timeout")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "t", common.ConnectTimeout, "Timeout for connecting to each address, and for the check once connected (e.g., 30s, 5m, 1h). Use 0 for no timeout")
 	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
 	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
 
