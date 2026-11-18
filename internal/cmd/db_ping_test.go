@@ -237,6 +237,14 @@ func TestIsConnectionRejected(t *testing.T) {
 			want: true,
 		},
 		{
+			// pgx wraps a connect failure in a *pgconn.ConnectError, whose
+			// fields can't be set from outside pgconn; %w wraps it the same
+			// way as far as errors.As is concerned.
+			name: "wrapped cannot connect now (57P03)",
+			err:  fmt.Errorf("failed to connect: %w", &pgconn.PgError{Code: "57P03", Message: "the database system is starting up"}),
+			want: true,
+		},
+		{
 			name: "authentication failed (28P01)",
 			err:  &pgconn.PgError{Code: "28P01", Message: "password authentication failed for user \"test\""},
 			want: false,

@@ -185,10 +185,12 @@ func isConnectionRejected(err error) bool {
 	// This occurs when the server is running but cannot accept new connections
 	// (e.g., during startup, shutdown, or when max_connections is reached).
 
-	// Check if this is a PostgreSQL error with the specific error code
-	if pgxErr, ok := err.(*pgconn.PgError); ok {
+	// Check if this is a PostgreSQL error with the specific error code. pgx
+	// returns a connect failure wrapped in a *pgconn.ConnectError, so look
+	// through the chain.
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		// ERRCODE_CANNOT_CONNECT_NOW is 57P03
-		return pgxErr.Code == "57P03"
+		return pgErr.Code == "57P03"
 	}
 
 	// All other errors (authentication, authorization, network issues, etc.)
