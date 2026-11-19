@@ -91,11 +91,15 @@ func outputBranchesTable(output io.Writer, branches []OutputBranch) error {
 	table.Header("BRANCH ID", "NAME", "STATUS", "CREATED BY", "CREATED")
 
 	for _, branch := range branches {
+		var createdBy string
+		if branch.Creator != nil {
+			createdBy = string(branch.Creator.Email)
+		}
 		table.Append(
 			branch.ID,
 			branch.Name,
 			string(branch.Status),
-			formatBranchCreator(branch.Creator),
+			createdBy,
 			branch.Created.Format("2006-01-02 15:04"),
 		)
 	}

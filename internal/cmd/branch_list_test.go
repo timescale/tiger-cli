@@ -93,12 +93,12 @@ func TestBranchListCmd(t *testing.T) {
 			args: []string{"branch", "list", "svc-12345"},
 			opts: []runOption{withExperimental()},
 			mock: expectList(sampleBranch(), paused),
-			wantStdout: `┌───────────┬───────────────────┬────────┬─────────────────────────────────┬──────────────────┐
-│ BRANCH ID │       NAME        │ STATUS │           CREATED BY            │     CREATED      │
-├───────────┼───────────────────┼────────┼─────────────────────────────────┼──────────────────┤
-│ br-12345  │ test-branch       │ READY  │ Jane Doe (jane.doe@example.com) │ 2025-01-16 09:00 │
-│ br-67890  │ feature/user-auth │ PAUSED │ Jane Doe (jane.doe@example.com) │ 2025-01-16 09:00 │
-└───────────┴───────────────────┴────────┴─────────────────────────────────┴──────────────────┘
+			wantStdout: `┌───────────┬───────────────────┬────────┬──────────────────────┬──────────────────┐
+│ BRANCH ID │       NAME        │ STATUS │      CREATED BY      │     CREATED      │
+├───────────┼───────────────────┼────────┼──────────────────────┼──────────────────┤
+│ br-12345  │ test-branch       │ READY  │ jane.doe@example.com │ 2025-01-16 09:00 │
+│ br-67890  │ feature/user-auth │ PAUSED │ jane.doe@example.com │ 2025-01-16 09:00 │
+└───────────┴───────────────────┴────────┴──────────────────────┴──────────────────┘
 `,
 		},
 		{
@@ -106,11 +106,11 @@ func TestBranchListCmd(t *testing.T) {
 			args: []string{"branch", "list"},
 			opts: []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock: expectList(sampleBranch()),
-			wantStdout: `┌───────────┬─────────────┬────────┬─────────────────────────────────┬──────────────────┐
-│ BRANCH ID │    NAME     │ STATUS │           CREATED BY            │     CREATED      │
-├───────────┼─────────────┼────────┼─────────────────────────────────┼──────────────────┤
-│ br-12345  │ test-branch │ READY  │ Jane Doe (jane.doe@example.com) │ 2025-01-16 09:00 │
-└───────────┴─────────────┴────────┴─────────────────────────────────┴──────────────────┘
+			wantStdout: `┌───────────┬─────────────┬────────┬──────────────────────┬──────────────────┐
+│ BRANCH ID │    NAME     │ STATUS │      CREATED BY      │     CREATED      │
+├───────────┼─────────────┼────────┼──────────────────────┼──────────────────┤
+│ br-12345  │ test-branch │ READY  │ jane.doe@example.com │ 2025-01-16 09:00 │
+└───────────┴─────────────┴────────┴──────────────────────┴──────────────────┘
 `,
 		},
 		{
@@ -122,20 +122,16 @@ func TestBranchListCmd(t *testing.T) {
 		},
 		{
 			// The API leaves the creator out when the user is no longer known,
-			// e.g. after being deleted, and may know only their email.
-			name: "table with missing creator details",
+			// e.g. after being deleted.
+			name: "table without a creator",
 			args: []string{"branch", "list", "svc-12345"},
 			opts: []runOption{withExperimental()},
-			mock: expectList(sampleBranch(noCreator), sampleBranch(namelessCreator, func(b *api.Branch) {
-				b.ID = "br-67890"
-				b.Name = "feature/user-auth"
-			})),
-			wantStdout: `┌───────────┬───────────────────┬────────┬──────────────────────┬──────────────────┐
-│ BRANCH ID │       NAME        │ STATUS │      CREATED BY      │     CREATED      │
-├───────────┼───────────────────┼────────┼──────────────────────┼──────────────────┤
-│ br-12345  │ test-branch       │ READY  │                      │ 2025-01-16 09:00 │
-│ br-67890  │ feature/user-auth │ READY  │ jane.doe@example.com │ 2025-01-16 09:00 │
-└───────────┴───────────────────┴────────┴──────────────────────┴──────────────────┘
+			mock: expectList(sampleBranch(noCreator)),
+			wantStdout: `┌───────────┬─────────────┬────────┬────────────┬──────────────────┐
+│ BRANCH ID │    NAME     │ STATUS │ CREATED BY │     CREATED      │
+├───────────┼─────────────┼────────┼────────────┼──────────────────┤
+│ br-12345  │ test-branch │ READY  │            │ 2025-01-16 09:00 │
+└───────────┴─────────────┴────────┴────────────┴──────────────────┘
 `,
 		},
 		{
