@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -18,9 +17,7 @@ import (
 	"testing"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/google/go-cmp/cmp"
-	"github.com/spf13/cobra"
 )
 
 // tarEntry is one entry of a test tarball, named relative to the repo root.
@@ -224,34 +221,14 @@ func skillsInstallOutput(dirs []string, removed ...string) string {
 	return b.String()
 }
 
-// withRunSkillsPicker stubs the interactive install location picker: it
-// expects to be offered exactly want, and answers with choose. A nil want
-// expects the picker not to be shown at all.
-func withRunSkillsPicker(want []skillsPickerItem, choose []bool) runOption {
-	return withSetup(func(t *testing.T) {
-		original := runSkillsPicker
-		runSkillsPicker = func(_ *cobra.Command, _ string, items []skillsPickerItem) ([]bool, error) {
-			if want == nil {
-				t.Error("install location picker shown, want none")
-				return nil, errors.New("picker shown")
-			}
-			if diff := cmp.Diff(want, items, cmp.AllowUnexported(skillsPickerItem{})); diff != "" {
-				t.Errorf("picker items mismatch (-want +got):\n%s", diff)
-			}
-			return choose, nil
-		}
-		t.Cleanup(func() { runSkillsPicker = original })
-	})
-}
-
-// pickerItems returns the items the picker offers with the default install
+// skillsPickerItems returns the items the picker offers with the default install
 // locations (the home directory shown as ~), selecting those in selected.
-func pickerItems(selected ...string) []skillsPickerItem {
-	items := []skillsPickerItem{
-		{label: "Universal", dir: "~/.agents/skills"},
-		{label: "Claude Code", dir: "~/.claude/skills"},
-		{label: "Google Antigravity", dir: "~/.gemini/config/skills"},
-		{label: "Kiro CLI", dir: "~/.kiro/skills"},
+func skillsPickerItems(selected ...string) []pickerItem {
+	items := []pickerItem{
+		{label: "Universal", detail: "~/.agents/skills"},
+		{label: "Claude Code", detail: "~/.claude/skills"},
+		{label: "Google Antigravity", detail: "~/.gemini/config/skills"},
+		{label: "Kiro CLI", detail: "~/.kiro/skills"},
 	}
 	for i := range items {
 		items[i].selected = slices.Contains(selected, items[i].label)
@@ -419,7 +396,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 			opts: []runOption{
 				withEnv("HOME", home(nil)),
 				withIsTerminal(true),
-				withRunSkillsPicker(pickerItems("Universal"), []bool{false, false, false, false}),
+				withRunPicker(skillsPickerItems("Universal"), []bool{false, false, false, false}),
 			},
 			wantErr: "no install locations selected",
 		},
@@ -562,7 +539,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 			opts: []runOption{
 				withEnv("HOME", universalPickerHome),
 				withIsTerminal(true),
-				withRunSkillsPicker(pickerItems("Universal"), []bool{true, false, false, false}),
+				withRunPicker(skillsPickerItems("Universal"), []bool{true, false, false, false}),
 				withSkillsTarball(tarball),
 			},
 			wantStdout: skillsInstallOutput([]string{universalDir(universalPickerHome)}),
@@ -576,7 +553,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 			opts: []runOption{
 				withEnv("HOME", existingClaudeHome),
 				withIsTerminal(true),
-				withRunSkillsPicker(pickerItems("Claude Code"), []bool{false, true, false, false}),
+				withRunPicker(skillsPickerItems("Claude Code"), []bool{false, true, false, false}),
 				withSkillsTarball(tarball),
 			},
 			wantStdout: skillsInstallOutput([]string{claudeDir(existingClaudeHome)}),
@@ -602,7 +579,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 					}
 					t.Cleanup(func() { os.Chmod(dir, 0o755) })
 				}),
-				withRunSkillsPicker(pickerItems("Universal"), []bool{true, false, false, false}),
+				withRunPicker(skillsPickerItems("Universal"), []bool{true, false, false, false}),
 				withSkillsTarball(tarball),
 			},
 			wantStdout: skillsInstallOutput([]string{universalDir(unreadableHome)}),
@@ -617,11 +594,11 @@ func TestSkillsInstallCmd(t *testing.T) {
 				withEnv("HOME", claudePickerEnvHome),
 				withEnv("CLAUDE_CONFIG_DIR", filepath.Join(claudePickerEnvHome, "claude-config")),
 				withIsTerminal(true),
-				withRunSkillsPicker([]skillsPickerItem{
-					{label: "Universal", dir: "~/.agents/skills", selected: true},
-					{label: "Claude Code", dir: "~/claude-config/skills"},
-					{label: "Google Antigravity", dir: "~/.gemini/config/skills"},
-					{label: "Kiro CLI", dir: "~/.kiro/skills"},
+				withRunPicker([]pickerItem{
+					{label: "Universal", detail: "~/.agents/skills", selected: true},
+					{label: "Claude Code", detail: "~/claude-config/skills"},
+					{label: "Google Antigravity", detail: "~/.gemini/config/skills"},
+					{label: "Kiro CLI", detail: "~/.kiro/skills"},
 				}, []bool{false, true, false, false}),
 				withSkillsTarball(tarball),
 			},
@@ -636,7 +613,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 			opts: []runOption{
 				withEnv("HOME", pickerHome),
 				withIsTerminal(true),
-				withRunSkillsPicker(pickerItems("Universal", "Claude Code"), []bool{false, true, false, true}),
+				withRunPicker(skillsPickerItems("Universal", "Claude Code"), []bool{false, true, false, true}),
 				withSkillsTarball(tarball),
 			},
 			wantStdout: skillsInstallOutput([]string{claudeDir(pickerHome), filepath.Join(pickerHome, ".kiro", "skills")}),
@@ -678,63 +655,11 @@ func TestSkillsInstallCmd(t *testing.T) {
 			opts: []runOption{
 				withEnv("HOME", customHome),
 				withIsTerminal(true),
-				withRunSkillsPicker(nil, nil),
+				withRunPicker(nil, nil),
 				withSkillsTarball(tarball),
 			},
 			wantStdout: skillsInstallOutput([]string{filepath.Join(customHome, "custom")}),
 			checks:     []checkFunc{checkTree(customHome, installedSkills("custom"))},
 		},
 	})
-}
-
-// TestSkillsPickerModel checks the picker's keys: toggling, moving, and that
-// only enter confirms. Helper-level because the picker is a Bubble Tea model
-// that needs a real TTY to run through the command; the command tests stub it
-// via withRunSkillsPicker.
-func TestSkillsPickerModel(t *testing.T) {
-	// Ctrl+C is {Code: 'c', Mod: tea.ModCtrl}; the raw control byte {Code: 3}
-	// stringifies to "\x03" and would match nothing.
-	cases := []struct {
-		name          string
-		keys          []tea.KeyPressMsg
-		wantSelected  []bool
-		wantConfirmed bool
-	}{
-		{"enter keeps the preselection", []tea.KeyPressMsg{{Code: tea.KeyEnter}}, []bool{true, false, false}, true},
-		{"space toggles the current row", []tea.KeyPressMsg{{Code: tea.KeySpace}, {Code: tea.KeyEnter}}, []bool{false, false, false}, true},
-		{"down then space toggles the next row", []tea.KeyPressMsg{{Code: tea.KeyDown}, {Code: tea.KeySpace}, {Code: tea.KeyEnter}}, []bool{true, true, false}, true},
-		{"number keys toggle their row", []tea.KeyPressMsg{{Code: '3'}, {Code: '1'}, {Code: tea.KeyEnter}}, []bool{false, false, true}, true},
-		{"number keys past the end do nothing", []tea.KeyPressMsg{{Code: '4'}, {Code: tea.KeyEnter}}, []bool{true, false, false}, true},
-		{"cursor can't run past the end", []tea.KeyPressMsg{{Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeySpace}, {Code: tea.KeyEnter}}, []bool{true, false, true}, true},
-		{"q cancels", []tea.KeyPressMsg{{Code: tea.KeySpace}, {Code: 'q'}}, []bool{false, false, false}, false},
-		{"esc cancels", []tea.KeyPressMsg{{Code: tea.KeyEsc}}, []bool{true, false, false}, false},
-		{"ctrl+c cancels", []tea.KeyPressMsg{{Code: 'c', Mod: tea.ModCtrl}}, []bool{true, false, false}, false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var m tea.Model = skillsPickerModel{items: []skillsPickerItem{
-				{label: "Universal", dir: "~/.agents/skills", selected: true},
-				{label: "Claude Code", dir: "~/.claude/skills"},
-				{label: "Kiro CLI", dir: "~/.kiro/skills"},
-			}}
-			for _, key := range tc.keys {
-				m, _ = m.Update(key)
-			}
-			result := m.(skillsPickerModel)
-			selected := make([]bool, len(result.items))
-			for i, item := range result.items {
-				selected[i] = item.selected
-			}
-			if diff := cmp.Diff(tc.wantSelected, selected); diff != "" {
-				t.Errorf("selection mismatch (-want +got):\n%s", diff)
-			}
-			if result.confirmed != tc.wantConfirmed {
-				t.Errorf("confirmed = %v, want %v", result.confirmed, tc.wantConfirmed)
-			}
-			if !result.done {
-				t.Error("done = false, want true (every case ends by quitting)")
-			}
-		})
-	}
 }
