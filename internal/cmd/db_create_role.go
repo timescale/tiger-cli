@@ -2,6 +2,12 @@ package cmd
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/pbkdf2"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -9,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/util"
@@ -124,6 +131,9 @@ PostgreSQL Configuration Parameters That May Be Set:
 			if err != nil {
 				return fmt.Errorf("failed to determine password: %w", err)
 			}
+			if err := checkPasswordNormalization(rolePassword); err != nil {
+				return err
+			}
 
 			// Build connection string
 			details, err := common.GetConnectionDetails(cfg, target, common.ConnectionDetailsOptions{
@@ -182,10 +192,12 @@ PostgreSQL Configuration Parameters That May Be Set:
 	return cmd
 }
 
-// buildCreateRoleSQL generates the CREATE ROLE SQL statement with LOGIN, PASSWORD, and optional IN ROLE clause
-func buildCreateRoleSQL(roleName string, quotedPassword string, fromRoles []string) string {
+// buildCreateRoleSQL generates the CREATE ROLE SQL statement with LOGIN, PASSWORD, and optional IN ROLE clause.
+// The verifier, from scramSHA256Verifier, needs no escaping: it holds only
+// base64 characters, '$', and ':'.
+func buildCreateRoleSQL(roleName string, passwordVerifier string, fromRoles []string) string {
 	sanitizedRoleName := pgx.Identifier{roleName}.Sanitize()
-	createSQL := fmt.Sprintf("CREATE ROLE %s WITH LOGIN PASSWORD %s", sanitizedRoleName, quotedPassword)
+	createSQL := fmt.Sprintf("CREATE ROLE %s WITH LOGIN PASSWORD '%s'", sanitizedRoleName, passwordVerifier)
 
 	// Add IN ROLE clause if fromRoles is specified
 	// IN ROLE adds the new role as a member of existing roles (equivalent to GRANT existing_role TO new_role)
@@ -271,14 +283,12 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 		}
 	} else {
 		// Use standard CREATE ROLE for non-tsdbadmin cases
-		// Fail if password contains a single quote (we don't support escaping)
-		if strings.Contains(rolePassword, "'") {
-			return fmt.Errorf("password cannot contain single quotes")
+		verifier, err := scramSHA256Verifier(rolePassword)
+		if err != nil {
+			return fmt.Errorf("failed to hash password: %w", err)
 		}
-		// Wrap password in single quotes for SQL literal
-		quotedPassword := "'" + rolePassword + "'"
 		// IN ROLE clause handles all role grants, so no need for separate GRANT statements
-		createSQL := buildCreateRoleSQL(roleName, quotedPassword, fromRoles)
+		createSQL := buildCreateRoleSQL(roleName, verifier, fromRoles)
 		if _, err := tx.Exec(ctx, createSQL); err != nil {
 			return fmt.Errorf("failed to create role: %w", err)
 		}
@@ -327,6 +337,93 @@ func getPasswordForRole(password string) (string, error) {
 
 	// Auto-generate secure password
 	return common.GenerateSecurePassword(32)
+}
+
+// errPasswordNormalized is returned for a password that SASLprep would change.
+var errPasswordNormalized = errors.New("password contains characters that database clients handle inconsistently, " +
+	"such as ligatures, full-width letters, non-ASCII spaces, or invisible characters. Choose a different password")
+
+// checkPasswordNormalization refuses a password that SASLprep (RFC 4013) would
+// change. Postgres and libpq apply SASLprep to a password before hashing it,
+// while pgx approximates it with PRECIS (RFC 8265), and the two disagree on
+// some characters. A password that neither SASLprep's mapping step nor its
+// NFKC normalization changes is hashed as typed by all of them, so a verifier
+// built from it works with every client.
+func checkPasswordNormalization(password string) error {
+	if strings.ContainsFunc(password, saslPrepMaps) || !norm.NFKC.IsNormalString(password) {
+		return errPasswordNormalized
+	}
+	return nil
+}
+
+// saslPrepMaps reports whether SASLprep's mapping step (RFC 4013, section 2)
+// changes r: it removes the characters in RFC 3454 table B.1 and replaces the
+// non-ASCII spaces in table C.1.2 with an ASCII space.
+func saslPrepMaps(r rune) bool {
+	switch {
+	// Table B.1: commonly mapped to nothing.
+	case r == 0x00AD, r == 0x034F, r == 0x1806, r >= 0x180B && r <= 0x180D,
+		r >= 0x200B && r <= 0x200D, r == 0x2060, r >= 0xFE00 && r <= 0xFE0F, r == 0xFEFF:
+		return true
+	// Table C.1.2: non-ASCII space characters.
+	case r == 0x00A0, r == 0x1680, r >= 0x2000 && r <= 0x200B, r == 0x202F, r == 0x205F, r == 0x3000:
+		return true
+	}
+	return false
+}
+
+// SCRAM-SHA-256 parameters, matching what libpq and Postgres use by default.
+const (
+	scramSaltLen    = 16
+	scramIterations = 4096
+)
+
+// scramSHA256Verifier hashes password into the SCRAM-SHA-256 verifier
+// Postgres stores for it, as libpq's PQencryptPasswordConn does. Postgres
+// stores a password already in this form as-is, so sending the verifier keeps
+// the plaintext off the server and out of its logs. The password is hashed as
+// typed, so it must pass checkPasswordNormalization first.
+func scramSHA256Verifier(password string) (string, error) {
+	salt := make([]byte, scramSaltLen)
+	if _, err := rand.Read(salt); err != nil {
+		return "", fmt.Errorf("failed to generate salt: %w", err)
+	}
+	return buildSCRAMSHA256Verifier(password, salt, scramIterations)
+}
+
+// buildSCRAMSHA256Verifier builds the verifier in the form Postgres stores it,
+// SCRAM-SHA-256$<iterations>:<salt>$<StoredKey>:<ServerKey> (RFC 5802, RFC
+// 7677).
+func buildSCRAMSHA256Verifier(password string, salt []byte, iterations int) (string, error) {
+	saltedPassword, err := pbkdf2.Key(sha256.New, password, salt, iterations, sha256.Size)
+	if err != nil {
+		return "", err
+	}
+	clientKey, err := hmacSHA256(saltedPassword, "Client Key")
+	if err != nil {
+		return "", err
+	}
+	storedKey := sha256.Sum256(clientKey)
+	serverKey, err := hmacSHA256(saltedPassword, "Server Key")
+	if err != nil {
+		return "", err
+	}
+
+	enc := base64.StdEncoding
+	return fmt.Sprintf("SCRAM-SHA-256$%d:%s$%s:%s",
+		iterations,
+		enc.EncodeToString(salt),
+		enc.EncodeToString(storedKey[:]),
+		enc.EncodeToString(serverKey),
+	), nil
+}
+
+func hmacSHA256(key []byte, message string) ([]byte, error) {
+	mac := hmac.New(sha256.New, key)
+	if _, err := mac.Write([]byte(message)); err != nil {
+		return nil, err
+	}
+	return mac.Sum(nil), nil
 }
 
 // CreateRoleResult represents the output of a create role operation

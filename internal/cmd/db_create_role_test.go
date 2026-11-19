@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"testing"
@@ -10,6 +11,9 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
 )
+
+const passwordNormalizedMsg = "password contains characters that database clients handle inconsistently, " +
+	"such as ligatures, full-width letters, non-ASCII spaces, or invisible characters. Choose a different password"
 
 func TestDbCreateRoleCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
@@ -137,6 +141,56 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			wantErr: "failed to determine password: entropy unavailable",
 		},
 		{
+			// NFKC folds the ligature into "fi".
+			name: "password with ligature refused",
+			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst", "--password", "\ufb01sh-password"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveTarget(m, "svc-12345", sampleService())
+			},
+			wantErr: passwordNormalizedMsg,
+		},
+		{
+			// NFKC composes e and the combining accent into one character.
+			name: "password with decomposed accent refused",
+			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst", "--password", "pe\u0301ncil-password"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveTarget(m, "svc-12345", sampleService())
+			},
+			wantErr: passwordNormalizedMsg,
+		},
+		{
+			// SASLprep replaces non-ASCII spaces with an ASCII space.
+			name: "password with no-break space refused",
+			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst", "--password", "my\u00a0password"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveTarget(m, "svc-12345", sampleService())
+			},
+			wantErr: passwordNormalizedMsg,
+		},
+		{
+			// SASLprep removes the variation selector that follows the heart.
+			name: "password from TIGER_NEW_PASSWORD with emoji variation selector refused",
+			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
+			opts: []runOption{withEnv("TIGER_NEW_PASSWORD", "my-\u2764\ufe0f-password")},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveTarget(m, "svc-12345", sampleService())
+			},
+			wantErr: passwordNormalizedMsg,
+		},
+		{
+			// The missing endpoint stops the command right after the check,
+			// proving a password SASLprep leaves unchanged gets through,
+			// single quotes included.
+			name: "non-ASCII password accepted",
+			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst", "--password", "p\u00e4ssw\u00f6rd-'\u5bc6\u7801'-\U0001F980"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveTarget(m, "svc-12345", sampleService(func(s *api.Service) {
+					s.Endpoint = nil
+				}))
+			},
+			wantErr: "failed to build connection string: endpoint not available",
+		},
+		{
 			name: "endpoint not available",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -163,78 +217,79 @@ func TestDbCreateRoleCmd(t *testing.T) {
 // keep helper-level tests.
 
 func TestBuildCreateRoleSQL(t *testing.T) {
+	const v = "SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy"
 	tests := []struct {
 		name      string
 		roleName  string
-		password  string
+		verifier  string
 		fromRoles []string
 		want      string
 	}{
 		{
 			name:     "no from roles",
 			roleName: "test_role",
-			password: "'my_password'",
-			want:     `CREATE ROLE "test_role" WITH LOGIN PASSWORD 'my_password'`,
+			verifier: v,
+			want:     `CREATE ROLE "test_role" WITH LOGIN PASSWORD 'SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy'`,
 		},
 		{
 			name:      "empty from roles",
 			roleName:  "test_role",
-			password:  "'test_pass'",
+			verifier:  v,
 			fromRoles: []string{},
-			want:      `CREATE ROLE "test_role" WITH LOGIN PASSWORD 'test_pass'`,
+			want:      `CREATE ROLE "test_role" WITH LOGIN PASSWORD 'SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy'`,
 		},
 		{
 			name:      "single from role",
 			roleName:  "ai_analyst",
-			password:  "'test_pass'",
+			verifier:  v,
 			fromRoles: []string{"app_role"},
-			want:      `CREATE ROLE "ai_analyst" WITH LOGIN PASSWORD 'test_pass' IN ROLE "app_role"`,
+			want:      `CREATE ROLE "ai_analyst" WITH LOGIN PASSWORD 'SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy' IN ROLE "app_role"`,
 		},
 		{
 			name:      "multiple from roles",
 			roleName:  "ai_analyst",
-			password:  "'test_pass'",
+			verifier:  v,
 			fromRoles: []string{"app_role", "readonly_role", "reporting_role"},
-			want:      `CREATE ROLE "ai_analyst" WITH LOGIN PASSWORD 'test_pass' IN ROLE "app_role", "readonly_role", "reporting_role"`,
+			want:      `CREATE ROLE "ai_analyst" WITH LOGIN PASSWORD 'SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy' IN ROLE "app_role", "readonly_role", "reporting_role"`,
 		},
 		{
 			name:     "case preserved by quoting",
 			roleName: "MixedCase_Role",
-			password: "'test_pass'",
-			want:     `CREATE ROLE "MixedCase_Role" WITH LOGIN PASSWORD 'test_pass'`,
+			verifier: v,
+			want:     `CREATE ROLE "MixedCase_Role" WITH LOGIN PASSWORD 'SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy'`,
 		},
 		{
 			name:     "role name with spaces",
 			roleName: "role with spaces",
-			password: "'test_pass'",
-			want:     `CREATE ROLE "role with spaces" WITH LOGIN PASSWORD 'test_pass'`,
+			verifier: v,
+			want:     `CREATE ROLE "role with spaces" WITH LOGIN PASSWORD 'SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy'`,
 		},
 		{
 			name:     "role name with dashes",
 			roleName: "role-with-dashes",
-			password: "'test_pass'",
-			want:     `CREATE ROLE "role-with-dashes" WITH LOGIN PASSWORD 'test_pass'`,
+			verifier: v,
+			want:     `CREATE ROLE "role-with-dashes" WITH LOGIN PASSWORD 'SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy'`,
 		},
 		{
 			// pgx.Identifier.Sanitize doubles embedded quotes, keeping the
 			// injection attempt inside the quoted identifier.
 			name:     "injection in role name",
 			roleName: `test"; DROP TABLE users; --`,
-			password: "'test_pass'",
-			want:     `CREATE ROLE "test""; DROP TABLE users; --" WITH LOGIN PASSWORD 'test_pass'`,
+			verifier: v,
+			want:     `CREATE ROLE "test""; DROP TABLE users; --" WITH LOGIN PASSWORD 'SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy'`,
 		},
 		{
 			name:      "injection in from role",
 			roleName:  "safe_role",
-			password:  "'test_pass'",
+			verifier:  v,
 			fromRoles: []string{`admin"; DROP TABLE users; --`},
-			want:      `CREATE ROLE "safe_role" WITH LOGIN PASSWORD 'test_pass' IN ROLE "admin""; DROP TABLE users; --"`,
+			want:      `CREATE ROLE "safe_role" WITH LOGIN PASSWORD 'SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy' IN ROLE "admin""; DROP TABLE users; --"`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assertOutput(t, buildCreateRoleSQL(tt.roleName, tt.password, tt.fromRoles), tt.want)
+			assertOutput(t, buildCreateRoleSQL(tt.roleName, tt.verifier, tt.fromRoles), tt.want)
 		})
 	}
 }
@@ -306,6 +361,47 @@ func TestBuildStatementTimeoutAlterSQL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assertOutput(t, buildStatementTimeoutAlterSQL(tt.roleName, tt.timeout), tt.want)
+		})
+	}
+}
+
+// The verifier's salt is random, and whether Postgres accepts it only shows on
+// a live database (integration_test.go logs in with the new role), so the
+// derivation keeps a helper-level test against a fixed salt. The expected
+// verifiers were derived independently, with Python's hashlib.
+func TestBuildSCRAMSHA256Verifier(t *testing.T) {
+	// The salt from the SCRAM-SHA-256 example in RFC 7677, section 3.
+	salt, err := base64.StdEncoding.DecodeString("W22ZaJ0SNY7soEsUEjb6gQ==")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name     string
+		password string
+		want     string
+	}{
+		{
+			// The RFC's example login, whose published proof and server
+			// signature this verifier's keys reproduce.
+			name:     "RFC 7677 example",
+			password: "pencil",
+			want:     "SCRAM-SHA-256$4096:W22ZaJ0SNY7soEsUEjb6gQ==$WG5d8oPm3OtcPnkdi4Uo7BkeZkBFzpcXkuLmtbsT4qY=:wfPLwcE6nTWhTAmQ7tl2KeoiWGPlZqQxSrmfPwDl2dU=",
+		},
+		{
+			name:     "non-ASCII password hashed as UTF-8",
+			password: "p\u00e4ssw\u00f6rd",
+			want:     "SCRAM-SHA-256$4096:W22ZaJ0SNY7soEsUEjb6gQ==$dcgqTWLkt/QY/G2TTG2Kx054l2TY/d1/rrqpxFf42c8=:1J1wEQIBJAVfD0SDivXshqbZYR5KFg/C5ltFBHBSzbc=",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := buildSCRAMSHA256Verifier(tt.password, salt, 4096)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertOutput(t, got, tt.want)
 		})
 	}
 }
