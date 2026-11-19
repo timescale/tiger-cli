@@ -88,13 +88,18 @@ func outputBranches(cmd *cobra.Command, cfg *config.Config, service api.Service,
 // outputBranchesTable outputs branches in a formatted table.
 func outputBranchesTable(output io.Writer, branches []OutputBranch) error {
 	table := tablewriter.NewWriter(output)
-	table.Header("BRANCH ID", "NAME", "STATUS", "CREATED")
+	table.Header("BRANCH ID", "NAME", "STATUS", "CREATED BY", "CREATED")
 
 	for _, branch := range branches {
+		var createdBy string
+		if branch.Creator != nil {
+			createdBy = string(branch.Creator.Email)
+		}
 		table.Append(
 			branch.ID,
 			branch.Name,
 			string(branch.Status),
+			createdBy,
 			branch.Created.Format("2006-01-02 15:04"),
 		)
 	}
