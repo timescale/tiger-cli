@@ -15,6 +15,11 @@ By default, a secure random password is auto-generated for the new role. You can
 - Use TIGER_NEW_PASSWORD environment variable
 - Let it auto-generate (default)
 
+The password is sent to the database only as a SCRAM-SHA-256 hash, so the
+plaintext never reaches the server or its logs. Passwords containing characters
+that database clients normalize inconsistently (such as ligatures, full-width
+letters, non-ASCII spaces, or invisible characters) are refused.
+
 The password is saved according to your --password-storage setting (keyring, pgpass, or none).
 
 Read-Only Mode for AI Agents:
@@ -28,7 +33,7 @@ This command executes PostgreSQL statements in a transaction to create and confi
 
 CREATE ROLE Options Used:
   - LOGIN: Always enabled to allow the role to connect
-  - PASSWORD: Always set (from flag, env var, or auto-generated)
+  - PASSWORD: Always set (from flag, env var, or auto-generated), as a SCRAM-SHA-256 hash
   - IN ROLE: Added when --from flag is provided to inherit grants from existing roles
 
 PostgreSQL Configuration Parameters That May Be Set:

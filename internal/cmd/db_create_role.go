@@ -43,6 +43,11 @@ By default, a secure random password is auto-generated for the new role. You can
 - Use TIGER_NEW_PASSWORD environment variable
 - Let it auto-generate (default)
 
+The password is sent to the database only as a SCRAM-SHA-256 hash, so the
+plaintext never reaches the server or its logs. Passwords containing characters
+that database clients normalize inconsistently (such as ligatures, full-width
+letters, non-ASCII spaces, or invisible characters) are refused.
+
 The password is saved according to your --password-storage setting (keyring, pgpass, or none).
 
 Read-Only Mode for AI Agents:
@@ -56,7 +61,7 @@ This command executes PostgreSQL statements in a transaction to create and confi
 
 CREATE ROLE Options Used:
   - LOGIN: Always enabled to allow the role to connect
-  - PASSWORD: Always set (from flag, env var, or auto-generated)
+  - PASSWORD: Always set (from flag, env var, or auto-generated), as a SCRAM-SHA-256 hash
   - IN ROLE: Added when --from flag is provided to inherit grants from existing roles
 
 PostgreSQL Configuration Parameters That May Be Set:
@@ -234,6 +239,11 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 	}
 	defer tx.Rollback(ctx)
 
+	verifier, err := scramSHA256Verifier(rolePassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
 	// Check if tsdbadmin is in the fromRoles list
 	hasTsdbadmin := false
 	var otherRoles []string
@@ -259,9 +269,10 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 		}
 
 		// Use timescale_functions.create_bare_readonly_role to create the role
-		// This function creates a read-only role that can inherit tsdbadmin privileges
+		// This function creates a read-only role that can inherit tsdbadmin privileges.
+		// It passes the password to CREATE ROLE unchanged, so the verifier is stored as-is.
 		if _, err := tx.Exec(ctx, "SELECT timescale_functions.create_bare_readonly_role($1, $2)",
-			roleName, rolePassword); err != nil {
+			roleName, verifier); err != nil {
 			return fmt.Errorf("failed to create role with create_bare_readonly_role: %w", err)
 		}
 
@@ -283,10 +294,6 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 		}
 	} else {
 		// Use standard CREATE ROLE for non-tsdbadmin cases
-		verifier, err := scramSHA256Verifier(rolePassword)
-		if err != nil {
-			return fmt.Errorf("failed to hash password: %w", err)
-		}
 		// IN ROLE clause handles all role grants, so no need for separate GRANT statements
 		createSQL := buildCreateRoleSQL(roleName, verifier, fromRoles)
 		if _, err := tx.Exec(ctx, createSQL); err != nil {

@@ -1027,7 +1027,9 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		roleName := fmt.Sprintf("integration_test_role_all_%d", time.Now().Unix())
-		password := fmt.Sprintf("test-password-all-%d", time.Now().Unix())
+		// The same kinds of characters as CreateRole_WithExplicitPassword, sent
+		// through create_bare_readonly_role instead of CREATE ROLE.
+		password := fmt.Sprintf(`pässwörd-'密码'-"\-🦀-all-%d`, time.Now().Unix())
 		createdRoles = append(createdRoles, roleName)
 
 		t.Logf("Creating role with all valid options (tsdbadmin + read-only): %s", roleName)
