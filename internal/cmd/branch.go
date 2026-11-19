@@ -123,8 +123,12 @@ func outputBranchTable(output io.Writer, branch OutputBranch) error {
 	if branch.Metrics != nil && branch.Metrics.StorageMb != nil {
 		table.Append("Storage", util.FormatStorageMB(*branch.Metrics.StorageMb)+" changed on this branch (billed)")
 	}
-	if branch.Creator != nil {
-		table.Append("Created By", formatBranchCreator(branch.Creator))
+	if creator := branch.Creator; creator != nil {
+		createdBy := string(creator.Email)
+		if creator.Name != "" {
+			createdBy = fmt.Sprintf("%s (%s)", creator.Name, creator.Email)
+		}
+		table.Append("Created By", createdBy)
 	}
 	table.Append("Created", branch.Created.Format("2006-01-02 15:04:05 MST"))
 	if branch.Endpoint != nil && branch.Endpoint.Host != nil && branch.Endpoint.Port != nil {
@@ -168,16 +172,4 @@ func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.B
 	outputBr.ConsoleURL = fmt.Sprintf("%s/projects/%s/services/%s/branches/%s/overview", cfg.ConsoleURL, branch.ProjectID, branch.ServiceID, branch.ID)
 
 	return outputBr
-}
-
-// formatBranchCreator renders a branch's creator as "name (email)", or just the
-// email when the name is unknown, or an empty string when the creator is.
-func formatBranchCreator(creator *api.BranchCreator) string {
-	if creator == nil {
-		return ""
-	}
-	if creator.Name == "" {
-		return string(creator.Email)
-	}
-	return fmt.Sprintf("%s (%s)", creator.Name, creator.Email)
 }
