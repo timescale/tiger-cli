@@ -633,6 +633,50 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	// Track created roles for testing (used by CreateRole_CountRoles and CreateRole_DuplicateError tests)
 	var createdRoles []string
 
+	// requireRoleLogin logs in as roleName with its stored password through
+	// both pgx (db query) and libpq (db psql), which hash the password
+	// independently, so a verifier either of them disagrees with fails here.
+	requireRoleLogin := func(t *testing.T, roleName string) {
+		t.Helper()
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "query", serviceID,
+			"--role", roleName,
+			"-o", "json",
+			"-c", "SELECT current_user",
+		)
+		if err != nil {
+			t.Fatalf("Login as %s through pgx failed: %v\nOutput: %s", roleName, err, output)
+		}
+		var result struct {
+			ResultSets []common.ResultSet `json:"result_sets"`
+		}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse query output as JSON: %v\nOutput: %s", err, output)
+		}
+		want := []common.ResultSet{{
+			CommandTag:   "SELECT 1",
+			Columns:      []common.Column{{Name: "current_user", Type: "name"}},
+			Rows:         [][]*string{{new(roleName)}},
+			RowsAffected: 1,
+		}}
+		if diff := cmp.Diff(want, result.ResultSets); diff != "" {
+			t.Errorf("current_user through pgx mismatch (-want +got):\n%s", diff)
+		}
+
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", serviceID,
+			"--role", roleName,
+			"--", "-Atc", "SELECT current_user",
+		)
+		if err != nil {
+			t.Fatalf("Login as %s through psql failed: %v\nOutput: %s", roleName, err, output)
+		}
+		assertOutput(t, output, roleName+"\n")
+	}
+
 	t.Run("CreateRole_Basic", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available from create test")
@@ -664,6 +708,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("Expected role_name=%s in output, got: %v", roleName, result["role_name"])
 		}
 
+		requireRoleLogin(t, roleName)
+
 		t.Logf("Successfully created basic role: %s", roleName)
 	})
 
@@ -673,7 +719,9 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		roleName := fmt.Sprintf("integration_test_role_pwd_%d", time.Now().Unix())
-		password := fmt.Sprintf("test-password-%d", time.Now().Unix())
+		// Quotes, a backslash, and non-ASCII characters that SASLprep leaves
+		// unchanged, all of which the verifier must hash as typed.
+		password := fmt.Sprintf(`pässwörd-'密码'-"\-🦀-%d`, time.Now().Unix())
 		createdRoles = append(createdRoles, roleName)
 
 		t.Logf("Creating role with explicit password: %s", roleName)
@@ -699,6 +747,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if result["role_name"] != roleName {
 			t.Errorf("Expected role_name=%s in output, got: %v", roleName, result["role_name"])
 		}
+
+		requireRoleLogin(t, roleName)
 
 		t.Logf("Successfully created role with explicit password: %s", roleName)
 	})
@@ -1018,6 +1068,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		} else if fromRoles[0] != "tsdbadmin" {
 			t.Errorf("Expected from_roles to contain 'tsdbadmin', got: %v", fromRoles)
 		}
+
+		requireRoleLogin(t, roleName)
 
 		t.Logf("Successfully created role with all valid options: %s", roleName)
 	})
