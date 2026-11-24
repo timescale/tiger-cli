@@ -29,7 +29,8 @@ The service can be given by ID or name as an argument, or will use the default
 service from your configuration. This command tests if the database is accepting
 connections and returns appropriate exit codes following pg_isready conventions.
 
-You can also pass a read replica set ID to test connectivity to that replica.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to test connectivity to that branch.") + `
+You can also pass a read replica set ID, or a branch by ID or name, to test
+connectivity to that replica or branch.
 
 --timeout limits the whole check. The host can resolve to several addresses,
 and each gets up to ` + common.ConnectTimeout.String() + ` (or PGCONNECT_TIMEOUT, if set) before the check
@@ -69,7 +70,7 @@ Return Codes:
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}

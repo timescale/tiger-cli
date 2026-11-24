@@ -21,8 +21,7 @@ func TestServiceGetTool(t *testing.T) {
 	}
 
 	// A fully populated service, so one success case covers every optional
-	// field: resources, storage, HA replicas, and both endpoints. Its IOPS are a
-	// preview field, dropped without the experimental gate.
+	// field: resources, IOPS, storage, HA replicas, and both endpoints.
 	fullService := sampleService(func(s *api.Service) {
 		s.Created = created
 		s.Metadata = &api.ServiceMetadata{Environment: new("PROD")}
@@ -65,11 +64,12 @@ func TestServiceGetTool(t *testing.T) {
 			"id":                "e6ue9697jf",
 			"name":              "test-service",
 			"status":            "READY",
+			"platform":          "STANDARD",
 			"type":              "TIMESCALEDB",
 			"region":            "us-east-1",
 			"created":           "2025-01-15T09:30:00Z",
 			"environment":       "PROD",
-			"resources":         map[string]any{"cpu": "2 cores", "memory": "8 GB"},
+			"resources":         map[string]any{"cpu": "2 cores", "memory": "8 GB", "iops": float64(6000)},
 			"storage":           "843.5 GB",
 			"replicas":          float64(2),
 			"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
@@ -82,6 +82,7 @@ func TestServiceGetTool(t *testing.T) {
 			"id":                "e6ue9697jf",
 			"name":              "test-service",
 			"status":            "READY",
+			"platform":          "STANDARD",
 			"type":              "TIMESCALEDB",
 			"region":            "us-east-1",
 			"created":           "2025-01-15T09:30:00Z",
@@ -167,6 +168,7 @@ func TestServiceGetTool(t *testing.T) {
 					"id":                "e6ue9697jf",
 					"name":              "test-service",
 					"status":            "READY",
+					"platform":          "STANDARD",
 					"type":              "TIMESCALEDB",
 					"region":            "us-east-1",
 					"created":           "2025-01-15T09:30:00Z",
@@ -177,13 +179,10 @@ func TestServiceGetTool(t *testing.T) {
 			},
 		},
 		{
-			// The platform, IOPS, and branch count are preview fields: the case
-			// above carries a platform and IOPS and drops them, while this one
-			// returns all three.
-			name: "experimental returns the platform, IOPS, and branch count",
+			// A fluid service also returns its branch count.
+			name: "returns a fluid service's platform, IOPS, and branch count",
 			tool: toolServiceGet,
 			args: args,
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(sampleService(func(s *api.Service) {
 					s.Created = created
@@ -219,10 +218,9 @@ func TestServiceGetTool(t *testing.T) {
 		{
 			// Only fluid services can be branched, so a standard one isn't
 			// counted. The mock fails the test on any branch listing.
-			name: "experimental standard service lists no branches",
+			name: "standard service lists no branches",
 			tool: toolServiceGet,
 			args: args,
-			opts: []runOption{withExperimental()},
 			mock: setupGet(noPasswordService),
 			wantOutput: map[string]any{
 				"service": map[string]any{
@@ -246,7 +244,6 @@ func TestServiceGetTool(t *testing.T) {
 			name: "branch count fails",
 			tool: toolServiceGet,
 			args: args,
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(fluidService)(m)
 				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).

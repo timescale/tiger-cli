@@ -3,58 +3,11 @@ package cmd
 import (
 	"net/http"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
-
-// TestBranchExperimentalGate covers the registration gate for the branch
-// commands: `tiger branch` and `tiger service branch` exist only behind the
-// experimental env var.
-func TestBranchExperimentalGate(t *testing.T) {
-	runCmdTests(t, []cmdTest{
-		{
-			name:    "branch unregistered by default",
-			args:    []string{"branch", "list"},
-			wantErr: `unknown command "branch" for "tiger"`,
-			wantStderr: "Error: unknown command \"branch\" for \"tiger\"\n" +
-				"Run 'tiger --help' for usage.\n",
-		},
-		{
-			// Cobra treats an unknown name under a group as a stray argument
-			// and prints the group's help (see TestServiceExperimentalGate).
-			name:       "service branch unregistered by default",
-			args:       []string{"service", "branch"},
-			wantStdout: matchHelp("Available Commands:", "branch"),
-		},
-		{
-			name:       "branch registered when experimental",
-			args:       []string{"branch", "--help"},
-			opts:       []runOption{withExperimental()},
-			wantStdout: matchHelp("Manage branches of Fluid Services."),
-		},
-		{
-			name:       "branches alias",
-			args:       []string{"branches", "--help"},
-			opts:       []runOption{withExperimental()},
-			wantStdout: matchHelp("Manage branches of Fluid Services."),
-		},
-		{
-			name:       "service branch registered when experimental",
-			args:       []string{"service", "branch", "--help"},
-			opts:       []runOption{withExperimental()},
-			wantStdout: matchHelp("tiger service branch svc-12345 --name ci-4821"),
-		},
-	})
-}
-
-// withExperimental turns on the experimental gate, which every branch command
-// sits behind.
-func withExperimental() runOption {
-	return withEnv("TIGER_EXPERIMENTAL", "true")
-}
 
 // sampleBranch returns a branch of sampleService with reasonable defaults.
 // Use overrides to customize specific fields.

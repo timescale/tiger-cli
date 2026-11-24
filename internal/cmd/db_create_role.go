@@ -35,8 +35,9 @@ func buildDbCreateRoleCmd(app *common.App) *cobra.Command {
 		Long: `Create a new database role with optional read-only enforcement.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. A read replica ID is rejected, since replicas
-are read-only; create the role on the primary instead.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to create the role on that branch.") + `
+service from your configuration. You can also pass a branch, by ID or name, to
+create the role on that branch. A read replica ID is rejected, since replicas
+are read-only; create the role on the primary instead.
 
 By default, a secure random password is auto-generated for the new role. You can:
 - Provide an explicit password with --password=<value>
@@ -117,7 +118,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			if cfg.ReadOnly.BlocksAll() {
 				return common.ErrReadOnly
 			}
-			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}

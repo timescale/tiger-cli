@@ -161,20 +161,15 @@ func (t *ConnectionTarget) Details(cfg *config.Config, opts ConnectionDetailsOpt
 
 // ResolveConnectionTarget resolves ref, an ID or a name, to the service,
 // branch, or read replica set it names and works out whose credentials it
-// uses. Branches are a preview, so unless allowBranches is set a ref naming
-// one is reported as not found.
-func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string, allowBranches bool) (*ConnectionTarget, error) {
-	kind := connectionTargetKind(allowBranches)
-	resolved, err := resolve(ctx, client, projectID, ref, nil, kind)
+// uses.
+func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string) (*ConnectionTarget, error) {
+	resolved, err := resolve(ctx, client, projectID, ref, nil, "service, branch, or read replica set")
 	if err != nil {
 		return nil, err
 	}
 
 	switch {
 	case resolved.Branch != nil:
-		if !allowBranches {
-			return nil, ExitWithCode(ExitServiceNotFound, fmt.Errorf("%s '%s' not found", kind, ref))
-		}
 		return NewBranchConnectionTarget(*resolved.Branch), nil
 	case resolved.ReadReplicaSet != nil:
 		replica := *resolved.ReadReplicaSet
@@ -190,24 +185,15 @@ func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponses
 
 // ResolveConnectionTargetByID is ResolveConnectionTarget for a caller that
 // takes only IDs: a ref that matched by name is reported as not found.
-func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string, allowBranches bool) (*ConnectionTarget, error) {
-	target, err := ResolveConnectionTarget(ctx, client, projectID, id, allowBranches)
+func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*ConnectionTarget, error) {
+	target, err := ResolveConnectionTarget(ctx, client, projectID, id)
 	if err != nil {
 		return nil, err
 	}
 	if target.ID != id {
-		return nil, ExitWithCode(ExitServiceNotFound, fmt.Errorf("%s '%s' not found", connectionTargetKind(allowBranches), id))
+		return nil, ExitWithCode(ExitServiceNotFound, fmt.Errorf("service, branch, or read replica set '%s' not found", id))
 	}
 	return target, nil
-}
-
-// connectionTargetKind names what ResolveConnectionTarget looks for, in its
-// errors. Branches are left out unless they are allowed.
-func connectionTargetKind(allowBranches bool) string {
-	if allowBranches {
-		return "service, branch, or read replica set"
-	}
-	return "service or read replica set"
 }
 
 // environmentTag reads an optional environment tag. Anything but PROD reads

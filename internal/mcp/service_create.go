@@ -31,7 +31,7 @@ type ServiceCreateInput struct {
 	WithPassword bool               `json:"with_password,omitempty"`
 }
 
-func (ServiceCreateInput) Schema(experimental bool) *jsonschema.Schema {
+func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceCreateInput](nil))
 
 	schema.Properties["name"].Description = "Human-readable name for the service (auto-generated if not provided)"
@@ -44,7 +44,7 @@ func (ServiceCreateInput) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
-	setCPUMemorySchemaProperties(schema, true, experimental,
+	setCPUMemorySchemaProperties(schema, true,
 		"CPU and memory allocation combination.",
 		"The valid combinations depend on the platform parameter.")
 
@@ -58,17 +58,11 @@ func (ServiceCreateInput) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
 
-	// The platform is a preview parameter, so without the experimental gate
-	// it is removed, and the schema rejects it as an unknown property.
-	if experimental {
-		schema.Properties["platform"].Description = "Storage platform to create the service on. It determines the valid cpu_memory combinations."
-		schema.Properties["platform"].Enum = util.AnySlice(common.ValidPlatforms())
-		schema.Properties["platform"].Default = util.Must(json.Marshal(common.PlatformStandard))
-	} else {
-		delete(schema.Properties, "platform")
-	}
+	schema.Properties["platform"].Description = "Storage platform to create the service on. It determines the valid cpu_memory combinations."
+	schema.Properties["platform"].Enum = util.AnySlice(common.ValidPlatforms())
+	schema.Properties["platform"].Default = util.Must(json.Marshal(common.PlatformStandard))
 
-	setIOPSSchemaProperties(schema, experimental,
+	setIOPSSchemaProperties(schema,
 		"If not specified, the service gets the baseline IOPS for the user's plan and its CPU allocation.")
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
@@ -91,19 +85,13 @@ type ServiceCreateOutput struct {
 	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
-func (ServiceCreateOutput) Schema(experimental bool) *jsonschema.Schema {
+func (ServiceCreateOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceCreateOutput](nil))
-	schema.Properties["service"] = ServiceDetail{}.Schema(experimental)
+	schema.Properties["service"] = ServiceDetail{}.Schema()
 	return schema
 }
 
-func newServiceCreateTool(experimental bool) *mcp.Tool {
-	// The fluid platform is a preview, described only behind the gate.
-	var fluidDefault string
-	if experimental {
-		fluidDefault = "\n\nServices on the fluid platform (platform 'fluid') are created with 0.25 CPU / 2 GB memory by default."
-	}
-
+func newServiceCreateTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceCreate,
 		Title: "Create Database Service",
@@ -111,11 +99,13 @@ func newServiceCreateTool(experimental bool) *mcp.Tool {
 
 The default type of service created depends on the user's plan:
 - Free plan: Creates a service with shared CPU/memory and the 'time-series' add-on
-- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on` + fluidDefault + `
+- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
+
+Services on the fluid platform (platform 'fluid') are created with 0.25 CPU / 2 GB memory by default.
 
 WARNING: Creates billable resources.`,
-		InputSchema:  ServiceCreateInput{}.Schema(experimental),
-		OutputSchema: ServiceCreateOutput{}.Schema(experimental),
+		InputSchema:  ServiceCreateInput{}.Schema(),
+		OutputSchema: ServiceCreateOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing
@@ -145,13 +135,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		input.Name = common.GenerateServiceName()
 	}
 
-	// The platform parameter only exists behind the experimental gate. Without
-	// it the platform is left empty, which the API defaults to STANDARD; with
-	// it, the SDK applies the schema's default.
-	var platform api.ServicePlatform
-	if s.app.Experimental {
-		platform = api.ServicePlatform(strings.ToUpper(input.Platform))
-	}
+	// The SDK applies the schema's default platform.
+	platform := api.ServicePlatform(strings.ToUpper(input.Platform))
 
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
@@ -184,10 +169,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		CPUMillis:      cpuMillis,
 		MemoryGbs:      memoryGBs,
 		EnvironmentTag: &input.Environment,
-	}
-	if s.app.Experimental {
-		serviceCreateReq.Platform = &platform
-		serviceCreateReq.Iops = input.IOPS
+		Platform:       &platform,
+		Iops:           input.IOPS,
 	}
 
 	// Make API call to create service

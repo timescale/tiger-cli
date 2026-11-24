@@ -11,7 +11,6 @@ import (
 )
 
 func TestBranchGetTool(t *testing.T) {
-	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x"}
 
 	// getBranch registers resolving branch and then fetching its parent, for
@@ -29,30 +28,22 @@ func TestBranchGetTool(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:        "not registered without the experimental gate",
-			tool:        toolBranchGet,
-			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "branch_get"`,
-		},
-		{
 			name:    "rejects a malformed branch ID",
 			tool:    toolBranchGet,
 			args:    map[string]any{"branch_id": "nope"},
-			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: validating /properties/branch_id: pattern: "nope" does not match regular expression "^[a-z0-9]{10}$"`,
 		},
 		{
 			name:    "not logged in",
 			tool:    toolBranchGet,
 			args:    args,
-			opts:    []runOption{experimental, withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 		},
 		{
 			name: "network error",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: "br4nch1d9x", Type: branchType}).
 					Return(nil, errors.New("connection refused"))
@@ -63,7 +54,6 @@ func TestBranchGetTool(t *testing.T) {
 			name: "branch not found",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveStatus(m, "br4nch1d9x", branchType, http.StatusNotFound, &api.ClientError{Message: new("resource not found")})
 			},
@@ -73,7 +63,6 @@ func TestBranchGetTool(t *testing.T) {
 			name: "nil response body",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveStatus(m, "br4nch1d9x", branchType, http.StatusOK, nil)
 			},
@@ -86,7 +75,6 @@ func TestBranchGetTool(t *testing.T) {
 			name: "refuses a match by name",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolve(m, "br4nch1d9x", branchType, sampleBranch(func(b *api.Branch) {
 					b.ID = "0th3rbr4nc"
@@ -100,7 +88,6 @@ func TestBranchGetTool(t *testing.T) {
 			name: "with password unavailable",
 			tool: toolBranchGet,
 			args: map[string]any{"branch_id": "br4nch1d9x", "with_password": true},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 			},
@@ -110,7 +97,6 @@ func TestBranchGetTool(t *testing.T) {
 			name:       "success",
 			tool:       toolBranchGet,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       getBranch(sampleBranch()),
 			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetail(api.DeployStatusREADY))},
 		},
@@ -119,7 +105,6 @@ func TestBranchGetTool(t *testing.T) {
 			name: "returns the IOPS in resources",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental},
 			mock: getBranch(sampleBranch(func(b *api.Branch) { b.Iops = new(16000) })),
 			wantOutput: map[string]any{"branch": func() map[string]any {
 				detail := withServiceName(sampleBranchDetail(api.DeployStatusREADY))
@@ -132,7 +117,6 @@ func TestBranchGetTool(t *testing.T) {
 			name: "returns the storage",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental},
 			mock: getBranch(sampleBranch(func(b *api.Branch) {
 				b.Metrics = &api.BranchMetrics{
 					CPUMillicores: new(120),
@@ -152,7 +136,6 @@ func TestBranchGetTool(t *testing.T) {
 			name: "metrics without storage",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental},
 			mock: getBranch(sampleBranch(func(b *api.Branch) {
 				b.Metrics = &api.BranchMetrics{CPUMillicores: new(120), MemoryMb: new(512)}
 			})),
@@ -164,7 +147,6 @@ func TestBranchGetTool(t *testing.T) {
 			name: "endpoint without a port",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental},
 			mock: getBranch(sampleBranch(func(b *api.Branch) { b.Endpoint.Port = nil })),
 			wantOutput: map[string]any{"branch": map[string]any{
 				"id":           "br4nch1d9x",
@@ -183,7 +165,6 @@ func TestBranchGetTool(t *testing.T) {
 			name: "branch without an endpoint",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental},
 			mock: getBranch(sampleBranch(branchStatus(api.DeployStatusQUEUED), func(b *api.Branch) { b.Endpoint = nil })),
 			wantOutput: map[string]any{"branch": map[string]any{
 				"id":           "br4nch1d9x",
@@ -202,7 +183,6 @@ func TestBranchGetTool(t *testing.T) {
 			name:       "without a creator",
 			tool:       toolBranchGet,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       getBranch(sampleBranch(noCreator)),
 			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetailNoCreator(api.DeployStatusREADY))},
 		},
@@ -210,7 +190,6 @@ func TestBranchGetTool(t *testing.T) {
 			name:       "creator without a name",
 			tool:       toolBranchGet,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       getBranch(sampleBranch(namelessCreator)),
 			wantOutput: map[string]any{"branch": withServiceName(sampleBranchDetailNamelessCreator(api.DeployStatusREADY))},
 		},
@@ -220,7 +199,6 @@ func TestBranchGetTool(t *testing.T) {
 			tool: toolBranchGet,
 			args: map[string]any{"branch_id": "br4nch1d9x", "with_password": true},
 			opts: []runOption{
-				experimental,
 				withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"),
 				withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw"),
 			},
@@ -238,7 +216,7 @@ func TestBranchGetTool(t *testing.T) {
 			name: "read-only all makes the connection string read-only",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "all"})},
+			opts: []runOption{withConfig(map[string]any{"read_only": "all"})},
 			mock: getBranch(sampleBranch()),
 			wantOutput: map[string]any{"branch": func() map[string]any {
 				detail := withServiceName(sampleBranchDetail(api.DeployStatusREADY))
@@ -252,7 +230,6 @@ func TestBranchGetTool(t *testing.T) {
 			name: "parent fetch fails",
 			tool: toolBranchGet,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").

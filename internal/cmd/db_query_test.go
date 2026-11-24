@@ -194,7 +194,7 @@ func TestDbQueryCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service, branch, or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service not found",
@@ -202,7 +202,7 @@ func TestDbQueryCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service or read replica set 'svc-12345' not found",
+			wantErr: "service, branch, or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
@@ -211,7 +211,7 @@ func TestDbQueryCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetStatus(m, "my-api-db", http.StatusBadRequest, &api.ClientError{Message: new("ambiguous service name matches multiple services")})
 			},
-			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' or 'tiger branch list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
@@ -228,7 +228,7 @@ func TestDbQueryCmd(t *testing.T) {
 			// A branch is started through `tiger branch`, not `tiger service`.
 			name: "branch paused",
 			args: []string{"db", "query", "br-12345", "-c", "SELECT 1"},
-			opts: []runOption{withExperimental(), withExecuteQuery(common.ExecuteQueryArgs{
+			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT 1",
 				Role:  "tsdbadmin",
 			}, nil, common.ErrPaused)},
@@ -238,7 +238,7 @@ func TestDbQueryCmd(t *testing.T) {
 		{
 			name: "branch not ready",
 			args: []string{"db", "query", "br-12345", "-c", "SELECT 1"},
-			opts: []runOption{withExperimental(), withExecuteQuery(common.ExecuteQueryArgs{
+			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT 1",
 				Role:  "tsdbadmin",
 			}, nil, common.ErrNotReady)},
@@ -528,15 +528,6 @@ result_sets:
 					Role:  "tsdbadmin",
 				}, &common.QueryResult{}, nil),
 			},
-		},
-		{
-			// Branches are a preview, so the help mentions them only behind
-			// the gate. The generated docs/cli reference covers the ungated
-			// help.
-			name:       "help mentions branches when experimental",
-			args:       []string{"db", "query", "--help"},
-			opts:       []runOption{withExperimental()},
-			wantStdout: matchHelp("You can also pass a branch, by ID or name, to query that branch."),
 		},
 	})
 }

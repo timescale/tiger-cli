@@ -109,20 +109,15 @@ func formatLogLines(entries []api.ServiceLogEntry) []string {
 }
 
 // setCPUMemorySchemaProperties sets a tool's cpu_memory property. shared
-// includes shared/shared, which a service can't be resized onto. Without the
-// experimental gate, only the standard platform's combinations are offered.
-// Behind it, the enum spans both platforms, so description is followed by
-// platformDescription, which says how the platform is decided, and then by
-// which combinations go with which: an enum can't express that, and every
-// tool's description must stand alone, since clients that search tools may
-// load one without the others.
-func setCPUMemorySchemaProperties(schema *jsonschema.Schema, shared, experimental bool, description, platformDescription string) {
+// includes shared/shared, which a service can't be resized onto. The enum
+// spans both platforms, so description is followed by platformDescription,
+// which says how the platform is decided, and then by which combinations go
+// with which: an enum can't express that, and every tool's description must
+// stand alone, since clients that search tools may load one without the
+// others.
+func setCPUMemorySchemaProperties(schema *jsonschema.Schema, shared bool, description, platformDescription string) {
 	property := schema.Properties["cpu_memory"]
-	property.Enum = util.AnySlice(common.AllowedCPUMemoryConfigs(shared, experimental).Strings())
-	if !experimental {
-		property.Description = description
-		return
-	}
+	property.Enum = util.AnySlice(common.AllowedCPUMemoryConfigs(shared).Strings())
 
 	standard := common.StandardCPUMemoryConfigs()
 	if !shared {
@@ -133,28 +128,17 @@ func setCPUMemorySchemaProperties(schema *jsonschema.Schema, shared, experimenta
 }
 
 // setPlatformSchemaProperties sets the platform property shared by the service
-// output types. The platform is a preview field, so without the experimental
-// gate the property is removed and clients aren't told about it.
-func setPlatformSchemaProperties(schema *jsonschema.Schema, experimental bool) {
-	if !experimental {
-		delete(schema.Properties, "platform")
-		return
-	}
+// output types.
+func setPlatformSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["platform"].Description = "Storage platform the service runs on"
 	schema.Properties["platform"].Enum = []any{api.ServicePlatformSTANDARD, api.ServicePlatformFLUID}
 }
 
-// setIOPSSchemaProperties sets a tool's iops input property. IOPS are a
-// preview parameter, so without the experimental gate the property is removed,
-// and the schema rejects it as an unknown property. defaultDescription, if
-// any, says what happens when iops is omitted. The allowed values aren't
-// listed: they depend on too much to describe, and would go stale. The API
-// validates the value.
-func setIOPSSchemaProperties(schema *jsonschema.Schema, experimental bool, defaultDescription string) {
-	if !experimental {
-		delete(schema.Properties, "iops")
-		return
-	}
+// setIOPSSchemaProperties sets a tool's iops input property.
+// defaultDescription, if any, says what happens when iops is omitted. The
+// allowed values aren't listed: they depend on too much to describe, and would
+// go stale. The API validates the value.
+func setIOPSSchemaProperties(schema *jsonschema.Schema, defaultDescription string) {
 	property := schema.Properties["iops"]
 	property.Description = strings.TrimSpace("Provisioned IOPS for the service's storage. " +
 		"Check the Tiger Data documentation for the allowed values, which depend on the user's plan, the service's platform, and its CPU/memory allocation. " +
@@ -171,27 +155,21 @@ type ResourceInfo struct {
 }
 
 // setResourceInfoSchemaProperties enhances the schema of a ResourceInfo
-// property nested inside a service output schema. IOPS are a preview field, so
-// without the experimental gate the property is removed.
-func setResourceInfoSchemaProperties(schema *jsonschema.Schema, experimental bool) {
+// property nested inside a service or branch output schema.
+func setResourceInfoSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["cpu"].Description = "CPU allocation"
 	schema.Properties["cpu"].Examples = []any{"0.5 cores", "1 core", "4 cores"}
 
 	schema.Properties["memory"].Description = "Memory allocation"
 	schema.Properties["memory"].Examples = []any{"2 GB", "4 GB", "16 GB"}
 
-	if experimental {
-		schema.Properties["iops"].Description = "Provisioned IOPS for the service's storage"
-		schema.Properties["iops"].Examples = []any{3000, 12000}
-	} else {
-		delete(schema.Properties, "iops")
-	}
+	schema.Properties["iops"].Description = "Provisioned IOPS for the service's storage"
+	schema.Properties["iops"].Examples = []any{3000, 12000}
 }
 
 // convertToResourceInfo converts a service's resource allocation to its MCP
-// output form, or nil if the API didn't return one. The IOPS are a preview
-// field, returned only if experimental is set.
-func convertToResourceInfo(service api.Service, experimental bool) *ResourceInfo {
+// output form, or nil if the API didn't return one.
+func convertToResourceInfo(service api.Service) *ResourceInfo {
 	if len(service.Resources) == 0 || service.Resources[0].Spec == nil {
 		return nil
 	}
@@ -212,9 +190,7 @@ func convertToResourceInfo(service api.Service, experimental bool) *ResourceInfo
 		info.Memory = "shared"
 	}
 
-	if experimental {
-		info.IOPS = util.Deref(spec.Iops)
-	}
+	info.IOPS = util.Deref(spec.Iops)
 
 	return info
 }
@@ -254,27 +230,27 @@ type ServiceDetail struct {
 	ConnectionString string        `json:"connection_string"`
 }
 
-func (ServiceDetail) Schema(experimental bool) *jsonschema.Schema {
+func (ServiceDetail) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceDetail](nil))
-	setServiceDetailSchemaProperties(schema, experimental)
+	setServiceDetailSchemaProperties(schema)
 	return schema
 }
 
 // setServiceDetailSchemaProperties describes ServiceDetail's properties in
 // schema, which is ServiceDetail's or that of a type embedding it.
-func setServiceDetailSchemaProperties(schema *jsonschema.Schema, experimental bool) {
+func setServiceDetailSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["id"].Description = "Service identifier (10-character alphanumeric string)"
 
 	schema.Properties["status"].Description = "Service status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
 
-	setPlatformSchemaProperties(schema, experimental)
+	setPlatformSchemaProperties(schema)
 
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
 
 	schema.Properties["environment"].Description = "Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."
 
-	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
 
 	setServiceStorageSchemaProperties(schema)
 
@@ -291,6 +267,7 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 		ServiceID: service.ServiceID,
 		Name:      service.Name,
 		Status:    string(service.Status),
+		Platform:  string(util.Deref(service.Platform)),
 		Type:      string(service.ServiceType),
 		Region:    service.RegionCode,
 		Created:   service.Created.Format("2006-01-02T15:04:05Z"),
@@ -298,12 +275,7 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 		Environment: string(common.ServiceEnvironmentTag(service)),
 	}
 
-	// The platform is a preview field, returned only behind the gate.
-	if s.app.Experimental {
-		detail.Platform = string(util.Deref(service.Platform))
-	}
-
-	detail.Resources = convertToResourceInfo(service, s.app.Experimental)
+	detail.Resources = convertToResourceInfo(service)
 	detail.Storage = convertToServiceStorage(service)
 
 	// Add replica information
@@ -348,16 +320,6 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	}
 
 	return detail
-}
-
-// branchIDHelp is the sentence a db tool's service_id description gains for
-// branches, saying what passing a branch ID does. Branches are a preview, so
-// it is empty without the experimental gate.
-func branchIDHelp(experimental bool, does string) string {
-	if !experimental {
-		return ""
-	}
-	return " A branch ID is also accepted — passing one " + does + " instead. Use branch_list to find branch IDs."
 }
 
 // setBranchIDSchemaProperties sets common branch_id schema properties. Like
@@ -433,9 +395,7 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 
 	setCreatorInfoSchemaProperties(schema.Properties["creator"])
 
-	// The branch tools only exist behind the experimental gate, so the IOPS
-	// are always included.
-	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
 
 	schema.Properties["storage"].Description = "Amount of storage the branch has changed since it was created. The branch is billed only for this storage, not for the storage it still shares with its parent service."
 	schema.Properties["storage"].Examples = []any{"512 MB", "1.2 GB"}

@@ -18,27 +18,11 @@ func buildServiceResizeCmd(app *common.App) *cobra.Command {
 	var memory string
 	var iops int
 
-	// IOPS are a preview, so their help text is shown only behind the
-	// experimental gate.
-	var iopsDescHelp, iopsSectionHelp, iopsExampleHelp string
-	if app.Experimental {
-		iopsDescHelp = ", memory, and provisioned IOPS\n"
-		iopsSectionHelp = `
-
-The allowed --iops values depend on your plan, the service's platform, and its
-CPU/memory allocation. See the Tiger Data documentation for details. If only
---iops is given, the service keeps its current CPU and memory. If --cpu or
---memory is given without --iops on the fluid platform, the IOPS is set to
-the baseline for the new size.`
-		iopsExampleHelp = "\n\n  # Change only the provisioned IOPS\n  tiger service resize --iops 16000"
-	} else {
-		iopsDescHelp = " and memory "
-	}
-
 	cmd := &cobra.Command{
 		Use:   "resize [name-or-id]",
 		Short: "Resize a database service",
-		Long: `Resize a database service by changing its CPU` + iopsDescHelp + `allocation.
+		Long: `Resize a database service by changing its CPU, memory, and provisioned IOPS
+allocation.
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. This command changes the compute and memory
@@ -49,10 +33,16 @@ the resize to complete, which may take several minutes. The service may be
 temporarily unavailable during the resize operation. Note that changing
 resources will affect your billing - increasing resources will increase costs.
 
-` + cpuMemoryHelp(false, app.Experimental) + `
+` + cpuMemoryHelp(false) + `
 
 Note: You can specify both CPU and memory together, or specify only one (the
-other will be automatically configured).` + iopsSectionHelp,
+other will be automatically configured).
+
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If only
+--iops is given, the service keeps its current CPU and memory. If --cpu or
+--memory is given without --iops on the fluid platform, the IOPS is set to
+the baseline for the new size.`,
 		Example: `  # Resize default service to 2 CPU cores and 8GB memory
   tiger service resize --cpu 2 --memory 8
 
@@ -63,7 +53,10 @@ other will be automatically configured).` + iopsSectionHelp,
   tiger service resize --cpu 2
 
   # Resize service using only memory (CPU will be auto-configured to 4 cores)
-  tiger service resize --memory 16` + iopsExampleHelp,
+  tiger service resize --memory 16
+
+  # Change only the provisioned IOPS
+  tiger service resize --iops 16000`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
@@ -79,14 +72,9 @@ other will be automatically configured).` + iopsSectionHelp,
 				return err
 			}
 
-			// --iops only exists behind the experimental gate
-			iopsSet := app.Experimental && cmd.Flags().Changed("iops")
-
+			iopsSet := cmd.Flags().Changed("iops")
 			if cpu == "" && memory == "" && !iopsSet {
-				if app.Experimental {
-					return errors.New("must specify at least one of --cpu, --memory, or --iops")
-				}
-				return errors.New("must specify at least one of --cpu or --memory")
+				return errors.New("must specify at least one of --cpu, --memory, or --iops")
 			}
 
 			resolved, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
@@ -94,9 +82,7 @@ other will be automatically configured).` + iopsSectionHelp,
 				return err
 			}
 
-			// Validate against the combinations of the service's platform. Not
-			// gated on experimental: only a service already created on the
-			// fluid platform gets the fluid combinations.
+			// Validate against the combinations of the service's platform.
 			cpuMemoryCfg, err := common.CPUMemoryConfigsFor(util.Deref(resolved.Platform)).WithoutShared().ValidateAndNormalize(cpu, memory)
 			if err != nil {
 				return err
@@ -130,7 +116,7 @@ other will be automatically configured).` + iopsSectionHelp,
 			// Report the size from the response rather than the request, since
 			// the API fills in what the request left out (e.g. the baseline
 			// IOPS for the new CPU/memory).
-			if size, ok := serviceSize(*resp.JSON202, app.Experimental); ok {
+			if size, ok := serviceSize(*resp.JSON202); ok {
 				cmd.PrintErrf("Resizing service %s to %s.\n", serviceLabel(*resolved), size)
 			} else {
 				cmd.PrintErrf("Resizing service %s.\n", serviceLabel(*resolved))
@@ -143,20 +129,18 @@ other will be automatically configured).` + iopsSectionHelp,
 	// Add flags
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in cores")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
-	if app.Experimental {
-		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
-		registerFlagCompletion(cmd, "iops", iopsCompletion)
-	}
+	cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 
-	registerFlagCompletion(cmd, "cpu", cpuCompletion(false, app.Experimental))
-	registerFlagCompletion(cmd, "memory", memoryCompletion(false, app.Experimental))
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(false))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(false))
+	registerFlagCompletion(cmd, "iops", iopsCompletion)
 
 	return cmd
 }
 
 // serviceSize formats the size of a service from its first resource, if it has
-// one. IOPS are a preview, so they're included only if experimental is set.
-func serviceSize(service api.Service, experimental bool) (string, bool) {
+// one.
+func serviceSize(service api.Service) (string, bool) {
 	if len(service.Resources) == 0 || service.Resources[0].Spec == nil {
 		return "", false
 	}
@@ -168,12 +152,7 @@ func serviceSize(service api.Service, experimental bool) (string, bool) {
 		cpuMemory.CPUMillis = *spec.CPUMillis
 		cpuMemory.MemoryGBs = *spec.MemoryGbs
 	}
-
-	var iops *int
-	if experimental {
-		iops = spec.Iops
-	}
-	return formatSize(cpuMemory, iops), true
+	return formatSize(cpuMemory, spec.Iops), true
 }
 
 // formatSize formats a CPU/memory allocation and, if non-nil, its provisioned

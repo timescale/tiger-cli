@@ -293,14 +293,13 @@ func outputCompletion(extra ...string) cobra.CompletionFunc {
 // cpuCompletion and memoryCompletion complete the --cpu and --memory flags,
 // drawn from the same allowed configurations used to validate the pair
 // (common.AllowedCPUMemoryConfigs). shared includes shared/shared, which a
-// service can't be resized onto, and experimental includes the fluid platform's
-// configurations, which are a preview.
-func cpuCompletion(shared, experimental bool) cobra.CompletionFunc {
-	return sizeCompletion(serviceConfigs(shared, experimental), cpuMillis, common.FormatCPUCores)
+// service can't be resized onto.
+func cpuCompletion(shared bool) cobra.CompletionFunc {
+	return sizeCompletion(serviceConfigs(shared), cpuMillis, common.FormatCPUCores)
 }
 
-func memoryCompletion(shared, experimental bool) cobra.CompletionFunc {
-	return sizeCompletion(serviceConfigs(shared, experimental), memoryGBs, strconv.Itoa)
+func memoryCompletion(shared bool) cobra.CompletionFunc {
+	return sizeCompletion(serviceConfigs(shared), memoryGBs, strconv.Itoa)
 }
 
 // branchCPUCompletion and branchMemoryCompletion complete the --cpu and
@@ -316,9 +315,9 @@ func memoryGBs(c common.CPUMemoryConfig) int { return c.MemoryGBs }
 
 // serviceConfigs returns the configurations the service commands' sizes are
 // drawn from (see completionCPUMemoryConfigs).
-func serviceConfigs(shared, experimental bool) func(*cobra.Command) common.CPUMemoryConfigs {
+func serviceConfigs(shared bool) func(*cobra.Command) common.CPUMemoryConfigs {
 	return func(cmd *cobra.Command) common.CPUMemoryConfigs {
-		return completionCPUMemoryConfigs(cmd, shared, experimental)
+		return completionCPUMemoryConfigs(cmd, shared)
 	}
 }
 
@@ -360,11 +359,10 @@ func sizeCompletion(configsFor func(*cobra.Command) common.CPUMemoryConfigs, siz
 }
 
 // completionCPUMemoryConfigs returns the configurations sizeCompletion draws
-// from. On a command with a --platform flag (`service create` behind the
-// experimental gate) that's already been given, they narrow to that platform's;
-// otherwise every allowed platform's are offered, since --platform may still
-// come later on the line.
-func completionCPUMemoryConfigs(cmd *cobra.Command, shared, experimental bool) common.CPUMemoryConfigs {
+// from. On a command with a --platform flag (`service create`) that's already
+// been given, they narrow to that platform's; otherwise every platform's are
+// offered, since --platform may still come later on the line.
+func completionCPUMemoryConfigs(cmd *cobra.Command, shared bool) common.CPUMemoryConfigs {
 	if platform := cmd.Flags().Lookup("platform"); platform != nil && platform.Changed {
 		switch strings.ToLower(platform.Value.String()) {
 		case common.PlatformStandard:
@@ -377,7 +375,7 @@ func completionCPUMemoryConfigs(cmd *cobra.Command, shared, experimental bool) c
 			return common.FluidCPUMemoryConfigs()
 		}
 	}
-	return common.AllowedCPUMemoryConfigs(shared, experimental)
+	return common.AllowedCPUMemoryConfigs(shared)
 }
 
 // The widest --iops range across every plan, platform, and CPU/memory

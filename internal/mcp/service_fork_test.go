@@ -51,6 +51,7 @@ func TestServiceForkTool(t *testing.T) {
 		"id":                "u8me885b93",
 		"name":              "test-service-fork",
 		"status":            "READY",
+		"platform":          "STANDARD",
 		"type":              "TIMESCALEDB",
 		"region":            "us-east-1",
 		"created":           "2025-01-15T10:30:00Z",
@@ -106,24 +107,7 @@ func TestServiceForkTool(t *testing.T) {
 			tool: toolServiceFork,
 			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "cpu_memory": "999 CPU/1 GB"},
 			wantErr: "validating \"arguments\": validating root: validating /properties/cpu_memory: enum: 999 CPU/1 GB does not equal any of: " +
-				"[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]",
-		},
-		{
-			// The fluid platform is a preview, so its combinations are left out
-			// of the enum without the experimental gate.
-			name: "fluid cpu/memory combination rejected without the experimental gate",
-			tool: toolServiceFork,
-			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "cpu_memory": "2 CPU/16 GB"},
-			wantErr: "validating \"arguments\": validating root: validating /properties/cpu_memory: enum: 2 CPU/16 GB does not equal any of: " +
-				"[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]",
-		},
-		{
-			// iops is a preview parameter, so without the gate it isn't in the
-			// schema, which rejects unknown properties.
-			name:    "iops rejected without the experimental gate",
-			tool:    toolServiceFork,
-			args:    map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "iops": 12000},
-			wantErr: `validating "arguments": validating root: unexpected additional properties ["iops"]`,
+				"[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB 0.25 CPU/2 GB 0.5 CPU/4 GB 1 CPU/8 GB 2 CPU/16 GB 4 CPU/32 GB 8 CPU/64 GB 16 CPU/128 GB 32 CPU/256 GB]",
 		},
 		{
 			// The tool isn't registered under read_only=all at startup; this is
@@ -176,7 +160,7 @@ func TestServiceForkTool(t *testing.T) {
 			wantErr: "failed to fetch service details: connection refused",
 		},
 		{
-			// Not gated on experimental: only a fluid source gets these.
+			// Only a fluid source gets these.
 			name: "cpu_memory must match the source's platform",
 			tool: toolServiceFork,
 			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "cpu_memory": "1 CPU/4 GB"},
@@ -226,21 +210,6 @@ func TestServiceForkTool(t *testing.T) {
 			args:       args,
 			mock:       expectFork(baseReq),
 			wantOutput: accepted,
-		},
-		{
-			// The platform is a preview field: the case above carries one from
-			// sampleService and drops it, while this one returns it.
-			name: "experimental returns the platform",
-			tool: toolServiceFork,
-			args: args,
-			opts: []runOption{withExperimental()},
-			mock: expectFork(baseReq, func(s *api.Service) {
-				s.Platform = new(api.ServicePlatformFLUID)
-			}),
-			wantOutput: map[string]any{
-				"service": detail(map[string]any{"platform": "FLUID"}),
-				"message": acceptedMsg,
-			},
 		},
 		{
 			name: "forks from the last snapshot",
@@ -297,10 +266,9 @@ func TestServiceForkTool(t *testing.T) {
 			},
 		},
 		{
-			name: "experimental passes a fluid cpu/memory combination through for a fluid source",
+			name: "passes a fluid cpu/memory combination through for a fluid source",
 			tool: toolServiceFork,
 			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "cpu_memory": "2 CPU/16 GB"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
 					s.Platform = new(api.ServicePlatformFLUID)
@@ -326,10 +294,9 @@ func TestServiceForkTool(t *testing.T) {
 		{
 			// The API validates the IOPS value, so it's sent as given, without
 			// a lookup of the source.
-			name: "experimental passes iops through and returns it",
+			name: "passes iops through and returns it",
 			tool: toolServiceFork,
 			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "iops": 12000},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				req := baseReq
 				req.Iops = new(12000)

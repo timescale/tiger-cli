@@ -25,7 +25,8 @@ service from your configuration. The connection string includes all necessary
 parameters for establishing a database connection to the
 TimescaleDB/PostgreSQL service.
 
-You can also pass a read replica set ID to get a connection string for that replica.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to get a connection string for that branch.") + `
+You can also pass a read replica set ID, or a branch by ID or name, to get a
+connection string for that replica or branch.
 
 By default, passwords are excluded from the connection string for security.
 Use --with-password to include the password directly in the connection string.
@@ -67,7 +68,7 @@ services writable.`,
 				return err
 			}
 
-			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}

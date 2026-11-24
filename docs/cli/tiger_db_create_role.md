@@ -7,7 +7,8 @@ Create a new database role
 Create a new database role with optional read-only enforcement.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. A read replica ID is rejected, since replicas
+service from your configuration. You can also pass a branch, by ID or name, to
+create the role on that branch. A read replica ID is rejected, since replicas
 are read-only; create the role on the primary instead.
 
 By default, a secure random password is auto-generated for the new role. You can:

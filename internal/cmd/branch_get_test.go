@@ -32,7 +32,7 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name:    "not logged in",
 			args:    []string{"branch", "get", "br-12345"},
-			opts:    []runOption{withExperimental(), withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
@@ -40,13 +40,12 @@ func TestBranchGetCmd(t *testing.T) {
 			// No default fallback: service_id only ever holds a service ID.
 			name:    "missing branch id",
 			args:    []string{"branch", "get"},
-			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			opts:    []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			wantErr: "branch name or ID is required",
 		},
 		{
 			name: "network error",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveError(m, "br-12345", branchType, errors.New("connection refused"))
 			},
@@ -55,7 +54,6 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name: "branch not found",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranchStatus(m, "br-12345", http.StatusNotFound, &api.ClientError{Message: new("branch not found")})
 			},
@@ -65,7 +63,6 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name: "ambiguous name refused",
 			args: []string{"branch", "get", "ci-4821"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranchStatus(m, "ci-4821", http.StatusBadRequest, &api.ClientError{Message: new("ref matches multiple branches")})
 			},
@@ -75,7 +72,6 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranchStatus(m, "br-12345", http.StatusForbidden, &api.ClientError{Message: new("forbidden")})
 			},
@@ -85,7 +81,6 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranchStatus(m, "br-12345", http.StatusOK, nil)
 			},
@@ -94,14 +89,12 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name:    "with password unavailable",
 			args:    []string{"branch", "get", "br-12345", "--with-password"},
-			opts:    []runOption{withExperimental()},
 			mock:    getSample,
 			wantErr: "password requested but not available for branch br-12345",
 		},
 		{
 			name:       "table",
 			args:       []string{"branch", "get", "br-12345"},
-			opts:       []runOption{withExperimental()},
 			mock:       getSample,
 			wantStdout: sampleBranchTable,
 		},
@@ -110,7 +103,6 @@ func TestBranchGetCmd(t *testing.T) {
 			// without it the branch is still shown, by parent ID.
 			name: "parent fetch fails",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
@@ -124,7 +116,7 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name: "table with password",
 			args: []string{"branch", "get", "br-12345", "--with-password"},
-			opts: []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
+			opts: []runOption{withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
 			mock: getSample,
 			wantStdout: `┌───────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │     PROPERTY      │                                                         VALUE                                                         │
@@ -149,7 +141,6 @@ func TestBranchGetCmd(t *testing.T) {
 			// or connect to.
 			name: "endpoint without a port",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) { b.Endpoint.Port = nil }))
 				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
@@ -175,7 +166,6 @@ func TestBranchGetCmd(t *testing.T) {
 			// than silently leaving out the connection details.
 			name: "endpoint not available",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch(branchStatus(api.DeployStatusQUEUED), func(b *api.Branch) { b.Endpoint = nil }))
 				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
@@ -199,7 +189,6 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name: "table with metrics",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: getWithMetrics,
 			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │     PROPERTY      │                                                    VALUE                                                    │
@@ -225,7 +214,6 @@ func TestBranchGetCmd(t *testing.T) {
 			// for it until it does.
 			name: "table with metrics but no storage",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch(func(b *api.Branch) {
 					b.Metrics = &api.BranchMetrics{CPUMillicores: new(120), MemoryMb: new(512)}
@@ -239,7 +227,6 @@ func TestBranchGetCmd(t *testing.T) {
 			// e.g. after being deleted.
 			name: "table without a creator",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
 				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
@@ -249,7 +236,6 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name: "table with a creator without a name",
 			args: []string{"branch", "get", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch(namelessCreator))
 				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
@@ -259,7 +245,6 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name:       "json",
 			args:       []string{"branch", "get", "br-12345", "-o", "json"},
-			opts:       []runOption{withExperimental()},
 			mock:       getSample,
 			wantStdout: sampleBranchJSON,
 		},
@@ -267,7 +252,7 @@ func TestBranchGetCmd(t *testing.T) {
 			// The branch has its own password, so its parent's isn't used.
 			name: "json with password",
 			args: []string{"branch", "get", "br-12345", "-o", "json", "--with-password"},
-			opts: []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"), withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw")},
+			opts: []runOption{withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"), withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw")},
 			mock: getSample,
 			wantStdout: `{
   "cpu_millis": 250,
@@ -303,7 +288,7 @@ func TestBranchGetCmd(t *testing.T) {
 			// connection string read-only.
 			name: "read-only all makes the connection string read-only",
 			args: []string{"branch", "get", "br-12345", "-o", "json"},
-			opts: []runOption{withExperimental(), withConfig(map[string]any{"read_only": "all"})},
+			opts: []runOption{withConfig(map[string]any{"read_only": "all"})},
 			mock: getSample,
 			wantStdout: `{
   "cpu_millis": 250,
@@ -336,7 +321,6 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name: "json with metrics",
 			args: []string{"branch", "get", "br-12345", "-o", "json"},
-			opts: []runOption{withExperimental()},
 			mock: getWithMetrics,
 			wantStdout: `{
   "cpu_millis": 250,
@@ -375,7 +359,6 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name: "json without a creator",
 			args: []string{"branch", "get", "br-12345", "-o", "json"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
 				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
@@ -385,14 +368,12 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name:       "yaml",
 			args:       []string{"branch", "get", "br-12345", "-o", "yaml"},
-			opts:       []runOption{withExperimental()},
 			mock:       getSample,
 			wantStdout: sampleBranchYAML,
 		},
 		{
 			name: "yaml without a creator",
 			args: []string{"branch", "get", "br-12345", "-o", "yaml"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch(noCreator))
 				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
@@ -402,21 +383,18 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name:       "env",
 			args:       []string{"branch", "get", "br-12345", "-o", "env"},
-			opts:       []runOption{withExperimental()},
 			mock:       getSample,
 			wantStdout: sampleBranchEnv,
 		},
 		{
 			name:       "describe alias",
 			args:       []string{"branch", "describe", "br-12345", "-o", "env"},
-			opts:       []runOption{withExperimental()},
 			mock:       getSample,
 			wantStdout: sampleBranchEnv,
 		},
 		{
 			name: "by name",
 			args: []string{"branch", "get", "test-branch", "-o", "env"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "test-branch", sampleBranch())
 				expectGetService(m, "svc-12345", sampleService(fluidPlatform))
@@ -426,7 +404,7 @@ func TestBranchGetCmd(t *testing.T) {
 		{
 			name:       "env with password",
 			args:       []string{"branch", "get", "br-12345", "-o", "env", "--with-password"},
-			opts:       []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
+			opts:       []runOption{withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw")},
 			mock:       getSample,
 			wantStdout: sampleBranchEnv + "PGPASSWORD=branch-pw\n",
 		},

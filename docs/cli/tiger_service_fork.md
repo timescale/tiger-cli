@@ -18,6 +18,13 @@ By default:
 
 You can override any of these defaults with the corresponding flags.
 
+The fork is always created on the same platform as the source service, so custom
+--cpu and --memory values must be valid for that platform.
+
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If --iops
+is not given, the fork inherits the source service's IOPS.
+
 The source service can be given by ID or name as an argument, or will use the
 default service from your configuration.
 
@@ -51,6 +58,9 @@ tiger service fork [name-or-id] [flags]
 
   # Fork with custom wait timeout
   tiger service fork svc-12345 --wait-timeout 45m
+
+  # Fork a service with more provisioned IOPS
+  tiger service fork svc-12345 --iops 16000
 ```
 
 ### Options
@@ -59,6 +69,7 @@ tiger service fork [name-or-id] [flags]
       --cpu string              CPU allocation in cores (inherits from source if not specified)
       --environment string      Environment tag (DEV or PROD) (default "DEV")
   -h, --help                    help for fork
+      --iops int                Provisioned IOPS (inherits from source if not specified)
       --last-snapshot           Fork at the last existing snapshot (faster)
       --memory string           Memory allocation in gigabytes (inherits from source if not specified)
       --name string             Name for the forked service (auto-generated if not provided)

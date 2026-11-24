@@ -53,7 +53,7 @@ func TestDbURICmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service, branch, or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service not found",
@@ -61,7 +61,7 @@ func TestDbURICmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service or read replica set 'svc-12345' not found",
+			wantErr: "service, branch, or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
@@ -70,43 +70,18 @@ func TestDbURICmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetStatus(m, "my-api-db", http.StatusBadRequest, &api.ClientError{Message: new("ambiguous service name matches multiple services")})
 			},
-			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' or 'tiger branch list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
-			// Branches are a preview, so the hint names `tiger branch list`
-			// only behind the gate.
-			name: "ambiguous name refused when experimental",
-			args: []string{"db", "uri", "my-api-db"},
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveTargetStatus(m, "my-api-db", http.StatusBadRequest, &api.ClientError{Message: new("ambiguous ref matches multiple resources")})
-			},
-			wantErr: "ambiguous ref matches multiple resources\nRun 'tiger service list' or 'tiger branch list' to find the ID you want",
-			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
-		},
-		{
-			// Branches are a preview, so without the gate a ref naming one is
-			// reported as not found, without mentioning branches.
-			name: "branch not found without experimental",
-			args: []string{"db", "uri", "test-branch"},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveTarget(m, "test-branch", sampleBranch())
-			},
-			wantErr: "service or read replica set 'test-branch' not found",
-			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
-		},
-		{
-			name:       "branch by name when experimental",
+			name:       "branch by name",
 			args:       []string{"db", "uri", "test-branch"},
-			opts:       []runOption{withExperimental()},
 			mock:       func(m *mocks.MockClientWithResponsesInterface) { expectResolveTarget(m, "test-branch", sampleBranch()) },
 			wantStdout: branchURI,
 		},
 		{
 			name:    "branch has no pooler",
 			args:    []string{"db", "uri", "br-12345", "--pooled"},
-			opts:    []runOption{withExperimental()},
 			mock:    func(m *mocks.MockClientWithResponsesInterface) { expectResolveTarget(m, "br-12345", sampleBranch()) },
 			wantErr: "connection pooler not available for this service",
 		},
@@ -268,18 +243,9 @@ func TestDbURICmd(t *testing.T) {
 			// A branch has its own password, saved under its own ID.
 			name:       "branch uses its own credentials",
 			args:       []string{"db", "uri", "br-12345", "--with-password"},
-			opts:       []runOption{withExperimental(), withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"), withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw")},
+			opts:       []runOption{withStoredPassword(common.BranchPasswordTarget(sampleBranch()), "branch-pw"), withStoredPassword(common.ServicePasswordTarget(sampleService()), "parent-pw")},
 			mock:       func(m *mocks.MockClientWithResponsesInterface) { expectResolveTarget(m, "br-12345", sampleBranch()) },
 			wantStdout: "postgresql://tsdbadmin:branch-pw@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require\n",
-		},
-		{
-			// Branches are a preview, so the help mentions them only behind
-			// the gate. The generated docs/cli reference covers the ungated
-			// help.
-			name:       "help mentions branches when experimental",
-			args:       []string{"db", "uri", "--help"},
-			opts:       []runOption{withExperimental()},
-			wantStdout: matchHelp("You can also pass a branch, by ID or name, to get a connection string for that branch."),
 		},
 	})
 }

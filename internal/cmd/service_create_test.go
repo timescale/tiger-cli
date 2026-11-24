@@ -27,42 +27,12 @@ func TestServiceCreateCmd(t *testing.T) {
 		Name:           "test-service",
 		ReplicaCount:   new(0),
 		EnvironmentTag: new(api.EnvironmentTagDEV),
+		Platform:       new(api.ServicePlatformSTANDARD),
 	}
 
 	svc := sampleService()
-	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
 
 	runCmdTests(t, []cmdTest{
-		{
-			// The fluid platform and IOPS are a preview, so their help text is gated.
-			name:       "help omits the fluid platform and IOPS",
-			args:       []string{"service", "create", "--help"},
-			wantStdout: matchHelp("Allowed CPU/Memory Configurations:", "fluid", "IOPS", "--iops"),
-		},
-		{
-			name: "experimental help lists the fluid platform configurations",
-			args: []string{"service", "create", "--help"},
-			opts: []runOption{experimental},
-			wantStdout: matchHelp(`Allowed CPU/Memory Configurations (fluid platform):
-  0.25 CPU / 2GB  |  0.5 CPU / 4GB  |  1 CPU / 8GB     |  2 CPU / 16GB
-  4 CPU / 32GB    |  8 CPU / 64GB   |  16 CPU / 128GB  |  32 CPU / 256GB`),
-		},
-		{
-			name: "experimental help says where to find the allowed IOPS values",
-			args: []string{"service", "create", "--help"},
-			opts: []runOption{experimental},
-			wantStdout: matchHelp(`The allowed --iops values depend on your plan, the service's platform, and its
-CPU/memory allocation. See the Tiger Data documentation for details. If --iops
-is not given, the service gets the baseline IOPS for your plan and its CPU
-allocation.`),
-		},
-		{
-			name: "experimental help describes the fluid platform's defaults",
-			args: []string{"service", "create", "--help"},
-			opts: []runOption{experimental},
-			wantStdout: matchHelp(`Services on the fluid platform (--platform fluid) are created with
-0.25 CPU / 2 GB memory by default.`),
-		},
 		{
 			name:    "invalid addon",
 			args:    []string{"service", "create", "--name", "test-service", "--addons", "invalid-addon"},
@@ -79,21 +49,8 @@ allocation.`),
 			wantErr: "environment must be one of: DEV, PROD (got 'STAGING')",
 		},
 		{
-			// --platform is a preview flag, so without the gate it doesn't exist.
-			name:    "platform flag rejected without experimental",
-			args:    []string{"service", "create", "--name", "test-service", "--platform", "fluid"},
-			wantErr: "unknown flag: --platform",
-		},
-		{
-			// --iops is a preview flag, so without the gate it doesn't exist.
-			name:    "iops flag rejected without experimental",
-			args:    []string{"service", "create", "--name", "test-service", "--iops", "12000"},
-			wantErr: "unknown flag: --iops",
-		},
-		{
 			name:    "invalid platform",
 			args:    []string{"service", "create", "--name", "test-service", "--platform", "hybrid"},
-			opts:    []runOption{experimental},
 			wantErr: "platform must be one of: standard, fluid (got 'hybrid')",
 		},
 		{
@@ -104,7 +61,6 @@ allocation.`),
 		{
 			name:    "fluid platform rejects a standard cpu/memory combination",
 			args:    []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--cpu", "1", "--memory", "4"},
-			opts:    []runOption{experimental},
 			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
@@ -429,7 +385,6 @@ Service is being created. Use 'tiger service list' to check status.
 `,
 		},
 		{
-			// Without the experimental gate, no platform is sent.
 			name: "all creation flags mapped to request",
 			args: []string{
 				"service", "create", "--name", "test-service",
@@ -446,6 +401,7 @@ Service is being created. Use 'tiger service list' to check status.
 					CPUMillis:      new("1000"),
 					MemoryGbs:      new("4"),
 					EnvironmentTag: new(api.EnvironmentTagPROD),
+					Platform:       new(api.ServicePlatformSTANDARD),
 				}).Return(&api.CreateServiceResponse{
 					HTTPResponse: httpResponse(http.StatusAccepted),
 					JSON202:      &svc,
@@ -462,33 +418,9 @@ Service is being created. Use 'tiger service list' to check status.
 `,
 		},
 		{
-			name: "experimental sends the standard platform by default",
-			args: []string{"service", "create", "--name", "test-service", "--no-wait", "--no-set-default", "-o", "env"},
-			opts: []runOption{experimental},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				req := baseReq
-				req.Platform = new(api.ServicePlatformSTANDARD)
-				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
-					Return(&api.CreateServiceResponse{
-						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &svc,
-					}, nil)
-			},
-			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
-PGPORT=5432
-PGDATABASE=tsdb
-PGUSER=tsdbadmin
-`,
-			wantStderr: `Creating service 'test-service'...
-Service ID: svc-12345
-Service is being created. Use 'tiger service list' to check status.
-`,
-		},
-		{
 			// The API validates the IOPS value, so it's sent as given.
-			name: "experimental platform fluid and iops mapped to request and shown in output",
+			name: "platform fluid and iops mapped to request and shown in output",
 			args: []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--iops", "12000", "--no-wait", "--no-set-default"},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				req := baseReq
 				req.Platform = new(api.ServicePlatformFLUID)
@@ -524,9 +456,8 @@ Service is being created. Use 'tiger service list' to check status.
 `,
 		},
 		{
-			name: "experimental fluid platform cpu only auto-configures memory",
+			name: "fluid platform cpu only auto-configures memory",
 			args: []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--cpu", "1", "--no-wait", "--no-set-default", "-o", "env"},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				req := baseReq
 				req.Platform = new(api.ServicePlatformFLUID)
@@ -605,6 +536,7 @@ Service is being created. Use 'tiger service list' to check status.
 					Addons:         &[]api.ServiceCreateAddons{},
 					ReplicaCount:   new(0),
 					EnvironmentTag: new(api.EnvironmentTagDEV),
+					Platform:       new(api.ServicePlatformSTANDARD),
 				}).Return(&api.CreateServiceResponse{
 					HTTPResponse: httpResponse(http.StatusAccepted),
 					JSON202:      &svc,
@@ -683,10 +615,12 @@ const sampleServiceCreateTable = `┌──────────────�
 │ Service ID        │ svc-12345                                                                                   │
 │ Name              │ test-service                                                                                │
 │ Status            │ READY                                                                                       │
+│ Platform          │ STANDARD                                                                                    │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
+│ IOPS              │ 6000                                                                                        │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
@@ -701,10 +635,12 @@ const sampleServiceCreateQueuedTable = `┌────────────�
 │ Service ID        │ svc-12345                                                                                   │
 │ Name              │ test-service                                                                                │
 │ Status            │ QUEUED                                                                                      │
+│ Platform          │ STANDARD                                                                                    │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
+│ IOPS              │ 6000                                                                                        │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
@@ -719,6 +655,7 @@ const sampleServiceCreateJSON = `{
     "port": 5432
   },
   "name": "test-service",
+  "platform": "STANDARD",
   "project_id": "test-project-123",
   "region_code": "us-east-1",
   "resources": [
@@ -726,6 +663,7 @@ const sampleServiceCreateJSON = `{
       "id": "resource-1",
       "spec": {
         "cpu_millis": 1000,
+        "iops": 6000,
         "memory_gbs": 4
       }
     }
@@ -751,6 +689,7 @@ endpoint:
   port: 5432
 host: svc-12345.project.tsdb.cloud.timescale.com
 name: test-service
+platform: STANDARD
 port: 5432
 project_id: test-project-123
 region_code: us-east-1
@@ -758,6 +697,7 @@ resources:
   - id: resource-1
     spec:
       cpu_millis: 1000
+      iops: 6000
       memory_gbs: 4
 role: tsdbadmin
 service_id: svc-12345

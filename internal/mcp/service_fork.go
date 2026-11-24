@@ -30,7 +30,7 @@ type ServiceForkInput struct {
 	WithPassword bool               `json:"with_password,omitempty"`
 }
 
-func (ServiceForkInput) Schema(experimental bool) *jsonschema.Schema {
+func (ServiceForkInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceForkInput](nil))
 
 	setServiceIDSchemaProperties(schema)
@@ -44,7 +44,7 @@ func (ServiceForkInput) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["target_time"].Description = "Target timestamp for point-in-time recovery (RFC3339 format). Only used when fork_strategy is 'PITR'."
 	schema.Properties["target_time"].Examples = []any{"2025-01-15T10:30:00Z", "2024-12-01T00:00:00Z"}
 
-	setCPUMemorySchemaProperties(schema, true, experimental,
+	setCPUMemorySchemaProperties(schema, true,
 		"CPU and memory allocation combination. If not specified, inherits from source service.",
 		"The fork is always on the source service's platform (the platform field from service_get), and the valid combinations depend on it.")
 
@@ -52,7 +52,7 @@ func (ServiceForkInput) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
 
-	setIOPSSchemaProperties(schema, experimental, "If not specified, inherits from the source service.")
+	setIOPSSchemaProperties(schema, "If not specified, inherits from the source service.")
 
 	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -74,19 +74,13 @@ type ServiceForkOutput struct {
 	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
-func (ServiceForkOutput) Schema(experimental bool) *jsonschema.Schema {
+func (ServiceForkOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceForkOutput](nil))
-	schema.Properties["service"] = ServiceDetail{}.Schema(experimental)
+	schema.Properties["service"] = ServiceDetail{}.Schema()
 	return schema
 }
 
-func newServiceForkTool(experimental bool) *mcp.Tool {
-	// The platform and IOPS are a preview, described only behind the gate.
-	var platformHelp string
-	if experimental {
-		platformHelp = "\n\nThe fork is always created on the same platform as the source service, which determines the valid cpu_memory combinations. Provisioned IOPS (iops) are inherited from the source service unless specified."
-	}
-
+func newServiceForkTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceFork,
 		Title: "Fork Database Service",
@@ -100,11 +94,13 @@ You must specify a fork strategy:
 By default:
 - Name will be auto-generated from the source service name
 - CPU and memory will be inherited from the source service
-- The forked service will be set as the default service` + platformHelp + `
+- The forked service will be set as the default service
+
+The fork is always created on the same platform as the source service, which determines the valid cpu_memory combinations. Provisioned IOPS (iops) are inherited from the source service unless specified.
 
 WARNING: Creates billable resources.`,
-		InputSchema:  ServiceForkInput{}.Schema(experimental),
-		OutputSchema: ServiceForkOutput{}.Schema(experimental),
+		InputSchema:  ServiceForkInput{}.Schema(),
+		OutputSchema: ServiceForkOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing
@@ -143,9 +139,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Parse CPU/Memory configuration if provided, against the combinations of
-	// the source's platform, which the fork inherits. Not gated on
-	// experimental: only a source already created on the fluid platform gets
-	// the fluid combinations.
+	// the source's platform, which the fork inherits.
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
 		source, err := common.GetService(ctx, client, projectID, input.ServiceID)
@@ -177,14 +171,12 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		CPUMillis:      cpuMillis,
 		MemoryGbs:      memoryGBs,
 		EnvironmentTag: &input.Environment,
+		Iops:           input.IOPS,
 	}
 
 	// Only set name if provided
 	if input.Name != "" {
 		forkReq.Name = &input.Name
-	}
-	if s.app.Experimental {
-		forkReq.Iops = input.IOPS
 	}
 
 	// Make API call to fork service

@@ -10,7 +10,6 @@ import (
 )
 
 func TestBranchCreateTool(t *testing.T) {
-	experimental := withExperimental()
 	args := map[string]any{"service_id": "e6ue9697jf"}
 	baseReq := api.BranchCreate{}
 
@@ -40,37 +39,29 @@ func TestBranchCreateTool(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:        "not registered without the experimental gate",
-			tool:        toolBranchCreate,
-			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "branch_create"`,
-		},
-		{
 			name:    "rejects a combination a branch can't have",
 			tool:    toolBranchCreate,
 			args:    map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "1 CPU/4 GB"},
-			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: validating /properties/cpu_memory: enum: 1 CPU/4 GB does not equal any of: [0.25 CPU/2 GB 0.5 CPU/4 GB 1 CPU/8 GB 2 CPU/16 GB 4 CPU/32 GB 8 CPU/64 GB 16 CPU/128 GB 32 CPU/256 GB]`,
 		},
 		{
 			name:    "not logged in",
 			tool:    toolBranchCreate,
 			args:    args,
-			opts:    []runOption{experimental, withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "read-only all refuses without an API call",
 			tool:    toolBranchCreate,
 			args:    args,
-			opts:    []runOption{experimental, withConfigAfterStart(map[string]any{"read_only": "all"})},
+			opts:    []runOption{withConfigAfterStart(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
 			name: "network error",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(nil, errors.New("connection refused"))
@@ -81,7 +72,6 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "API error",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(&api.CreateBranchResponse{
@@ -95,7 +85,6 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "nil response body",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(&api.CreateBranchResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
@@ -107,7 +96,6 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "saves the password and leaves the default alone",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental},
 			mock: expectCreate(baseReq, created),
 			wantOutput: map[string]any{
 				"branch":           sampleBranchDetail(api.DeployStatusQUEUED),
@@ -122,7 +110,7 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "read-only prod allows branching",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
+			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock: expectCreate(baseReq, created),
 			wantOutput: map[string]any{
 				"branch":           sampleBranchDetail(api.DeployStatusQUEUED),
@@ -134,7 +122,6 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "custom name and compute",
 			tool: toolBranchCreate,
 			args: map[string]any{"service_id": "e6ue9697jf", "name": "ci-4821", "cpu_memory": "2 CPU/16 GB"},
-			opts: []runOption{experimental},
 			mock: expectCreate(api.BranchCreate{
 				Name:      new("ci-4821"),
 				CPUMillis: new(2000),
@@ -150,7 +137,6 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "iops",
 			tool: toolBranchCreate,
 			args: map[string]any{"service_id": "e6ue9697jf", "iops": 16000},
-			opts: []runOption{experimental},
 			mock: expectCreate(api.BranchCreate{Iops: new(16000)}, created),
 			wantOutput: map[string]any{
 				"branch":           sampleBranchDetail(api.DeployStatusQUEUED),
@@ -164,7 +150,7 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "reports a password storage failure",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental, withKeyringError(errors.New("keyring is locked"))},
+			opts: []runOption{withKeyringError(errors.New("keyring is locked"))},
 			mock: expectCreate(baseReq, created),
 			wantOutput: map[string]any{
 				"branch":  sampleBranchDetail(api.DeployStatusQUEUED),
@@ -180,7 +166,6 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "no initial password",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental},
 			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED))),
 			wantOutput: map[string]any{
 				"branch":  sampleBranchDetail(api.DeployStatusQUEUED),
@@ -192,7 +177,6 @@ func TestBranchCreateTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchCreate,
 			args:     map[string]any{"service_id": "e6ue9697jf", "wait": true},
-			opts:     []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectCreate(baseReq, created)(m)
 				expectGetBranch(m, sampleBranch())
@@ -210,7 +194,7 @@ func TestBranchCreateTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchCreate,
 			args:     map[string]any{"service_id": "e6ue9697jf", "wait": true, "with_password": true},
-			opts:     []runOption{experimental, withConfig(map[string]any{"password_storage": "none"})},
+			opts:     []runOption{withConfig(map[string]any{"password_storage": "none"})},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectCreate(baseReq, created)(m)
 				expectGetBranch(m, sampleBranch())
@@ -236,7 +220,6 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "without a creator",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental},
 			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED), noCreator)),
 			wantOutput: map[string]any{
 				"branch":  sampleBranchDetailNoCreator(api.DeployStatusQUEUED),
@@ -247,7 +230,6 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "creator without a name",
 			tool: toolBranchCreate,
 			args: args,
-			opts: []runOption{experimental},
 			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED), namelessCreator)),
 			wantOutput: map[string]any{
 				"branch":  sampleBranchDetailNamelessCreator(api.DeployStatusQUEUED),
@@ -260,7 +242,7 @@ func TestBranchCreateTool(t *testing.T) {
 			name: "with password and no endpoint",
 			tool: toolBranchCreate,
 			args: map[string]any{"service_id": "e6ue9697jf", "with_password": true},
-			opts: []runOption{experimental, withConfig(map[string]any{"password_storage": "none"})},
+			opts: []runOption{withConfig(map[string]any{"password_storage": "none"})},
 			mock: expectCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED), func(b *api.Branch) {
 				b.InitialPassword = new("branch-pw")
 				b.Endpoint = nil

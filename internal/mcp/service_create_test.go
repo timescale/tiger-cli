@@ -32,6 +32,7 @@ func TestServiceCreateTool(t *testing.T) {
 		Name:           "test-service",
 		ReplicaCount:   new(0),
 		EnvironmentTag: new(api.EnvironmentTagDEV),
+		Platform:       new(api.ServicePlatformSTANDARD),
 	}
 
 	newService := func(overrides ...func(*api.Service)) api.Service {
@@ -58,6 +59,7 @@ func TestServiceCreateTool(t *testing.T) {
 		"id":                "e6ue9697jf",
 		"name":              "test-service",
 		"status":            "READY",
+		"platform":          "STANDARD",
 		"type":              "TIMESCALEDB",
 		"region":            "us-east-1",
 		"created":           "2025-01-15T09:30:00Z",
@@ -107,55 +109,27 @@ func TestServiceCreateTool(t *testing.T) {
 			tool: toolServiceCreate,
 			args: map[string]any{"name": "test-service", "cpu_memory": "3 CPU/8 GB"},
 			wantErr: `validating "arguments": validating root: validating /properties/cpu_memory: enum: 3 CPU/8 GB does not equal any of: ` +
-				`[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]`,
-		},
-		{
-			// platform is a preview parameter, so without the gate it isn't in
-			// the schema, which rejects unknown properties.
-			name:    "platform rejected without the experimental gate",
-			tool:    toolServiceCreate,
-			args:    map[string]any{"name": "test-service", "platform": "fluid"},
-			wantErr: `validating "arguments": validating root: unexpected additional properties ["platform"]`,
+				`[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB 0.25 CPU/2 GB 0.5 CPU/4 GB 1 CPU/8 GB 2 CPU/16 GB 4 CPU/32 GB 8 CPU/64 GB 16 CPU/128 GB 32 CPU/256 GB]`,
 		},
 		{
 			name:    "unknown platform rejected by the schema",
 			tool:    toolServiceCreate,
 			args:    map[string]any{"name": "test-service", "platform": "hybrid"},
-			opts:    []runOption{withExperimental()},
 			wantErr: `validating "arguments": validating root: validating /properties/platform: enum: hybrid does not equal any of: [standard fluid]`,
-		},
-		{
-			// iops is a preview parameter, so without the gate it isn't in the
-			// schema, which rejects unknown properties.
-			name:    "iops rejected without the experimental gate",
-			tool:    toolServiceCreate,
-			args:    map[string]any{"name": "test-service", "iops": 12000},
-			wantErr: `validating "arguments": validating root: unexpected additional properties ["iops"]`,
 		},
 		{
 			// Beyond the sign, the API validates the value.
 			name:    "negative iops rejected by the schema",
 			tool:    toolServiceCreate,
 			args:    map[string]any{"name": "test-service", "iops": -1000},
-			opts:    []runOption{withExperimental()},
 			wantErr: `validating "arguments": validating root: validating /properties/iops: minimum: -1000/1 is less than 0.000000`,
-		},
-		{
-			// The fluid platform is a preview, so its combinations are left out
-			// of the enum without the experimental gate.
-			name: "fluid cpu_memory rejected by the schema without the experimental gate",
-			tool: toolServiceCreate,
-			args: map[string]any{"name": "test-service", "cpu_memory": "1 CPU/8 GB"},
-			wantErr: `validating "arguments": validating root: validating /properties/cpu_memory: enum: 1 CPU/8 GB does not equal any of: ` +
-				`[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]`,
 		},
 		{
 			// The enum takes every platform's combinations, so the handler
 			// checks the one given against the requested platform.
-			name: "experimental cpu_memory must match the platform",
+			name: "cpu_memory must match the platform",
 			tool: toolServiceCreate,
 			args: map[string]any{"name": "test-service", "cpu_memory": "1 CPU/8 GB"},
-			opts: []runOption{withExperimental()},
 			wantErr: "invalid CPU/Memory specification: invalid CPU/Memory combination '1 CPU/8 GB'. Valid options: " +
 				"shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
 		},
@@ -227,7 +201,6 @@ func TestServiceCreateTool(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
-			// Without the experimental gate, no platform is sent.
 			name:       "creates a service with the schema defaults",
 			tool:       toolServiceCreate,
 			args:       args,
@@ -235,25 +208,9 @@ func TestServiceCreateTool(t *testing.T) {
 			wantOutput: accepted,
 		},
 		{
-			name: "experimental sends the standard platform by default",
-			tool: toolServiceCreate,
-			args: args,
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				req := baseReq
-				req.Platform = new(api.ServicePlatformSTANDARD)
-				expectCreate(req)(m)
-			},
-			wantOutput: map[string]any{
-				"service": detail(map[string]any{"platform": "STANDARD"}),
-				"message": acceptedMsg,
-			},
-		},
-		{
-			name: "experimental passes platform fluid through and returns it",
+			name: "passes platform fluid through and returns it",
 			tool: toolServiceCreate,
 			args: map[string]any{"name": "test-service", "platform": "fluid"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				req := baseReq
 				req.Platform = new(api.ServicePlatformFLUID)
@@ -297,6 +254,7 @@ func TestServiceCreateTool(t *testing.T) {
 				CPUMillis:      new("2000"),
 				MemoryGbs:      new("8"),
 				EnvironmentTag: new(api.EnvironmentTagDEV),
+				Platform:       new(api.ServicePlatformSTANDARD),
 			}, func(s *api.Service) {
 				s.RegionCode = "us-west-2"
 				s.HaReplicas = &api.HAReplica{ReplicaCount: new(2)}
@@ -312,10 +270,9 @@ func TestServiceCreateTool(t *testing.T) {
 			},
 		},
 		{
-			name: "experimental passes a fluid cpu_memory through",
+			name: "passes a fluid cpu_memory through",
 			tool: toolServiceCreate,
 			args: map[string]any{"name": "test-service", "platform": "fluid", "cpu_memory": "1 CPU/8 GB"},
-			opts: []runOption{withExperimental()},
 			mock: expectCreate(api.ServiceCreate{
 				Name:           "test-service",
 				ReplicaCount:   new(0),
@@ -337,10 +294,9 @@ func TestServiceCreateTool(t *testing.T) {
 		},
 		{
 			// The API validates the IOPS value, so it's sent as given.
-			name: "experimental passes iops through and returns it",
+			name: "passes iops through and returns it",
 			tool: toolServiceCreate,
 			args: map[string]any{"name": "test-service", "platform": "fluid", "cpu_memory": "1 CPU/8 GB", "iops": 12000},
-			opts: []runOption{withExperimental()},
 			mock: expectCreate(api.ServiceCreate{
 				Name:           "test-service",
 				ReplicaCount:   new(0),

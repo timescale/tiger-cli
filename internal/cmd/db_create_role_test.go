@@ -92,7 +92,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service, branch, or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service not found",
@@ -100,7 +100,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service or read replica set 'svc-12345' not found",
+			wantErr: "service, branch, or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
@@ -109,7 +109,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetStatus(m, "my-api-db", http.StatusBadRequest, &api.ClientError{Message: new("ambiguous service name matches multiple services")})
 			},
-			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' or 'tiger branch list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
@@ -199,15 +199,6 @@ func TestDbCreateRoleCmd(t *testing.T) {
 				}))
 			},
 			wantErr: "failed to build connection string: endpoint not available",
-		},
-		{
-			// Branches are a preview, so the help mentions them only behind
-			// the gate. The generated docs/cli reference covers the ungated
-			// help.
-			name:       "help mentions branches when experimental",
-			args:       []string{"db", "create", "role", "--help"},
-			opts:       []runOption{withExperimental()},
-			wantStdout: matchHelp("You can also pass a branch, by ID or name, to create the role on that branch."),
 		},
 	})
 }

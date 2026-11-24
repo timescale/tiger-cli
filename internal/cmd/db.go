@@ -31,16 +31,6 @@ func buildDbCmd(app *common.App) *cobra.Command {
 	return cmd
 }
 
-// branchRefHelp is the paragraph a db command's help gains for branches, saying
-// what passing one does. Branches are a preview, so it is empty without the
-// experimental gate.
-func branchRefHelp(experimental bool, text string) string {
-	if !experimental {
-		return ""
-	}
-	return "\n\n" + text
-}
-
 // handleDatabaseError adds guidance to the failures whose fix isn't evident from
 // the message: the readiness sentinels, and a Postgres authentication failure,
 // which otherwise arrives as a bare pgx error saying nothing about the password
@@ -70,17 +60,11 @@ func handleDatabaseError(err error, target *common.ConnectionTarget) error {
 }
 
 // resolveConnectionTarget resolves the ref a db command was given to what it
-// connects to: a service, a read replica set, or (behind the experimental
-// gate) a branch, by ID or name.
-func resolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, ref serviceRef, experimental bool) (*common.ConnectionTarget, error) {
-	hint := "Run 'tiger service list' to find the ID you want"
-	if experimental {
-		hint = "Run 'tiger service list' or 'tiger branch list' to find the ID you want"
-	}
-
-	target, err := common.ResolveConnectionTarget(ctx, client, projectID, ref.ref, experimental)
+// connects to: a service, a read replica set, or a branch, by ID or name.
+func resolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, ref serviceRef) (*common.ConnectionTarget, error) {
+	target, err := common.ResolveConnectionTarget(ctx, client, projectID, ref.ref)
 	if err != nil {
-		return nil, withAmbiguousRefHint(err, hint)
+		return nil, withAmbiguousRefHint(err, "Run 'tiger service list' or 'tiger branch list' to find the ID you want")
 	}
 	if err := checkDefaultIsID(target.ID, ref); err != nil {
 		return nil, err

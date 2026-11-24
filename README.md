@@ -110,7 +110,7 @@ Tiger CLI provides the following commands:
   - `use` - Switch the active project (requires an OAuth login; clears the default `service_id`, since it belonged to the previous project) (alias: `switch`)
 - `tiger service` - Service lifecycle management (aliases: `services`, `svc`)
   - `list` - List all services (alias: `ls`)
-  - `create` - Create a new service
+  - `create` - Create a new service, on the standard or fluid platform (`--platform`)
   - `get` - Show detailed service information (aliases: `describe`, `show`)
   - `fork` - Fork an existing service
   - `start` - Start a stopped service (alias: `resume`)
@@ -123,6 +123,18 @@ Tiger CLI provides the following commands:
   - `metrics available` - List the metric names available for a service
   - `metrics details` - Show a metric's description, type, default aggregation and labels
   - `metrics series` - Fetch a metric's time series, with label filters, an aggregation function, group by and bucket size
+  - `branch` - Create a branch of a Fluid Service (the same command as `tiger branch create`)
+- `tiger branch` - Branch management for Fluid Services (alias: `branches`)
+  - `create` - Create a branch of a Fluid Service
+  - `list` - List the branches of a service (alias: `ls`)
+  - `get` - Show detailed branch information (aliases: `describe`, `show`)
+  - `start` - Start a stopped branch (alias: `resume`)
+  - `stop` - Stop a running branch (alias: `pause`)
+  - `rename` - Rename a branch
+  - `resize` - Resize branch CPU and memory allocation or provisioned IOPS
+  - `delete` - Delete a branch (alias: `rm`)
+  - `update-password` - Update branch master password
+  - `logs` - View branch logs (alias: `log`)
 - `tiger db` - Database operations
   - `psql` - Connect to a database with psql (in an interactive terminal, if the service has read replicas, offers to connect to one of them; use `--no-replica-prompt` to skip) (alias: `connect`)
   - `query` - Execute a SQL query against a database and display the results, without needing psql (alias: `sql`)
@@ -159,7 +171,9 @@ tiger db psql my-api-db
 tiger service stop my-api-db
 ```
 
-Names are matched exactly. A name that matches more than one service is refused; run `tiger service list` to find the ID you want. A default service (`tiger config set service_id`, `--service-id`, or `TIGER_SERVICE_ID`) must be an ID, and destructive commands still ask you to type the ID to confirm. The MCP tools take IDs only.
+`tiger db` commands also accept a branch, by ID or name, and `tiger branch` commands take a branch the same way.
+
+Names are matched exactly. A name that matches more than one service is refused; run `tiger service list` (or `tiger branch list`) to find the ID you want. A default service (`tiger config set service_id`, `--service-id`, or `TIGER_SERVICE_ID`) must be an ID, and destructive commands still ask you to type the ID to confirm. The MCP tools take IDs only.
 
 ## MCP Server
 
@@ -232,6 +246,18 @@ The MCP server exposes the following tools to AI assistants:
 - `service_delete` - Permanently delete a database service (asks you to confirm first if the service is tagged PROD)
 - `service_update_password` - Set a new, randomly generated master password for a service (asks you to confirm first if the service is tagged PROD)
 - `service_logs` - View logs for a database service
+
+**Branch Management:**
+- `branch_create` - Create a branch of a Fluid Service, a lightweight copy of its data with its own compute
+- `branch_list` - List the branches of a database service
+- `branch_get` - Get detailed information about a specific branch
+- `branch_start` - Start a stopped branch
+- `branch_stop` - Stop a running branch
+- `branch_rename` - Rename a branch
+- `branch_resize` - Resize a branch by changing its CPU and memory allocation or its provisioned IOPS
+- `branch_delete` - Permanently delete a branch
+- `branch_update_password` - Set a new, randomly generated master password for a branch
+- `branch_logs` - View logs for a branch
 
 **Service Metrics:**
 - `service_metrics_available` - List the metric names available for a service (hardware usage, PostgreSQL settings and activity, PgBouncer pools, TimescaleDB internals)
@@ -321,10 +347,10 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
 - `read_only` - Which services this CLI may change: `all`, `prod`, or `off` (default: `off`, which protects nothing). An interactive `tiger auth login` offers a menu of the three modes, and records your choice either way, so it only asks until you answer once. `true` and `on` are accepted as aliases for `all`, and `false` for `off`, so existing config files and `TIGER_READ_ONLY=true` behave as before.
 
-  Changing a protected service is refused, and so is creating one: `tiger service create`/`fork`/`start`/`stop`/`rename`/`resize`/`update-password`/`delete` and `tiger db create role` return an error. Connection strings for it open the session in Tiger Cloud's immutable read-only mode, so the server rejects writes and DDL — that covers `tiger db psql`, `tiger db query`, `tiger db uri`, the `db_query` MCP tool, and the connection strings embedded in `tiger service` output and the equivalent MCP tools.
+  Changing a protected service is refused, and so is creating one: `tiger service create`/`fork`/`branch`/`start`/`stop`/`rename`/`resize`/`update-password`/`delete`, `tiger branch create`/`start`/`stop`/`rename`/`resize`/`update-password`/`delete`, and `tiger db create role` return an error. Connection strings for it open the session in Tiger Cloud's immutable read-only mode, so the server rejects writes and DDL — that covers `tiger db psql`, `tiger db query`, `tiger db uri`, the `db_query` MCP tool, and the connection strings embedded in `tiger service` output and the equivalent MCP tools.
 
   - `all` protects every service, and the MCP write tools aren't registered at all, so they don't appear in `tools/list` and can't be called.
-  - `prod` protects only services tagged `PROD`, leaving `DEV` services writable. `tiger service create`/`fork` and the `service_create`/`service_fork` MCP tools are gated on the environment they request, so creating a `DEV` service is allowed and a `PROD` one is not — otherwise you could create a service this same mode then refuses to delete. Forking a `PROD` service into a `DEV` fork is allowed, since that reads production without changing it. The MCP write tools stay registered — they still work on `DEV` services — and refuse per call instead. These commands read the tag off the service they resolve, so the tag costs no extra API call, and the operation is refused if that lookup fails. The MCP write tools, which take IDs, fetch the service to read its tag. A read replica is judged on its own tag, so a replica of a `PROD` primary is protected only if that replica set is itself tagged `PROD`.
+  - `prod` protects only services tagged `PROD`, leaving `DEV` services writable. `tiger service create`/`fork` and the `service_create`/`service_fork` MCP tools are gated on the environment they request, so creating a `DEV` service is allowed and a `PROD` one is not — otherwise you could create a service this same mode then refuses to delete. Forking a `PROD` service into a `DEV` fork is allowed, since that reads production without changing it. The MCP write tools stay registered — they still work on `DEV` services — and refuse per call instead. These commands read the tag off the service they resolve, so the tag costs no extra API call, and the operation is refused if that lookup fails. The MCP write tools, which take IDs, fetch the service to read its tag. A read replica is judged on its own tag, so a replica of a `PROD` primary is protected only if that replica set is itself tagged `PROD`. A branch has no tag and is always judged as `DEV`, so branches of a `PROD` service stay writable, and a `PROD` service can still be branched.
 
 - `service_id` - Default service ID. Cleared automatically when the active project changes: by `tiger project`, and by `tiger auth login` unless it lands on the same project as the previous login. A service belongs to the project it was created in
 - `version_check` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available. Set to `false` to disable. Default: `true`.

@@ -25,8 +25,7 @@ func TestServiceListTool(t *testing.T) {
 	// One service per conversion branch: whole cores with an untagged (DEV)
 	// service, fractional cores with a PROD tag, a free tier service whose null
 	// CPU and memory read as "shared", and a service with no resources at all.
-	// The first carries IOPS, a preview field dropped without the experimental
-	// gate, and storage usage.
+	// The first carries IOPS and storage usage.
 	services := []api.Service{
 		sampleService(func(s *api.Service) {
 			s.Created = created
@@ -61,17 +60,19 @@ func TestServiceListTool(t *testing.T) {
 				"id":          "e6ue9697jf",
 				"name":        "test-service",
 				"status":      "READY",
+				"platform":    "STANDARD",
 				"type":        "TIMESCALEDB",
 				"region":      "us-east-1",
 				"created":     "2025-01-15T09:30:00Z",
 				"environment": "DEV",
-				"resources":   map[string]any{"cpu": "4 cores", "memory": "16 GB"},
+				"resources":   map[string]any{"cpu": "4 cores", "memory": "16 GB", "iops": float64(6000)},
 				"storage":     "1.2 GB",
 			},
 			map[string]any{
 				"id":          "u8me885b93",
 				"name":        "prod-service",
 				"status":      "READY",
+				"platform":    "STANDARD",
 				"type":        "TIMESCALEDB",
 				"region":      "us-east-1",
 				"created":     "2025-01-15T09:30:00Z",
@@ -82,6 +83,7 @@ func TestServiceListTool(t *testing.T) {
 				"id":          "fr33tier01",
 				"name":        "free-service",
 				"status":      "READY",
+				"platform":    "STANDARD",
 				"type":        "POSTGRES",
 				"region":      "us-east-1",
 				"created":     "2025-01-15T09:30:00Z",
@@ -92,6 +94,7 @@ func TestServiceListTool(t *testing.T) {
 				"id":          "pausedsvc1",
 				"name":        "paused-service",
 				"status":      "PAUSED",
+				"platform":    "STANDARD",
 				"type":        "TIMESCALEDB",
 				"region":      "us-east-1",
 				"created":     "2025-01-15T09:30:00Z",
@@ -142,11 +145,8 @@ func TestServiceListTool(t *testing.T) {
 			wantOutput: listed,
 		},
 		{
-			// The platform and IOPS are preview fields: the case above carries
-			// them and drops them, while this one returns them.
-			name: "experimental lists the platform and IOPS",
+			name: "lists a fluid service's platform and IOPS",
 			tool: toolServiceList,
-			opts: []runOption{withExperimental()},
 			mock: expectServices([]api.Service{sampleService(func(s *api.Service) {
 				s.Created = created
 				s.Platform = new(api.ServicePlatformFLUID)

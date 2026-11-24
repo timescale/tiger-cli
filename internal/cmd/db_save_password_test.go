@@ -55,7 +55,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service, branch, or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service not found",
@@ -63,7 +63,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service or read replica set 'svc-12345' not found",
+			wantErr: "service, branch, or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
@@ -72,7 +72,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetStatus(m, "my-api-db", http.StatusBadRequest, &api.ClientError{Message: new("ambiguous service name matches multiple services")})
 			},
-			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' or 'tiger branch list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
@@ -219,21 +219,11 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			// A branch has its own password, saved under its own ID.
 			name: "branch saves against itself",
 			args: []string{"db", "save-password", "test-branch", "--password=branch-pw"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTarget(m, "test-branch", sampleBranch())
 			},
 			wantStderr: "Password saved for branch 'test-branch' (br-12345), role tsdbadmin\n",
 			checks:     []checkFunc{checkStoredPassword("br-12345", "branch-pw")},
-		},
-		{
-			// Branches are a preview, so the help mentions them only behind
-			// the gate. The generated docs/cli reference covers the ungated
-			// help.
-			name:       "help mentions branches when experimental",
-			args:       []string{"db", "save-password", "--help"},
-			opts:       []runOption{withExperimental()},
-			wantStdout: matchHelp("You can also pass a branch, by ID or name, to save the password for that branch."),
 		},
 	})
 }

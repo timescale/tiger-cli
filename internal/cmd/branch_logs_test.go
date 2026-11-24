@@ -53,7 +53,7 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name:    "not logged in",
 			args:    []string{"branch", "logs", "br-12345"},
-			opts:    []runOption{withExperimental(), withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
@@ -61,19 +61,17 @@ func TestBranchLogsCmd(t *testing.T) {
 			// No default fallback: service_id only ever holds a service ID.
 			name:    "missing branch id",
 			args:    []string{"branch", "logs"},
-			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			opts:    []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			wantErr: "branch name or ID is required",
 		},
 		{
 			name:    "invalid since flag",
 			args:    []string{"branch", "logs", "br-12345", "--since", "bogus"},
-			opts:    []runOption{withExperimental()},
 			wantErr: "invalid argument \"bogus\" for \"--since\" flag: invalid time format `bogus` must be one of: `2006-01-02T15:04:05Z07:00`",
 		},
 		{
 			name: "branch not found",
 			args: []string{"branch", "logs", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranchStatus(m, "br-12345", http.StatusNotFound, &api.ClientError{Message: new("branch not found")})
 			},
@@ -83,7 +81,6 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name: "ambiguous name refused",
 			args: []string{"branch", "logs", "ci-4821"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranchStatus(m, "ci-4821", http.StatusBadRequest, &api.ClientError{Message: new("ref matches multiple branches")})
 			},
@@ -93,7 +90,6 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name:     "network error",
 			args:     []string{"branch", "logs", "br-12345"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
@@ -105,7 +101,6 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name:     "API error",
 			args:     []string{"branch", "logs", "br-12345"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
@@ -121,7 +116,6 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name:     "nil response body",
 			args:     []string{"branch", "logs", "br-12345"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
@@ -133,14 +127,12 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name:     "empty logs",
 			args:     []string{"branch", "logs", "br-12345"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock:     setupLogs(api.BranchLogs{Entries: []api.ServiceLogEntry{}}),
 		},
 		{
 			name:       "empty logs json output",
 			args:       []string{"branch", "logs", "br-12345", "-o", "json"},
-			opts:       []runOption{withExperimental()},
 			synctest:   true,
 			mock:       setupLogs(api.BranchLogs{}),
 			wantStdout: "[]\n",
@@ -148,7 +140,6 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name:       "empty logs yaml output",
 			args:       []string{"branch", "logs", "br-12345", "-o", "yaml"},
-			opts:       []runOption{withExperimental()},
 			synctest:   true,
 			mock:       setupLogs(api.BranchLogs{}),
 			wantStdout: "[]\n",
@@ -156,7 +147,6 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name:     "text output",
 			args:     []string{"branch", "logs", "br-12345"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock:     setupLogs(api.BranchLogs{Entries: entries}),
 			wantStdout: "LOG: database system is ready to accept connections\n" +
@@ -167,7 +157,6 @@ func TestBranchLogsCmd(t *testing.T) {
 			// TestMain so the expected output stays literal.
 			name:     "text output with timestamps",
 			args:     []string{"branch", "logs", "br-12345"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock:     setupLogs(api.BranchLogs{Entries: timestampedEntries}),
 			wantStdout: "2025-01-15 10:30:00 UTC LOG: checkpoint starting\n" +
@@ -176,7 +165,6 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name:     "json output",
 			args:     []string{"branch", "logs", "br-12345", "-o", "json"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock:     setupLogs(api.BranchLogs{Entries: timestampedEntries}),
 			wantStdout: `[
@@ -196,7 +184,6 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name:     "yaml output",
 			args:     []string{"branch", "logs", "br-12345", "-o", "yaml"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock:     setupLogs(api.BranchLogs{Entries: timestampedEntries}),
 			wantStdout: `- message: 'LOG: checkpoint starting'
@@ -212,7 +199,6 @@ func TestBranchLogsCmd(t *testing.T) {
 			// requested with it. Entries beyond --tail are trimmed.
 			name:     "pagination with tail",
 			args:     []string{"branch", "logs", "br-12345", "--tail", "3"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
@@ -239,7 +225,6 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name: "since and until params",
 			args: []string{"branch", "logs", "br-12345", "--since", "2024-01-15T09:00:00Z", "--until", "2024-01-15T10:00:00Z"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
 				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
@@ -257,7 +242,6 @@ func TestBranchLogsCmd(t *testing.T) {
 			// Without --until, the upper bound is pinned to the current time.
 			name:     "since param alone",
 			args:     []string{"branch", "logs", "br-12345", "--since", "2024-01-15T09:00:00Z"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
@@ -275,7 +259,6 @@ func TestBranchLogsCmd(t *testing.T) {
 			// Without --since, no lower bound is sent.
 			name: "until param alone",
 			args: []string{"branch", "logs", "br-12345", "--until", "2024-01-15T10:00:00Z"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
 				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -290,7 +273,6 @@ func TestBranchLogsCmd(t *testing.T) {
 		{
 			name:     "log alias",
 			args:     []string{"branch", "log", "br-12345"},
-			opts:     []runOption{withExperimental()},
 			synctest: true,
 			mock: setupLogs(api.BranchLogs{Entries: []api.ServiceLogEntry{
 				{Message: "LOG: ready", Severity: "LOG"},

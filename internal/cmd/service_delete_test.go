@@ -138,8 +138,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 		},
 		{
 			// The API deletes a service's branches along with it, so they're
-			// listed before the prompt and after the delete, even without the
-			// experimental gate.
+			// listed before the prompt and after the delete.
 			name: "confirmation lists the branches deleted with the service",
 			args: []string{"service", "delete", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
@@ -231,19 +230,6 @@ func TestServiceDeleteCmd(t *testing.T) {
 			args:       []string{"service", "rm", "svc-12345", "--confirm"},
 			mock:       setupDelete("svc-12345"),
 			wantStderr: "Service 'test-service' (svc-12345) deleted.\n",
-		},
-		{
-			// Branches are a preview, so the help mentions them only behind
-			// the gate.
-			name:       "help mentions branches when experimental",
-			args:       []string{"service", "delete", "--help"},
-			opts:       []runOption{withExperimental()},
-			wantStdout: matchHelp("Deleting a service also deletes all of its branches."),
-		},
-		{
-			name:       "help omits branches by default",
-			args:       []string{"service", "delete", "--help"},
-			wantStdout: matchHelp("Delete a database service permanently.", "branch"),
 		},
 	})
 }

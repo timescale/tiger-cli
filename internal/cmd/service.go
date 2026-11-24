@@ -15,9 +15,6 @@ import (
 )
 
 // buildServiceCmd creates the main service command with all subcommands.
-// experimental still gates `backups` and `branch`, which are backed by gateway
-// endpoints marked `x-tigerdata-preview: true`; when false, they are not added
-// to the tree at all. See CLAUDE.md's "Experimental Feature Gating".
 func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service",
@@ -39,11 +36,11 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd.AddCommand(buildServiceResizeCmd(app))
 	cmd.AddCommand(buildServiceLogsCmd(app))
 	cmd.AddCommand(buildServiceMetricsCmd(app))
+	cmd.AddCommand(buildServiceBranchCmd(app))
 
 	// Experimental commands, unregistered until the previews graduate.
 	if app.Experimental {
 		cmd.AddCommand(buildServiceBackupCmd(app))
-		cmd.AddCommand(buildServiceBranchCmd(app))
 	}
 
 	return cmd
@@ -62,15 +59,11 @@ const (
 
 // cpuMemoryHelp renders the allowed CPU/Memory configurations section of a
 // command's help text. shared includes shared/shared, which a service can't be
-// resized onto. The fluid platform is a preview, so its table is added only
-// behind the experimental gate (it has no shared configuration).
-func cpuMemoryHelp(shared, experimental bool) string {
+// resized onto (the fluid platform has no shared configuration).
+func cpuMemoryHelp(shared bool) string {
 	standard := standardNoSharedCPUMemoryHelp
 	if shared {
 		standard = standardCPUMemoryHelp
-	}
-	if !experimental {
-		return "Allowed CPU/Memory Configurations:\n" + standard
 	}
 	return "Allowed CPU/Memory Configurations (standard platform):\n" + standard +
 		"\n\nAllowed CPU/Memory Configurations (fluid platform):\n" + fluidCPUMemoryHelp
@@ -79,8 +72,8 @@ func cpuMemoryHelp(shared, experimental bool) string {
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service
-	// BranchCount is set only by service get, behind the experimental gate,
-	// for a service that can have branches.
+	// BranchCount is set only by service get, for a service that can have
+	// branches.
 	BranchCount *int `json:"branch_count,omitempty"`
 	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty"`
@@ -90,8 +83,6 @@ type OutputService struct {
 // serviceOutputOptions controls what the service output functions include.
 // The zero value leaves out every optional field.
 type serviceOutputOptions struct {
-	// Experimental includes preview fields (the platform).
-	Experimental bool
 	// WithPassword includes the tsdbadmin password, if one is available.
 	WithPassword bool
 	// RequirePassword fails the output when WithPassword finds no password.
@@ -222,18 +213,12 @@ func outputServiceTable(output io.Writer, service OutputService) error {
 
 // prepareServiceForOutput builds the output view of a service. cmd may be nil,
 // in which case the connection-details warning is dropped rather than printed.
-// The platform and IOPS fields are preview fields, so they are dropped unless
-// opts.Experimental is set.
 func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, opts serviceOutputOptions) OutputService {
 	outputSvc := OutputService{
 		Service:     service,
 		BranchCount: opts.BranchCount,
 	}
 	outputSvc.Service.InitialPassword = nil
-	if !opts.Experimental {
-		outputSvc.Service.Platform = nil
-		outputSvc.Service.Resources = resourcesWithoutIOPS(service.Resources)
-	}
 
 	detailsOpts := common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
@@ -254,24 +239,6 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 	outputSvc.ConsoleURL = fmt.Sprintf("%s/projects/%s/services/%s/overview", cfg.ConsoleURL, service.ProjectID, service.ServiceID)
 
 	return outputSvc
-}
-
-// resourcesWithoutIOPS returns a copy of resources with the IOPS cleared,
-// leaving the caller's service untouched.
-func resourcesWithoutIOPS(resources []api.Resource) []api.Resource {
-	if resources == nil {
-		return nil
-	}
-	stripped := make([]api.Resource, len(resources))
-	for i, resource := range resources {
-		stripped[i] = resource
-		if resource.Spec != nil {
-			spec := *resource.Spec
-			spec.Iops = nil
-			stripped[i].Spec = &spec
-		}
-	}
-	return stripped
 }
 
 // setDefaultService sets the given service as the default service in the configuration

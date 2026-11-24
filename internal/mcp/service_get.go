@@ -32,9 +32,9 @@ type ServiceGetOutput struct {
 	Service ServiceGetDetail `json:"service"`
 }
 
-func (ServiceGetOutput) Schema(experimental bool) *jsonschema.Schema {
+func (ServiceGetOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceGetOutput](nil))
-	schema.Properties["service"] = ServiceGetDetail{}.Schema(experimental)
+	schema.Properties["service"] = ServiceGetDetail{}.Schema()
 	return schema
 }
 
@@ -45,28 +45,23 @@ type ServiceGetDetail struct {
 	BranchCount *int `json:"branch_count,omitempty"`
 }
 
-func (ServiceGetDetail) Schema(experimental bool) *jsonschema.Schema {
+func (ServiceGetDetail) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceGetDetail](nil))
-	setServiceDetailSchemaProperties(schema, experimental)
+	setServiceDetailSchemaProperties(schema)
 
-	// Branches are a preview, so the count is described only behind the gate.
-	if experimental {
-		schema.Properties["branch_count"].Description = "Number of branches of the service (only returned for Fluid Services)"
-	} else {
-		delete(schema.Properties, "branch_count")
-	}
+	schema.Properties["branch_count"].Description = "Number of branches of the service (only returned for Fluid Services)"
 
 	return schema
 }
 
-func newServiceGetTool(experimental bool) *mcp.Tool {
+func newServiceGetTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceGet,
 		Title: "Get Service Details",
 		Description: "Get detailed information for a specific database service. " +
 			"Returns connection endpoints, replica configuration, resource allocation, creation time, and status.",
 		InputSchema:  ServiceGetInput{}.Schema(),
-		OutputSchema: ServiceGetOutput{}.Schema(experimental),
+		OutputSchema: ServiceGetOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
 			OpenWorldHint: new(false),
@@ -105,9 +100,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 		Service: ServiceGetDetail{ServiceDetail: s.convertToServiceDetail(cfg, *resp.JSON200, input.WithPassword)},
 	}
 
-	// Branches are a preview, so they're counted only behind the gate. The
-	// rest of the output doesn't depend on the count.
-	if s.app.Experimental && common.CanHaveBranches(*resp.JSON200) {
+	if common.CanHaveBranches(*resp.JSON200) {
 		if count, err := common.CountBranches(ctx, client, projectID, input.ServiceID); err != nil {
 			s.logger.Error("MCP: Failed to count branches", slog.Any("error", err))
 		} else {

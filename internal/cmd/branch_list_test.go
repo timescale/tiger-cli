@@ -31,20 +31,18 @@ func TestBranchListCmd(t *testing.T) {
 		{
 			name:    "not logged in",
 			args:    []string{"branch", "list", "svc-12345"},
-			opts:    []runOption{withExperimental(), withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "missing service id",
 			args:    []string{"branch", "list"},
-			opts:    []runOption{withExperimental()},
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name: "service not found",
 			args: []string{"branch", "list", "svc-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefNotFound(m, "svc-12345")
 			},
@@ -54,7 +52,6 @@ func TestBranchListCmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"branch", "list", "svc-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "svc-12345", nil).
@@ -65,7 +62,6 @@ func TestBranchListCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"branch", "list", "svc-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "svc-12345", nil).
@@ -80,7 +76,6 @@ func TestBranchListCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"branch", "list", "svc-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "svc-12345", nil).
@@ -91,7 +86,6 @@ func TestBranchListCmd(t *testing.T) {
 		{
 			name: "table",
 			args: []string{"branch", "list", "svc-12345"},
-			opts: []runOption{withExperimental()},
 			mock: expectList(sampleBranch(), paused),
 			wantStdout: `┌───────────┬───────────────────┬────────┬──────────────────────┬──────────────────┐
 │ BRANCH ID │       NAME        │ STATUS │      CREATED BY      │     CREATED      │
@@ -104,7 +98,7 @@ func TestBranchListCmd(t *testing.T) {
 		{
 			name: "default service from config",
 			args: []string{"branch", "list"},
-			opts: []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock: expectList(sampleBranch()),
 			wantStdout: `┌───────────┬─────────────┬────────┬──────────────────────┬──────────────────┐
 │ BRANCH ID │    NAME     │ STATUS │      CREATED BY      │     CREATED      │
@@ -116,7 +110,6 @@ func TestBranchListCmd(t *testing.T) {
 		{
 			name:       "no branches",
 			args:       []string{"branch", "list", "svc-12345"},
-			opts:       []runOption{withExperimental()},
 			mock:       expectList(),
 			wantStderr: "No branches found for service 'test-service' (svc-12345).\n",
 		},
@@ -125,7 +118,6 @@ func TestBranchListCmd(t *testing.T) {
 			// e.g. after being deleted.
 			name: "table without a creator",
 			args: []string{"branch", "list", "svc-12345"},
-			opts: []runOption{withExperimental()},
 			mock: expectList(sampleBranch(noCreator)),
 			wantStdout: `┌───────────┬─────────────┬────────┬────────────┬──────────────────┐
 │ BRANCH ID │    NAME     │ STATUS │ CREATED BY │     CREATED      │
@@ -137,7 +129,6 @@ func TestBranchListCmd(t *testing.T) {
 		{
 			name: "json",
 			args: []string{"branch", "list", "svc-12345", "-o", "json"},
-			opts: []runOption{withExperimental()},
 			mock: expectList(sampleBranch()),
 			wantStdout: `[
   {
@@ -174,7 +165,6 @@ func TestBranchListCmd(t *testing.T) {
 			// still a list rather than a message.
 			name:       "no branches json",
 			args:       []string{"branch", "list", "svc-12345", "-o", "json"},
-			opts:       []runOption{withExperimental()},
 			mock:       expectList(),
 			wantStdout: "[]\n",
 		},
@@ -183,7 +173,6 @@ func TestBranchListCmd(t *testing.T) {
 			// e.g. after being deleted.
 			name: "json without a creator",
 			args: []string{"branch", "list", "svc-12345", "-o", "json"},
-			opts: []runOption{withExperimental()},
 			mock: expectList(sampleBranch(noCreator)),
 			wantStdout: `[
   {
@@ -213,7 +202,6 @@ func TestBranchListCmd(t *testing.T) {
 		{
 			name: "yaml",
 			args: []string{"branch", "list", "svc-12345", "-o", "yaml"},
-			opts: []runOption{withExperimental()},
 			mock: expectList(sampleBranch()),
 			wantStdout: `- connection_string: postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require
   console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview
@@ -242,14 +230,12 @@ func TestBranchListCmd(t *testing.T) {
 		{
 			name:       "no branches yaml",
 			args:       []string{"branch", "list", "svc-12345", "-o", "yaml"},
-			opts:       []runOption{withExperimental()},
 			mock:       expectList(),
 			wantStdout: "[]\n",
 		},
 		{
 			name: "yaml without a creator",
 			args: []string{"branch", "list", "svc-12345", "-o", "yaml"},
-			opts: []runOption{withExperimental()},
 			mock: expectList(sampleBranch(noCreator)),
 			wantStdout: `- connection_string: postgresql://tsdbadmin@br-12345.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require
   console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/branches/br-12345/overview

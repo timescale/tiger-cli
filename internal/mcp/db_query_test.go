@@ -299,7 +299,7 @@ func TestDBQueryTool(t *testing.T) {
 				m.EXPECT().ResolveRefWithResponse(validCtx, testProjectID, &api.ResolveRefParams{Ref: "e6ue9697jf"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to resolve service or read replica set 'e6ue9697jf': connection refused",
+			wantErr: "failed to resolve service, branch, or read replica set 'e6ue9697jf': connection refused",
 		},
 		{
 			name: "service lookup API error",
@@ -308,7 +308,7 @@ func TestDBQueryTool(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveStatus(m, "e6ue9697jf", nil, http.StatusNotFound, &api.ClientError{Message: new("resource not found")})
 			},
-			wantErr: "service or read replica set 'e6ue9697jf' not found",
+			wantErr: "service, branch, or read replica set 'e6ue9697jf' not found",
 		},
 		{
 			name: "nil response body",
@@ -340,25 +340,13 @@ func TestDBQueryTool(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolve(m, "mydatabase", nil, sampleService())
 			},
-			wantErr: "service or read replica set 'mydatabase' not found",
-		},
-		{
-			// Branches are a preview, so without the gate a branch ID is
-			// reported as not found, without mentioning branches.
-			name: "branch not found without the experimental gate",
-			tool: toolDBQuery,
-			args: map[string]any{"service_id": "br4nch1d9x", "query": "SELECT 1"},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolve(m, "br4nch1d9x", nil, sampleBranch())
-			},
-			wantErr: "service or read replica set 'br4nch1d9x' not found",
+			wantErr: "service, branch, or read replica set 'mydatabase' not found",
 		},
 		{
 			// A branch is started with branch_start, not service_start.
 			name: "paused branch points at branch_start",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "br4nch1d9x", "query": "SELECT 1"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolve(m, "br4nch1d9x", nil, sampleBranch(branchStatus(api.DeployStatusPAUSED)))
 			},
@@ -368,7 +356,6 @@ func TestDBQueryTool(t *testing.T) {
 			name: "provisioning branch points at branch_get",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "br4nch1d9x", "query": "SELECT 1"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolve(m, "br4nch1d9x", nil, sampleBranch(branchStatus(api.DeployStatusQUEUED)))
 			},
@@ -636,7 +623,7 @@ func TestDBQueryTool(t *testing.T) {
 			name: "runs the query on a branch",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "br4nch1d9x", "query": "SELECT 1"},
-			opts: []runOption{withExperimental(), withExecuteQuery(common.NewBranchConnectionTarget(branch), baseArgs, result, nil)},
+			opts: []runOption{withExecuteQuery(common.NewBranchConnectionTarget(branch), baseArgs, result, nil)},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolve(m, "br4nch1d9x", nil, branch)
 			},

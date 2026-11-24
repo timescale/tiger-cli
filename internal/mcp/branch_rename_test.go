@@ -10,7 +10,6 @@ import (
 )
 
 func TestBranchRenameTool(t *testing.T) {
-	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x", "name": "feature/rbac"}
 	expectRename := func(m *mocks.MockClientWithResponsesInterface) {
 		renamed := sampleBranch(func(b *api.Branch) { b.Name = "feature/rbac" })
@@ -29,23 +28,17 @@ func TestBranchRenameTool(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:        "not registered without the experimental gate",
-			tool:        toolBranchRename,
-			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "branch_rename"`,
-		},
-		{
 			name:    "read-only all refuses without an API call",
 			tool:    toolBranchRename,
 			args:    args,
-			opts:    []runOption{experimental, withConfigAfterStart(map[string]any{"read_only": "all"})},
+			opts:    []runOption{withConfigAfterStart(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
 			name:       "read-only prod allows",
 			tool:       toolBranchRename,
 			args:       args,
-			opts:       []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock:       expectRename,
 			wantOutput: renamed,
 		},
@@ -53,14 +46,12 @@ func TestBranchRenameTool(t *testing.T) {
 			name:    "empty name",
 			tool:    toolBranchRename,
 			args:    map[string]any{"branch_id": "br4nch1d9x", "name": "  "},
-			opts:    []runOption{experimental},
 			wantErr: "new name cannot be empty",
 		},
 		{
 			name: "network error",
 			tool: toolBranchRename,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.BranchRename{Name: "feature/rbac"}).
@@ -72,7 +63,6 @@ func TestBranchRenameTool(t *testing.T) {
 			name: "nil response body",
 			tool: toolBranchRename,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().RenameBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.BranchRename{Name: "feature/rbac"}).
@@ -84,7 +74,6 @@ func TestBranchRenameTool(t *testing.T) {
 			name:       "success",
 			tool:       toolBranchRename,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectRename,
 			wantOutput: renamed,
 		},

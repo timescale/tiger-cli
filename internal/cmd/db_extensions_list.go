@@ -21,9 +21,9 @@ func buildDbExtensionsListCmd(app *common.App) *cobra.Command {
 extension's version, the schema it lives in, and its description.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. You can also pass a read replica set ID to
-list the extensions on that replica. The connection is opened in Tiger Cloud's
-immutable read-only mode.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to list the extensions on that\nbranch."),
+service from your configuration. You can also pass a read replica set ID, or a
+branch by ID or name, to list the extensions on that replica or branch. The
+connection is opened in Tiger Cloud's immutable read-only mode.`,
 		Example: `  # List the extensions installed in the default service
   tiger db extensions list
 
@@ -46,7 +46,7 @@ immutable read-only mode.` + branchRefHelp(app.Experimental, "You can also pass 
 				return err
 			}
 
-			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}
