@@ -22,22 +22,16 @@ type ServiceResizeInput struct {
 	IOPS      *int   `json:"iops,omitempty"`
 }
 
-// Schema requires cpu_memory unless the experimental gate adds iops, after
-// which the handler requires at least one of the two.
-func (ServiceResizeInput) Schema(experimental bool) *jsonschema.Schema {
+// The handler requires at least one of cpu_memory and iops.
+func (ServiceResizeInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceResizeInput](nil))
 	setServiceIDSchemaProperties(schema)
 
-	cpuMemoryDescription := "CPU and memory allocation combination."
-	if experimental {
-		cpuMemoryDescription = "CPU and memory allocation combination. If not specified, the service keeps its current CPU and memory."
-	} else {
-		schema.Required = append(schema.Required, "cpu_memory")
-	}
-	setCPUMemorySchemaProperties(schema, false, experimental, cpuMemoryDescription,
+	setCPUMemorySchemaProperties(schema, false,
+		"CPU and memory allocation combination. If not specified, the service keeps its current CPU and memory.",
 		"The valid combinations depend on the service's platform (the platform field from service_get).")
 
-	setIOPSSchemaProperties(schema, experimental, "If not specified while changing CPU/memory on the fluid platform, the IOPS is set to the baseline for the new size.")
+	setIOPSSchemaProperties(schema, "If not specified while changing CPU/memory on the fluid platform, the IOPS is set to the baseline for the new size.")
 
 	return schema
 }
@@ -48,33 +42,26 @@ type ServiceResizeOutput struct {
 	Message   string        `json:"message"`
 }
 
-func (ServiceResizeOutput) Schema(experimental bool) *jsonschema.Schema {
+func (ServiceResizeOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceResizeOutput](nil))
-	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
 	schema.Properties["message"].Description = "Human-readable outcome of the operation"
 	return schema
 }
 
-func newServiceResizeTool(experimental bool) *mcp.Tool {
-	// IOPS are a preview, described only behind the gate.
-	resources, required := "CPU and memory allocation", ""
-	if experimental {
-		resources = "CPU and memory allocation or its provisioned IOPS"
-		required = " At least one of cpu_memory or iops is required."
-	}
-
+func newServiceResizeTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceResize,
 		Title: "Resize Database Service",
-		Description: `Resize a database service by changing its ` + resources + `.` + required + `
+		Description: `Resize a database service by changing its CPU and memory allocation or its provisioned IOPS. At least one of cpu_memory or iops is required.
 
 This tool changes the compute resources allocated to your database service. It returns once
 the resize request is accepted, without waiting for the resize to complete, which may take
 several minutes. The service may be temporarily unavailable during the resize operation.
 
 WARNING: Creates billable resource changes. Increasing resources will increase costs.`,
-		InputSchema:  ServiceResizeInput{}.Schema(experimental),
-		OutputSchema: ServiceResizeOutput{}.Schema(experimental),
+		InputSchema:  ServiceResizeInput{}.Schema(),
+		OutputSchema: ServiceResizeOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Not destructive, just modifies resources
@@ -112,7 +99,6 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		slog.Any("iops", input.IOPS),
 	)
 
-	// The schema requires cpu_memory unless the experimental gate adds iops.
 	// An IOPS-only resize omits CPU and memory, which the API leaves unchanged.
 	if input.CPUMemory == "" && input.IOPS == nil {
 		return nil, ServiceResizeOutput{}, errors.New("at least one of cpu_memory or iops is required")
@@ -120,8 +106,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
 		// Parse CPU/Memory combination against the combinations of the
-		// service's platform. Not gated on experimental: only a service already
-		// created on the fluid platform gets the fluid combinations.
+		// service's platform.
 		cpuMillisStr, memoryGBsStr, err := common.CPUMemoryConfigsFor(util.Deref(current.Platform)).WithoutShared().Parse(input.CPUMemory)
 		if err != nil {
 			return nil, ServiceResizeOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
@@ -133,9 +118,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	resizeReq := api.ResizeInput{
 		CPUMillis: cpuMillis,
 		MemoryGbs: memoryGBs,
-	}
-	if s.app.Experimental {
-		resizeReq.Iops = input.IOPS
+		Iops:      input.IOPS,
 	}
 
 	// Make API call to resize service

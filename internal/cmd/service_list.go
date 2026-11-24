@@ -44,7 +44,7 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 			if resp.JSON200 == nil {
 				return fmt.Errorf("empty response from API")
 			}
-			return outputServices(cmd, cfg, *resp.JSON200, serviceOutputOptions{Experimental: app.Experimental})
+			return outputServices(cmd, cfg, *resp.JSON200, serviceOutputOptions{})
 		},
 	}
 

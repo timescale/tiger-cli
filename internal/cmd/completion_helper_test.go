@@ -264,23 +264,8 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "--platform flag values",
 			args:       []string{"__complete", "service", "create", "--platform", ""},
-			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: "standard\nfluid\n" + noFileComp,
 			wantStderr: directive,
-			checks:     []checkFunc{checkNotLoaded},
-		},
-		{
-			name:       "--cpu flag values",
-			args:       []string{"__complete", "service", "create", "--cpu", ""},
-			wantStdout: "0.5\n1\n2\n4\n8\n16\n32\nshared\n" + keepOrder,
-			wantStderr: keepOrderDirective,
-			checks:     []checkFunc{checkNotLoaded},
-		},
-		{
-			name:       "--memory flag values",
-			args:       []string{"__complete", "service", "create", "--memory", ""},
-			wantStdout: "2\n4\n8\n16\n32\n64\n128\nshared\n" + keepOrder,
-			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
@@ -288,7 +273,6 @@ func TestCompletion(t *testing.T) {
 			// standard ones, once each.
 			name:       "--memory flag values include the fluid platform's",
 			args:       []string{"__complete", "service", "create", "--memory", ""},
-			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: "2\n4\n8\n16\n32\n64\n128\n256\nshared\n" + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
@@ -298,7 +282,6 @@ func TestCompletion(t *testing.T) {
 			// ones rather than trailing them.
 			name:       "--cpu flag values include the fluid platform's",
 			args:       []string{"__complete", "service", "create", "--cpu", ""},
-			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: "0.25\n0.5\n1\n2\n4\n8\n16\n32\nshared\n" + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
@@ -306,7 +289,6 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "--cpu flag values narrow to a given fluid platform",
 			args:       []string{"__complete", "service", "create", "--platform", "fluid", "--cpu", ""},
-			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: "0.25\n0.5\n1\n2\n4\n8\n16\n32\n" + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
@@ -314,7 +296,6 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "--memory flag values narrow to a given standard platform",
 			args:       []string{"__complete", "service", "create", "--platform", "standard", "--memory", ""},
-			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: "2\n4\n8\n16\n32\n64\n128\nshared\n" + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
@@ -323,7 +304,7 @@ func TestCompletion(t *testing.T) {
 			// A service can't be resized onto shared CPU/memory.
 			name:       "--memory flag values for resize omit shared",
 			args:       []string{"__complete", "service", "resize", "--memory", ""},
-			wantStdout: "2\n4\n8\n16\n32\n64\n128\n" + keepOrder,
+			wantStdout: "2\n4\n8\n16\n32\n64\n128\n256\n" + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
@@ -354,7 +335,6 @@ func TestCompletion(t *testing.T) {
 			// allocation: the API validates the value.
 			name:       "--iops flag values",
 			args:       []string{"__complete", "service", "create", "--iops", ""},
-			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: iopsSteps(3000, 256000) + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},

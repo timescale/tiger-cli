@@ -110,7 +110,7 @@ Tiger CLI provides the following commands:
   - `use` - Switch the active project (requires an OAuth login; clears the default `service_id`, since it belonged to the previous project) (alias: `switch`)
 - `tiger service` - Service lifecycle management (aliases: `services`, `svc`)
   - `list` - List all services (alias: `ls`)
-  - `create` - Create a new service
+  - `create` - Create a new service, on the standard or fluid platform (`--platform`)
   - `get` - Show detailed service information (aliases: `describe`, `show`)
   - `fork` - Fork an existing service
   - `start` - Start a stopped service (alias: `resume`)

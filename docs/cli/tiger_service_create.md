@@ -10,15 +10,27 @@ The default type of service created depends on your plan:
 - Free plan: Creates a service with shared CPU/memory and the 'time-series' add-on
 - Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
 
+Services on the fluid platform (--platform fluid) are created with
+0.25 CPU / 2 GB memory by default.
+
 By default, the newly created service will be set as your default service for
 future commands. Use --no-set-default to prevent this behavior.
 
-Allowed CPU/Memory Configurations:
+Allowed CPU/Memory Configurations (standard platform):
   shared / shared  |  0.5 CPU / 2GB  |  1 CPU / 4GB    |  2 CPU / 8GB
   4 CPU / 16GB     |  8 CPU / 32GB   |  16 CPU / 64GB  |  32 CPU / 128GB
 
+Allowed CPU/Memory Configurations (fluid platform):
+  0.25 CPU / 2GB  |  0.5 CPU / 4GB  |  1 CPU / 8GB     |  2 CPU / 16GB
+  4 CPU / 32GB    |  8 CPU / 64GB   |  16 CPU / 128GB  |  32 CPU / 256GB
+
 Note: You can specify both CPU and memory together, or specify only one (the
 other will be automatically configured).
+
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If --iops
+is not given, the service gets the baseline IOPS for your plan and its CPU
+allocation.
 
 ```
 tiger service create [flags]
@@ -56,6 +68,12 @@ tiger service create [flags]
 
   # Create service with custom wait timeout
   tiger service create --name patient-db --wait-timeout 1h
+
+  # Create a service on the fluid platform
+  tiger service create --name fluid-db --platform fluid
+
+  # Create a service with provisioned IOPS
+  tiger service create --name fast-db --cpu 2 --iops 16000
 ```
 
 ### Options
@@ -65,11 +83,13 @@ tiger service create [flags]
       --cpu string              CPU allocation in cores or 'shared'
       --environment string      Environment tag (DEV or PROD) (default "DEV")
   -h, --help                    help for create
+      --iops int                Provisioned IOPS
       --memory string           Memory allocation in gigabytes or 'shared'
       --name string             Service name (auto-generated if not provided)
       --no-set-default          Don't set this service as the default service
       --no-wait                 Don't wait for operation to complete
   -o, --output string           Output format (json, yaml, env, table)
+      --platform string         Storage platform (standard or fluid) (default "standard")
       --region string           Region code
       --replicas int            Number of high-availability replicas
       --wait-timeout duration   Wait timeout duration (e.g., 30m, 1h30m, 90s) (default 30m0s)

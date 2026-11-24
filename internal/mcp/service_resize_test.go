@@ -44,7 +44,7 @@ func TestServiceResizeTool(t *testing.T) {
 		"message":   "Resize request accepted. The resize is in progress and may take several minutes to complete.",
 	}
 	const enumMsg = `validating "arguments": validating root: validating /properties/cpu_memory: enum: %s does not equal any of: ` +
-		`[0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]`
+		`[0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB 0.25 CPU/2 GB 0.5 CPU/4 GB 1 CPU/8 GB 2 CPU/16 GB 4 CPU/32 GB 8 CPU/64 GB 16 CPU/128 GB 32 CPU/256 GB]`
 
 	runToolTests(t, []toolTest{
 		{
@@ -61,32 +61,10 @@ func TestServiceResizeTool(t *testing.T) {
 			wantErr: `validating "arguments": validating root: validating /properties/service_id: pattern: "nope" does not match regular expression "^[a-z0-9]{10}$"`,
 		},
 		{
-			name:    "requires cpu_memory",
-			tool:    toolServiceResize,
-			args:    map[string]any{"service_id": "e6ue9697jf"},
-			wantErr: `validating "arguments": validating root: required: missing properties: ["cpu_memory"]`,
-		},
-		{
-			// iops is a preview parameter, so without the gate it isn't in the
-			// schema, which rejects unknown properties.
-			name:    "iops rejected without the experimental gate",
-			tool:    toolServiceResize,
-			args:    map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/8 GB", "iops": 12000},
-			wantErr: `validating "arguments": validating root: unexpected additional properties ["iops"]`,
-		},
-		{
 			name:    "rejects an unsupported CPU/memory combination",
 			tool:    toolServiceResize,
 			args:    map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "3 CPU/12 GB"},
 			wantErr: fmt.Sprintf(enumMsg, "3 CPU/12 GB"),
-		},
-		{
-			// The fluid platform is a preview, so its combinations are left out
-			// of the enum without the experimental gate.
-			name:    "rejects a fluid combination without the experimental gate",
-			tool:    toolServiceResize,
-			args:    map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/16 GB"},
-			wantErr: fmt.Sprintf(enumMsg, "2 CPU/16 GB"),
 		},
 		{
 			// A service can't be resized onto the free tier, so the enum leaves
@@ -144,7 +122,7 @@ func TestServiceResizeTool(t *testing.T) {
 			wantErr: "failed to fetch service details: connection refused",
 		},
 		{
-			// Not gated on experimental: only a fluid service gets these.
+			// Only a fluid service gets these.
 			name: "cpu_memory must match the service's platform",
 			tool: toolServiceResize,
 			args: args,
@@ -156,12 +134,11 @@ func TestServiceResizeTool(t *testing.T) {
 			wantErr: "invalid CPU/Memory specification: invalid CPU/Memory combination '2 CPU/8 GB'. Valid options: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
-			// Behind the gate cpu_memory is optional, so the handler requires
-			// at least one of the two after the lookup.
-			name:    "experimental requires cpu_memory or iops",
+			// cpu_memory is optional, so the handler requires at least one of
+			// the two after the lookup.
+			name:    "requires cpu_memory or iops",
 			tool:    toolServiceResize,
 			args:    map[string]any{"service_id": "e6ue9697jf"},
-			opts:    []runOption{withExperimental()},
 			mock:    expectLookup,
 			wantErr: "at least one of cpu_memory or iops is required",
 		},
@@ -209,10 +186,9 @@ func TestServiceResizeTool(t *testing.T) {
 			wantOutput: accepted,
 		},
 		{
-			name: "experimental passes a fluid combination through for a fluid service",
+			name: "passes a fluid combination through for a fluid service",
 			tool: toolServiceResize,
 			args: map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/16 GB"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
 					s.Platform = new(api.ServicePlatformFLUID)
@@ -237,10 +213,9 @@ func TestServiceResizeTool(t *testing.T) {
 		{
 			// CPU and memory are omitted, which the API leaves unchanged. The
 			// API validates the IOPS value.
-			name: "experimental iops only omits cpu and memory",
+			name: "iops only omits cpu and memory",
 			tool: toolServiceResize,
 			args: map[string]any{"service_id": "e6ue9697jf", "iops": 12000},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				fluid := func(iops int) api.Service {
 					return sampleService(func(s *api.Service) {

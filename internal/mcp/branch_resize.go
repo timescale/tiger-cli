@@ -42,9 +42,7 @@ type BranchResizeOutput struct {
 
 func (BranchResizeOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[BranchResizeOutput](nil))
-	// Branches only exist on the fluid platform, so the IOPS are always
-	// included.
-	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
 	schema.Properties["message"].Description = "Human-readable outcome of the operation"
 	return schema
 }

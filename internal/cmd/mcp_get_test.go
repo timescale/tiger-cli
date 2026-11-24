@@ -28,11 +28,13 @@ Output:
     • id (required): string - Service identifier (10-character alphanumeric string)
     • name (required): string
     • password: string - Password for tsdbadmin user (only included if with_password=true)
+    • platform: string - Storage platform the service runs on
     • pooler_endpoint: string - Connection pooler endpoint
     • region (required): string
     • replicas (required): integer - Number of HA replicas (0=single node/no HA, 1+=HA enabled)
     • resources: object, null
       • cpu: string - CPU allocation
+      • iops: integer - Provisioned IOPS for the service's storage
       • memory: string - Memory allocation
     • status (required): string - Service status
     • storage: string - Amount of storage the service is using
@@ -55,9 +57,11 @@ Output:
     • environment (required): string - Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified.
     • id (required): string - Service identifier (10-character alphanumeric string)
     • name (required): string
+    • platform: string - Storage platform the service runs on
     • region (required): string
     • resources: object, null
       • cpu: string - CPU allocation
+      • iops: integer - Provisioned IOPS for the service's storage
       • memory: string - Memory allocation
     • status (required): string - Service status
     • storage: string - Amount of storage the service is using
@@ -99,6 +103,14 @@ Output:
             "name": {
               "type": "string"
             },
+            "platform": {
+              "description": "Storage platform the service runs on",
+              "enum": [
+                "STANDARD",
+                "FLUID"
+              ],
+              "type": "string"
+            },
             "region": {
               "type": "string"
             },
@@ -113,6 +125,14 @@ Output:
                     "4 cores"
                   ],
                   "type": "string"
+                },
+                "iops": {
+                  "description": "Provisioned IOPS for the service's storage",
+                  "examples": [
+                    3000,
+                    12000
+                  ],
+                  "type": "integer"
                 },
                 "memory": {
                   "description": "Memory allocation",
@@ -208,6 +228,12 @@ outputSchema:
             type: string
           name:
             type: string
+          platform:
+            description: Storage platform the service runs on
+            enum:
+              - STANDARD
+              - FLUID
+            type: string
           region:
             type: string
           resources:
@@ -220,6 +246,12 @@ outputSchema:
                   - 1 core
                   - 4 cores
                 type: string
+              iops:
+                description: Provisioned IOPS for the service's storage
+                examples:
+                  - 3000
+                  - 12000
+                type: integer
               memory:
                 description: Memory allocation
                 examples:

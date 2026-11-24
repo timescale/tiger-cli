@@ -12,7 +12,6 @@ import (
 
 func TestServiceResizeCmd(t *testing.T) {
 	svc := sampleService()
-	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
 
 	// A fluid service at 1 CPU/8 GB.
 	fluidSvc := sampleService(fluidPlatform, func(s *api.Service) {
@@ -34,35 +33,6 @@ func TestServiceResizeCmd(t *testing.T) {
 	}
 
 	runCmdTests(t, []cmdTest{
-		{
-			// The fluid platform and IOPS are a preview, so their help text is gated.
-			name:       "help omits the fluid platform and IOPS",
-			args:       []string{"service", "resize", "--help"},
-			wantStdout: matchHelp("Allowed CPU/Memory Configurations:", "fluid", "IOPS", "--iops"),
-		},
-		{
-			name: "experimental help lists the fluid platform configurations",
-			args: []string{"service", "resize", "--help"},
-			opts: []runOption{experimental},
-			wantStdout: matchHelp(`Allowed CPU/Memory Configurations (fluid platform):
-  0.25 CPU / 2GB  |  0.5 CPU / 4GB  |  1 CPU / 8GB     |  2 CPU / 16GB
-  4 CPU / 32GB    |  8 CPU / 64GB   |  16 CPU / 128GB  |  32 CPU / 256GB`),
-		},
-		{
-			name: "experimental help says resize changes IOPS",
-			args: []string{"service", "resize", "--help"},
-			opts: []runOption{experimental},
-			wantStdout: matchHelp(`Resize a database service by changing its CPU, memory, and provisioned IOPS
-allocation.`),
-		},
-		{
-			name: "experimental help says where to find the allowed IOPS values",
-			args: []string{"service", "resize", "--help"},
-			opts: []runOption{experimental},
-			wantStdout: matchHelp(`The allowed --iops values depend on your plan, the service's platform, and its
-CPU/memory allocation. See the Tiger Data documentation for details. If only
---iops is given, the service keeps its current CPU and memory.`),
-		},
 		{
 			name:    "not logged in",
 			args:    []string{"service", "resize", "svc-12345", "--cpu", "2", "--memory", "8"},
@@ -98,7 +68,7 @@ CPU/memory allocation. See the Tiger Data documentation for details. If only
 						JSON202:      resized(svc, 2000, 8, 6000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB, 6000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -108,20 +78,8 @@ The resize is in progress and may take several minutes to complete.
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
-			name:    "missing cpu and memory",
+			name:    "missing cpu, memory, and iops",
 			args:    []string{"service", "resize", "svc-12345"},
-			wantErr: "must specify at least one of --cpu or --memory",
-		},
-		{
-			// --iops is a preview flag, so without the gate it doesn't exist.
-			name:    "iops flag rejected without experimental",
-			args:    []string{"service", "resize", "svc-12345", "--iops", "12000"},
-			wantErr: "unknown flag: --iops",
-		},
-		{
-			name:    "experimental missing cpu, memory, and iops",
-			args:    []string{"service", "resize", "svc-12345"},
-			opts:    []runOption{experimental},
 			wantErr: "must specify at least one of --cpu, --memory, or --iops",
 		},
 		{
@@ -152,7 +110,7 @@ The resize is in progress and may take several minutes to complete.
 			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
 		},
 		{
-			// Not gated on experimental: only a fluid service gets these.
+			// Only a fluid service gets these.
 			name: "fluid service rejects a standard combination",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2", "--memory", "8"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -207,7 +165,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(svc, 2000, 8, 6000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB, 6000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -223,7 +181,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(svc, 2000, 8, 6000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/8 GB, 6000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -238,7 +196,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(svc, 4000, 16, 6000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 4 CPU/16 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 4 CPU/16 GB, 6000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -253,7 +211,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(svc, 500, 2, 4000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 0.5 CPU/2 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 0.5 CPU/2 GB, 4000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -270,7 +228,7 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(svc, 500, 2, 4000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 0.5 CPU/2 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 0.5 CPU/2 GB, 4000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
@@ -285,16 +243,15 @@ The resize is in progress and may take several minutes to complete.
 						JSON202:      resized(fluidSvc, 2000, 16, 6000),
 					}, nil)
 			},
-			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB.
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB, 6000 IOPS.
 The resize is in progress and may take several minutes to complete.
 `,
 		},
 		{
 			// CPU and memory are omitted, which the API leaves unchanged. The
 			// API validates the IOPS value.
-			name: "experimental iops only omits cpu and memory",
+			name: "iops only omits cpu and memory",
 			args: []string{"service", "resize", "svc-12345", "--iops", "12000"},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", fluidSvc)
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{Iops: new(12000)}).
@@ -308,9 +265,8 @@ The resize is in progress and may take several minutes to complete.
 `,
 		},
 		{
-			name: "experimental iops with cpu",
+			name: "iops with cpu",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2", "--iops", "16000"},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", fluidSvc)
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16"), Iops: new(16000)}).
@@ -325,9 +281,8 @@ The resize is in progress and may take several minutes to complete.
 		},
 		{
 			// The IOPS weren't requested, so they come from the response.
-			name: "experimental cpu only reports the baseline iops",
+			name: "cpu only reports the baseline iops",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2"},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", fluidSvc)
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}).

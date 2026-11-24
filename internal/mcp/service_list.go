@@ -26,9 +26,9 @@ type ServiceListOutput struct {
 	Services []ServiceInfo `json:"services"`
 }
 
-func (ServiceListOutput) Schema(experimental bool) *jsonschema.Schema {
+func (ServiceListOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceListOutput](nil))
-	schema.Properties["services"].Items = ServiceInfo{}.Schema(experimental)
+	schema.Properties["services"].Items = ServiceInfo{}.Schema()
 	return schema
 }
 
@@ -46,7 +46,7 @@ type ServiceInfo struct {
 	Storage     string        `json:"storage,omitempty"`
 }
 
-func (ServiceInfo) Schema(experimental bool) *jsonschema.Schema {
+func (ServiceInfo) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceInfo](nil))
 
 	schema.Properties["id"].Description = "Service identifier (10-character alphanumeric string)"
@@ -54,26 +54,26 @@ func (ServiceInfo) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["status"].Description = "Service status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
 
-	setPlatformSchemaProperties(schema, experimental)
+	setPlatformSchemaProperties(schema)
 
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
 
 	schema.Properties["environment"].Description = "Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."
 
-	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
 	setServiceStorageSchemaProperties(schema)
 
 	return schema
 }
 
-func newServiceListTool(experimental bool) *mcp.Tool {
+func newServiceListTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceList,
 		Title: "List Database Services",
 		Description: "List all database services in your Tiger Cloud project. " +
 			"Returns services with status, type, region, resource allocation, and storage usage.",
 		InputSchema:  ServiceListInput{}.Schema(),
-		OutputSchema: ServiceListOutput{}.Schema(experimental),
+		OutputSchema: ServiceListOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
 			OpenWorldHint: new(false),
@@ -124,6 +124,7 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 		ServiceID: service.ServiceID,
 		Name:      service.Name,
 		Status:    string(service.Status),
+		Platform:  string(util.Deref(service.Platform)),
 		Type:      string(service.ServiceType),
 		Region:    service.RegionCode,
 		Created:   service.Created.Format("2006-01-02T15:04:05Z"),
@@ -132,12 +133,7 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 		Environment: string(common.ServiceEnvironmentTag(service)),
 	}
 
-	// The platform is a preview field, returned only behind the gate.
-	if s.app.Experimental {
-		info.Platform = string(util.Deref(service.Platform))
-	}
-
-	info.Resources = convertToResourceInfo(service, s.app.Experimental)
+	info.Resources = convertToResourceInfo(service)
 	info.Storage = convertToServiceStorage(service)
 
 	return info

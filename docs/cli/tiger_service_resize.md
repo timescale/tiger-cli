@@ -4,7 +4,8 @@ Resize a database service
 
 ### Synopsis
 
-Resize a database service by changing its CPU and memory allocation.
+Resize a database service by changing its CPU, memory, and provisioned IOPS
+allocation.
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. This command changes the compute and memory
@@ -15,12 +16,22 @@ the resize to complete, which may take several minutes. The service may be
 temporarily unavailable during the resize operation. Note that changing
 resources will affect your billing - increasing resources will increase costs.
 
-Allowed CPU/Memory Configurations:
+Allowed CPU/Memory Configurations (standard platform):
   0.5 CPU / 2GB  |  1 CPU / 4GB    |  2 CPU / 8GB     |  4 CPU / 16GB
   8 CPU / 32GB   |  16 CPU / 64GB  |  32 CPU / 128GB
 
+Allowed CPU/Memory Configurations (fluid platform):
+  0.25 CPU / 2GB  |  0.5 CPU / 4GB  |  1 CPU / 8GB     |  2 CPU / 16GB
+  4 CPU / 32GB    |  8 CPU / 64GB   |  16 CPU / 128GB  |  32 CPU / 256GB
+
 Note: You can specify both CPU and memory together, or specify only one (the
 other will be automatically configured).
+
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If only
+--iops is given, the service keeps its current CPU and memory. If --cpu or
+--memory is given without --iops on the fluid platform, the IOPS is set to
+the baseline for the new size.
 
 ```
 tiger service resize [name-or-id] [flags]
@@ -40,6 +51,9 @@ tiger service resize [name-or-id] [flags]
 
   # Resize service using only memory (CPU will be auto-configured to 4 cores)
   tiger service resize --memory 16
+
+  # Change only the provisioned IOPS
+  tiger service resize --iops 16000
 ```
 
 ### Options
@@ -47,6 +61,7 @@ tiger service resize [name-or-id] [flags]
 ```
       --cpu string      CPU allocation in cores
   -h, --help            help for resize
+      --iops int        Provisioned IOPS
       --memory string   Memory allocation in gigabytes
 ```
 

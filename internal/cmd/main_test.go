@@ -703,9 +703,8 @@ func expectResolveRefStatus(m *mocks.MockClientWithResponsesInterface, ref strin
 }
 
 // sampleService returns an api.Service with reasonable defaults. It carries a
-// platform and IOPS, as the API returns them, so every case without the
-// experimental gate also proves the preview fields are dropped from output.
-// Use overrides to customize specific fields.
+// platform and IOPS, as the API returns them. Use overrides to customize
+// specific fields.
 func sampleService(overrides ...func(*api.Service)) api.Service {
 	svc := api.Service{
 		ServiceID:   "svc-12345",

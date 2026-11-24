@@ -39,7 +39,6 @@ func TestServiceGetCmd(t *testing.T) {
 	})
 
 	fluidService := sampleService(fluidPlatform)
-	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
 
 	withInitialPassword := sampleService(func(s *api.Service) {
 		s.InitialPassword = new("super-secret-pw")
@@ -172,11 +171,13 @@ func TestServiceGetCmd(t *testing.T) {
 │ Service ID        │ svc-12345                                                                                   │
 │ Name              │ test-service                                                                                │
 │ Status            │ READY                                                                                       │
+│ Platform          │ STANDARD                                                                                    │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
 │ Environment       │ PROD                                                                                        │
 │ CPU               │ 2 cores                                                                                     │
 │ Memory            │ 8 GB                                                                                        │
+│ IOPS              │ 6000                                                                                        │
 │ Storage           │ 843.5 GB used                                                                               │
 │ Replicas          │ 2                                                                                           │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
@@ -197,10 +198,12 @@ func TestServiceGetCmd(t *testing.T) {
 │ Service ID        │ svc-12345                                                                                   │
 │ Name              │ test-service                                                                                │
 │ Status            │ READY                                                                                       │
+│ Platform          │ STANDARD                                                                                    │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ shared                                                                                      │
 │ Memory            │ shared                                                                                      │
+│ IOPS              │ 6000                                                                                        │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
@@ -222,10 +225,12 @@ func TestServiceGetCmd(t *testing.T) {
 │ Service ID        │ svc-12345                                                                                   │
 │ Name              │ test-service                                                                                │
 │ Status            │ READY                                                                                       │
+│ Platform          │ STANDARD                                                                                    │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 0.25 cores                                                                                  │
 │ Memory            │ 2 GB                                                                                        │
+│ IOPS              │ 6000                                                                                        │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
@@ -244,10 +249,12 @@ func TestServiceGetCmd(t *testing.T) {
 │ Service ID        │ svc-12345                                                                                   │
 │ Name              │ test-service                                                                                │
 │ Status            │ READY                                                                                       │
+│ Platform          │ STANDARD                                                                                    │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ shared                                                                                      │
 │ Memory            │ shared                                                                                      │
+│ IOPS              │ 6000                                                                                        │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
@@ -268,6 +275,7 @@ func TestServiceGetCmd(t *testing.T) {
     "port": 5432
   },
   "name": "test-service",
+  "platform": "STANDARD",
   "project_id": "test-project-123",
   "region_code": "us-east-1",
   "resources": [
@@ -275,6 +283,7 @@ func TestServiceGetCmd(t *testing.T) {
       "id": "resource-1",
       "spec": {
         "cpu_millis": 1000,
+        "iops": 6000,
         "memory_gbs": 4
       }
     }
@@ -304,6 +313,7 @@ endpoint:
   port: 5432
 host: svc-12345.project.tsdb.cloud.timescale.com
 name: test-service
+platform: STANDARD
 port: 5432
 project_id: test-project-123
 region_code: us-east-1
@@ -311,6 +321,7 @@ resources:
   - id: resource-1
     spec:
       cpu_millis: 1000
+      iops: 6000
       memory_gbs: 4
 role: tsdbadmin
 service_id: svc-12345
@@ -319,13 +330,10 @@ status: READY
 `,
 		},
 		{
-			// The platform, IOPS, and branch count are preview fields: the
-			// output cases above carry a platform and IOPS from sampleService
-			// and drop them, while these show all three with the gate.
-			name: "experimental table output shows platform, IOPS, and branches",
+			// A fluid service also shows its branch count.
+			name: "table output shows platform, IOPS, and branches",
 			args: []string{"service", "get", "svc-12345"},
 			mock: setupGetFluid,
-			opts: []runOption{experimental},
 			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
 │     PROPERTY      │                                            VALUE                                            │
 ├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -347,10 +355,9 @@ status: READY
 `,
 		},
 		{
-			name: "experimental json output includes platform, IOPS, and branches",
+			name: "json output includes platform, IOPS, and branches",
 			args: []string{"service", "get", "svc-12345", "-o", "json"},
 			mock: setupGetFluid,
-			opts: []runOption{experimental},
 			wantStdout: `{
   "created": "2025-01-15T10:30:00Z",
   "endpoint": {
@@ -385,10 +392,9 @@ status: READY
 `,
 		},
 		{
-			name: "experimental yaml output includes platform, IOPS, and branches",
+			name: "yaml output includes platform, IOPS, and branches",
 			args: []string{"service", "get", "svc-12345", "-o", "yaml"},
 			mock: setupGetFluid,
-			opts: []runOption{experimental},
 			wantStdout: `branch_count: 2
 connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
 console_url: https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview
@@ -418,10 +424,9 @@ status: READY
 		{
 			// Only fluid services can be branched, so a standard one isn't
 			// counted. The mock fails the test on any branch listing.
-			name:       "experimental standard service lists no branches",
+			name:       "standard service lists no branches",
 			args:       []string{"service", "get", "svc-12345", "-o", "env"},
 			mock:       setupGet(sampleService()),
-			opts:       []runOption{experimental},
 			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 		{
@@ -459,10 +464,12 @@ status: READY
 │ Service ID        │ svc-12345                                                                                                   │
 │ Name              │ test-service                                                                                                │
 │ Status            │ READY                                                                                                       │
+│ Platform          │ STANDARD                                                                                                    │
 │ Type              │ TIMESCALEDB                                                                                                 │
 │ Region            │ us-east-1                                                                                                   │
 │ CPU               │ 1 core                                                                                                      │
 │ Memory            │ 4 GB                                                                                                        │
+│ IOPS              │ 6000                                                                                                        │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                                     │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                                             │
 │ Password          │ super-secret-pw                                                                                             │
@@ -489,10 +496,12 @@ status: READY
 │ Service ID  │ svc-12345                                                                                 │
 │ Name        │ test-service                                                                              │
 │ Status      │ READY                                                                                     │
+│ Platform    │ STANDARD                                                                                  │
 │ Type        │ TIMESCALEDB                                                                               │
 │ Region      │ us-east-1                                                                                 │
 │ CPU         │ 1 core                                                                                    │
 │ Memory      │ 4 GB                                                                                      │
+│ IOPS        │ 6000                                                                                      │
 │ Created     │ 2025-01-15 10:30:00 UTC                                                                   │
 │ Console URL │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview │
 └─────────────┴───────────────────────────────────────────────────────────────────────────────────────────┘
@@ -516,10 +525,12 @@ status: READY
 │ Service ID  │ svc-12345                                                                                 │
 │ Name        │ test-service                                                                              │
 │ Status      │ READY                                                                                     │
+│ Platform    │ STANDARD                                                                                  │
 │ Type        │ TIMESCALEDB                                                                               │
 │ Region      │ us-east-1                                                                                 │
 │ CPU         │ 1 core                                                                                    │
 │ Memory      │ 4 GB                                                                                      │
+│ IOPS        │ 6000                                                                                      │
 │ Created     │ 2025-01-15 10:30:00 UTC                                                                   │
 │ Console URL │ https://console.cloud.tigerdata.com/projects/test-project-123/services/svc-12345/overview │
 └─────────────┴───────────────────────────────────────────────────────────────────────────────────────────┘

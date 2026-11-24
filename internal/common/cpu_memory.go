@@ -135,18 +135,15 @@ func CPUMemoryConfigsFor(platform api.ServicePlatform) CPUMemoryConfigs {
 
 // AllowedCPUMemoryConfigs returns the CPU/Memory configurations allowed across
 // platforms: the standard platform's, including shared/shared if shared is set
-// (a service can't be resized onto it), followed by the fluid platform's if
-// fluid is set. Each platform's configurations stay together, in their own
-// order, so the platforms read as separate groups.
-func AllowedCPUMemoryConfigs(shared, fluid bool) CPUMemoryConfigs {
+// (a service can't be resized onto it), followed by the fluid platform's. Each
+// platform's configurations stay together, in their own order, so the
+// platforms read as separate groups.
+func AllowedCPUMemoryConfigs(shared bool) CPUMemoryConfigs {
 	configs := StandardCPUMemoryConfigs()
 	if !shared {
 		configs = configs.WithoutShared()
 	}
-	if fluid {
-		configs = append(configs, FluidCPUMemoryConfigs()...)
-	}
-	return configs
+	return append(configs, FluidCPUMemoryConfigs()...)
 }
 
 // WithoutShared returns the configurations other than shared/shared, which a

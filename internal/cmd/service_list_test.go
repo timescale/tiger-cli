@@ -145,6 +145,7 @@ func TestServiceListCmd(t *testing.T) {
     port: 5432
   host: svc-12345.project.tsdb.cloud.timescale.com
   name: test-service
+  platform: STANDARD
   port: 5432
   project_id: test-project-123
   region_code: us-east-1
@@ -152,6 +153,7 @@ func TestServiceListCmd(t *testing.T) {
     - id: resource-1
       spec:
         cpu_millis: 1000
+        iops: 6000
         memory_gbs: 4
   role: tsdbadmin
   service_id: svc-12345
@@ -166,6 +168,7 @@ func TestServiceListCmd(t *testing.T) {
     port: 5432
   host: svc-67890.project.tsdb.cloud.timescale.com
   name: analytics-db
+  platform: STANDARD
   port: 5432
   project_id: test-project-123
   region_code: eu-west-1
@@ -173,6 +176,7 @@ func TestServiceListCmd(t *testing.T) {
     - id: resource-1
       spec:
         cpu_millis: 1000
+        iops: 6000
         memory_gbs: 4
   role: tsdbadmin
   service_id: svc-67890
@@ -220,6 +224,7 @@ const serviceListJSON = `[
       "port": 5432
     },
     "name": "test-service",
+    "platform": "STANDARD",
     "project_id": "test-project-123",
     "region_code": "us-east-1",
     "resources": [
@@ -227,6 +232,7 @@ const serviceListJSON = `[
         "id": "resource-1",
         "spec": {
           "cpu_millis": 1000,
+          "iops": 6000,
           "memory_gbs": 4
         }
       }
@@ -248,6 +254,7 @@ const serviceListJSON = `[
       "port": 5432
     },
     "name": "analytics-db",
+    "platform": "STANDARD",
     "project_id": "test-project-123",
     "region_code": "eu-west-1",
     "resources": [
@@ -255,6 +262,7 @@ const serviceListJSON = `[
         "id": "resource-1",
         "spec": {
           "cpu_millis": 1000,
+          "iops": 6000,
           "memory_gbs": 4
         }
       }

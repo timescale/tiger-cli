@@ -43,27 +43,6 @@ Service is being forked. Use 'tiger service list' to check status.
 
 	runCmdTests(t, []cmdTest{
 		{
-			// The platform and IOPS are a preview, so their help text is gated.
-			name:       "help omits the platform and IOPS",
-			args:       []string{"service", "fork", "--help"},
-			wantStdout: matchHelp("You can override any of these defaults", "platform", "IOPS", "--iops"),
-		},
-		{
-			name: "experimental help says the fork keeps the source's platform",
-			args: []string{"service", "fork", "--help"},
-			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: matchHelp(`The fork is always created on the same platform as the source service, so custom
---cpu and --memory values must be valid for that platform.`),
-		},
-		{
-			name: "experimental help says the fork inherits the source's IOPS",
-			args: []string{"service", "fork", "--help"},
-			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: matchHelp(`The allowed --iops values depend on your plan, the service's platform, and its
-CPU/memory allocation. See the Tiger Data documentation for details. If --iops
-is not given, the fork inherits the source service's IOPS.`),
-		},
-		{
 			name:    "multiple timing flags",
 			args:    []string{"service", "fork", "svc-12345", "--last-snapshot", "--to-timestamp", "2025-01-15T10:30:00Z"},
 			wantErr: "if any flags in the group [now last-snapshot to-timestamp] are set none of the others can be; [last-snapshot to-timestamp] were all set",
@@ -77,12 +56,6 @@ is not given, the fork inherits the source service's IOPS.`),
 			name:    "unparseable timestamp",
 			args:    []string{"service", "fork", "svc-12345", "--to-timestamp", "not-a-timestamp"},
 			wantErr: "invalid argument \"not-a-timestamp\" for \"--to-timestamp\" flag: invalid time format `not-a-timestamp` must be one of: `2006-01-02T15:04:05Z07:00`",
-		},
-		{
-			// --iops is a preview flag, so without the gate it doesn't exist.
-			name:    "iops flag rejected without experimental",
-			args:    []string{"service", "fork", "svc-12345", "--iops", "12000"},
-			wantErr: "unknown flag: --iops",
 		},
 		{
 			name:    "invalid environment",
@@ -150,7 +123,7 @@ is not given, the fork inherits the source service's IOPS.`),
 			wantErr: "invalid CPU/Memory combination. Allowed combinations: shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
 		},
 		{
-			// Not gated on experimental: only a fluid source gets these.
+			// Only a fluid source gets these.
 			name: "fluid source rejects a standard combination",
 			args: []string{"service", "fork", "svc-12345", "--cpu", "2", "--memory", "8"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -372,9 +345,8 @@ Connect with: tiger db psql
 		},
 		{
 			// The API validates the IOPS value, so it's sent as given.
-			name: "experimental iops mapped to request and shown in output",
+			name: "iops mapped to request and shown in output",
 			args: []string{"service", "fork", "svc-12345", "--iops", "12000", "--no-wait", "--no-set-default"},
-			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
 				req := baseReq
@@ -420,10 +392,12 @@ const sampleForkedServiceTable = `┌──────────────�
 │ Service ID        │ svc-67890                                                                                   │
 │ Name              │ test-service-fork                                                                           │
 │ Status            │ READY                                                                                       │
+│ Platform          │ STANDARD                                                                                    │
 │ Type              │ TIMESCALEDB                                                                                 │
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 core                                                                                      │
 │ Memory            │ 4 GB                                                                                        │
+│ IOPS              │ 6000                                                                                        │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
