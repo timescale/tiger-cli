@@ -159,15 +159,11 @@ func (t *ConnectionTarget) Details(cfg *config.Config, opts ConnectionDetailsOpt
 	return details, nil
 }
 
-// connectionTargetKind names what ResolveConnectionTarget looks for, in its
-// errors.
-const connectionTargetKind = "service, branch, or read replica set"
-
 // ResolveConnectionTarget resolves ref, an ID or a name, to the service,
 // branch, or read replica set it names and works out whose credentials it
 // uses.
 func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID, ref string) (*ConnectionTarget, error) {
-	resolved, err := resolve(ctx, client, projectID, ref, nil, connectionTargetKind)
+	resolved, err := resolve(ctx, client, projectID, ref, nil, "service, branch, or read replica set")
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +191,7 @@ func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithRespo
 		return nil, err
 	}
 	if target.ID != id {
-		return nil, ExitWithCode(ExitServiceNotFound, fmt.Errorf("%s '%s' not found", connectionTargetKind, id))
+		return nil, ExitWithCode(ExitServiceNotFound, fmt.Errorf("service, branch, or read replica set '%s' not found", id))
 	}
 	return target, nil
 }
