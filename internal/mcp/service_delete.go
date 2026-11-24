@@ -55,7 +55,7 @@ func newServiceDeleteTool() *mcp.Tool {
 		Title: "Delete Database Service",
 		Description: `Delete a database service permanently.
 
-This operation is irreversible: the service and all of its data are destroyed. Deleting a service also deletes all of its branches. Deleting a service tagged PROD automatically prompts the user, via an elicitation request through the MCP client, to confirm the deletion before it proceeds, so agents don't need to ask the user for confirmation themselves; if the client cannot prompt, the deletion is refused and the user must run 'tiger service delete' from the CLI instead.`,
+This operation is irreversible: the service, all of its data, and all of its branches are destroyed. Deleting a service tagged PROD automatically prompts the user, via an elicitation request through the MCP client, to confirm the deletion before it proceeds, so agents don't need to ask the user for confirmation themselves; if the client cannot prompt, the deletion is refused and the user must run 'tiger service delete' from the CLI instead.`,
 		InputSchema:  ServiceDeleteInput{}.Schema(),
 		OutputSchema: ServiceDeleteOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{

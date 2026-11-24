@@ -40,7 +40,7 @@ type DBQueryInput struct {
 func (DBQueryInput) Schema(transport Transport) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBQueryInput](nil))
 
-	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service A branch ID is also accepted — passing one runs the query against that branch instead. Use branch_list to find branch IDs."
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs, or branch_list to find branch IDs. A read replica set ID or branch ID is also accepted here — passing one runs the query against that read replica (which is read-only) or branch instead of the primary service."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 

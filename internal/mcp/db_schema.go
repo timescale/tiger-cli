@@ -26,7 +26,7 @@ type DBSchemaInput struct {
 func (DBSchemaInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBSchemaInput](nil))
 
-	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one introspects that read replica instead of the primary service A branch ID is also accepted — passing one introspects that branch instead. Use branch_list to find branch IDs."
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs, or branch_list to find branch IDs. A read replica set ID or branch ID is also accepted here — passing one introspects that read replica or branch instead of the primary service."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
