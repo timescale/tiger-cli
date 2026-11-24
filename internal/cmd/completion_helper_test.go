@@ -269,20 +269,20 @@ func TestCompletion(t *testing.T) {
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
-			// Without --platform yet, the fluid platform's values join the
-			// standard ones, once each.
-			name:       "--memory flag values include the fluid platform's",
-			args:       []string{"__complete", "service", "create", "--memory", ""},
-			wantStdout: "2\n4\n8\n16\n32\n64\n128\n256\nshared\n" + keepOrder,
+			// The fluid platform's smaller sizes sort in among the standard
+			// ones rather than trailing them.
+			name:       "--cpu flag values",
+			args:       []string{"__complete", "service", "create", "--cpu", ""},
+			wantStdout: "0.25\n0.5\n1\n2\n4\n8\n16\n32\nshared\n" + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
-			// The fluid platform's smaller sizes sort in among the standard
-			// ones rather than trailing them.
-			name:       "--cpu flag values include the fluid platform's",
-			args:       []string{"__complete", "service", "create", "--cpu", ""},
-			wantStdout: "0.25\n0.5\n1\n2\n4\n8\n16\n32\nshared\n" + keepOrder,
+			// Without --platform yet, the fluid platform's values join the
+			// standard ones, once each.
+			name:       "--memory flag values",
+			args:       []string{"__complete", "service", "create", "--memory", ""},
+			wantStdout: "2\n4\n8\n16\n32\n64\n128\n256\nshared\n" + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
