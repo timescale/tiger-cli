@@ -8,12 +8,9 @@ List the PostgreSQL extensions installed in a database service, with each
 extension's version, the schema it lives in, and its description.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. You can also pass a read replica set ID to
-list the extensions on that replica. The connection is opened in Tiger Cloud's
-immutable read-only mode.
-
-You can also pass a branch, by ID or name, to list the extensions on that
-branch.
+service from your configuration. You can also pass a read replica set ID, or a
+branch by ID or name, to list the extensions on that replica or branch. The
+connection is opened in Tiger Cloud's immutable read-only mode.
 
 ```
 tiger db extensions list [name-or-id] [flags]

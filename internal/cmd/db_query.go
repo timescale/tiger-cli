@@ -33,10 +33,8 @@ Unlike 'tiger db psql', this runs the query directly and does not require a
 local psql installation.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. You can also pass a read replica set ID to
-query that replica.
-
-You can also pass a branch, by ID or name, to query that branch.
+service from your configuration. You can also pass a read replica set ID, or a
+branch by ID or name, to query that replica or branch.
 
 The query comes from --command, from the SQL file named by --file, or, if
 neither is given, from stdin.

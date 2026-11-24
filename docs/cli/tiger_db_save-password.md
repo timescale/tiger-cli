@@ -7,15 +7,14 @@ Save password for a database service
 Save a password for a database service to configured password storage.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. The password can be provided via:
+service from your configuration. You can also pass a branch, by ID or name, to
+save the password for that branch. The password can be provided via:
 1. --password flag with explicit value (highest precedence)
 2. TIGER_NEW_PASSWORD environment variable
 3. Interactive prompt (if neither provided)
 
 The password will be saved according to your --password-storage setting
 (keyring, pgpass, or none).
-
-You can also pass a branch, by ID or name, to save the password for that branch.
 
 ```
 tiger db save-password [name-or-id] [flags]
