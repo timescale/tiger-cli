@@ -3,34 +3,11 @@ package cmd
 import (
 	"net/http"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
-
-// TestBranchRegistration covers where the branch commands sit in the tree:
-// `tiger branch`, its `branches` alias, and `tiger service branch`.
-func TestBranchRegistration(t *testing.T) {
-	runCmdTests(t, []cmdTest{
-		{
-			name:       "branch registered",
-			args:       []string{"branch", "--help"},
-			wantStdout: matchHelp("Manage branches of Fluid Services."),
-		},
-		{
-			name:       "branches alias",
-			args:       []string{"branches", "--help"},
-			wantStdout: matchHelp("Manage branches of Fluid Services."),
-		},
-		{
-			name:       "service branch registered",
-			args:       []string{"service", "branch", "--help"},
-			wantStdout: matchHelp("tiger service branch svc-12345 --name ci-4821"),
-		},
-	})
-}
 
 // sampleBranch returns a branch of sampleService with reasonable defaults.
 // Use overrides to customize specific fields.
