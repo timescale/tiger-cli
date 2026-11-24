@@ -29,7 +29,7 @@ func TestBranchStopCmd(t *testing.T) {
 		{
 			name:    "not logged in",
 			args:    []string{"branch", "stop", "br-12345"},
-			opts:    []runOption{withExperimental(), withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
@@ -37,26 +37,25 @@ func TestBranchStopCmd(t *testing.T) {
 			// No default fallback: service_id only ever holds a service ID.
 			name:    "missing branch id",
 			args:    []string{"branch", "stop"},
-			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			opts:    []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			wantErr: "branch name or ID is required",
 		},
 		{
 			name:    "read-only all refuses",
 			args:    []string{"branch", "stop", "br-12345"},
-			opts:    []runOption{withExperimental(), withConfig(map[string]any{"read_only": "all"})},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
 			name:       "read-only prod allows",
 			args:       []string{"branch", "stop", "br-12345", "--no-wait"},
-			opts:       []runOption{withExperimental(), withConfig(map[string]any{"read_only": "prod"})},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock:       setupStop(api.DeployStatusPAUSING),
 			wantStderr: noWaitStderr,
 		},
 		{
 			name: "network error",
 			args: []string{"branch", "stop", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
 				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
@@ -67,7 +66,6 @@ func TestBranchStopCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"branch", "stop", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
 				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
@@ -82,7 +80,6 @@ func TestBranchStopCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"branch", "stop", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, "br-12345", sampleBranch())
 				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "svc-12345", "br-12345").
@@ -93,7 +90,6 @@ func TestBranchStopCmd(t *testing.T) {
 		{
 			name:       "no-wait",
 			args:       []string{"branch", "stop", "br-12345", "--no-wait"},
-			opts:       []runOption{withExperimental()},
 			mock:       setupStop(api.DeployStatusPAUSING),
 			wantStderr: noWaitStderr,
 		},
@@ -101,7 +97,6 @@ func TestBranchStopCmd(t *testing.T) {
 			name:     "wait polls until paused",
 			synctest: true,
 			args:     []string{"branch", "stop", "br-12345"},
-			opts:     []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupStop(api.DeployStatusPAUSING)(m)
 				expectGetBranch(m, sampleBranch(branchStatus(api.DeployStatusPAUSED)))
@@ -115,7 +110,6 @@ func TestBranchStopCmd(t *testing.T) {
 			name:     "wait timeout",
 			synctest: true,
 			args:     []string{"branch", "stop", "br-12345"},
-			opts:     []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupStop(api.DeployStatusPAUSING)(m)
 				pausing := sampleBranch(branchStatus(api.DeployStatusPAUSING))
@@ -135,7 +129,6 @@ func TestBranchStopCmd(t *testing.T) {
 		{
 			name:       "pause alias",
 			args:       []string{"branch", "pause", "br-12345", "--no-wait"},
-			opts:       []runOption{withExperimental()},
 			mock:       setupStop(api.DeployStatusPAUSING),
 			wantStderr: noWaitStderr,
 		},

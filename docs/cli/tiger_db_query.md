@@ -13,6 +13,8 @@ The service can be given by ID or name as an argument, or will use the default
 service from your configuration. You can also pass a read replica set ID to
 query that replica.
 
+You can also pass a branch, by ID or name, to query that branch.
+
 The query comes from --command, from the SQL file named by --file, or, if
 neither is given, from stdin.
 

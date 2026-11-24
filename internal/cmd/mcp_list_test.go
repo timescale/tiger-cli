@@ -10,6 +10,16 @@ import (
 
 func TestMCPListCmd(t *testing.T) {
 	defaultTools := []string{
+		"branch_create",
+		"branch_delete",
+		"branch_get",
+		"branch_list",
+		"branch_logs",
+		"branch_rename",
+		"branch_resize",
+		"branch_start",
+		"branch_stop",
+		"branch_update_password",
 		"db_extensions_list",
 		"db_query",
 		"db_schema",
@@ -33,6 +43,16 @@ func TestMCPListCmd(t *testing.T) {
 	wantText := `┌──────┬───────────────────────────┐
 │ TYPE │           NAME            │
 ├──────┼───────────────────────────┤
+│ tool │ branch_create             │
+│ tool │ branch_delete             │
+│ tool │ branch_get                │
+│ tool │ branch_list               │
+│ tool │ branch_logs               │
+│ tool │ branch_rename             │
+│ tool │ branch_resize             │
+│ tool │ branch_start              │
+│ tool │ branch_stop               │
+│ tool │ branch_update_password    │
 │ tool │ db_extensions_list        │
 │ tool │ db_query                  │
 │ tool │ db_schema                 │
@@ -59,6 +79,9 @@ func TestMCPListCmd(t *testing.T) {
 	wantTextReadOnly := `┌──────┬───────────────────────────┐
 │ TYPE │           NAME            │
 ├──────┼───────────────────────────┤
+│ tool │ branch_get                │
+│ tool │ branch_list               │
+│ tool │ branch_logs               │
 │ tool │ db_extensions_list        │
 │ tool │ db_query                  │
 │ tool │ db_schema                 │
@@ -72,7 +95,7 @@ func TestMCPListCmd(t *testing.T) {
 └──────┴───────────────────────────┘
 `
 
-	// TIGER_EXPERIMENTAL registers the preview backup and branch tools on top
+	// TIGER_EXPERIMENTAL registers the preview backup tools on top
 	// of the (always-registered) default set, which already includes metrics.
 	wantTextExperimental := `┌──────┬──────────────────────────────┐
 │ TYPE │             NAME             │
@@ -192,7 +215,7 @@ func TestMCPListCmd(t *testing.T) {
 			wantStdout: wantTextReadOnly,
 		},
 		{
-			name: "experimental adds backup and branch tools",
+			name: "experimental adds backup tools",
 			args: []string{"mcp", "list"},
 			opts: append(noDocsProxy(nil),
 				withEnv("TIGER_EXPERIMENTAL", "true")),

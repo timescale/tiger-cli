@@ -10,7 +10,6 @@ import (
 )
 
 func TestBranchUpdatePasswordTool(t *testing.T) {
-	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x"}
 	generated := withGenerateSecurePassword(32, "generated-pw", nil)
 	expectUpdate := func(m *mocks.MockClientWithResponsesInterface) {
@@ -26,16 +25,10 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:        "not registered without the experimental gate",
-			tool:        toolBranchUpdatePassword,
-			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "branch_update_password"`,
-		},
-		{
 			name:    "read-only all refuses without an API call",
 			tool:    toolBranchUpdatePassword,
 			args:    args,
-			opts:    []runOption{experimental, withConfigAfterStart(map[string]any{"read_only": "all"})},
+			opts:    []runOption{withConfigAfterStart(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
@@ -44,7 +37,7 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			name: "read-only prod allows",
 			tool: toolBranchUpdatePassword,
 			args: args,
-			opts: []runOption{experimental, generated, withConfig(map[string]any{"read_only": "prod"})},
+			opts: []runOption{generated, withConfig(map[string]any{"read_only": "prod"})},
 			mock: expectUpdate,
 			wantOutput: map[string]any{
 				"message":          "Password updated for tsdbadmin.",
@@ -55,7 +48,6 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			name: "branch not found",
 			tool: toolBranchUpdatePassword,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveStatus(m, "br4nch1d9x", branchType, http.StatusNotFound, &api.ClientError{Message: new("resource not found")})
 			},
@@ -65,7 +57,7 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			name: "network error",
 			tool: toolBranchUpdatePassword,
 			args: args,
-			opts: []runOption{experimental, generated},
+			opts: []runOption{generated},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.UpdatePasswordInput{Password: "generated-pw"}).
@@ -77,7 +69,7 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			name: "password generation fails",
 			tool: toolBranchUpdatePassword,
 			args: args,
-			opts: []runOption{experimental, withGenerateSecurePassword(32, "", errors.New("failed to generate random password: entropy unavailable"))},
+			opts: []runOption{withGenerateSecurePassword(32, "", errors.New("failed to generate random password: entropy unavailable"))},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 			},
@@ -88,7 +80,7 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			name: "unexpected 200 is an error",
 			tool: toolBranchUpdatePassword,
 			args: args,
-			opts: []runOption{experimental, generated},
+			opts: []runOption{generated},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().UpdateBranchPasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", api.UpdatePasswordInput{Password: "generated-pw"}).
@@ -100,7 +92,7 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			name: "saves the generated password",
 			tool: toolBranchUpdatePassword,
 			args: args,
-			opts: []runOption{experimental, generated},
+			opts: []runOption{generated},
 			mock: expectUpdate,
 			wantOutput: map[string]any{
 				"message":          "Password updated for tsdbadmin.",
@@ -112,7 +104,7 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			name: "with_password returns the password",
 			tool: toolBranchUpdatePassword,
 			args: map[string]any{"branch_id": "br4nch1d9x", "with_password": true},
-			opts: []runOption{experimental, generated},
+			opts: []runOption{generated},
 			mock: expectUpdate,
 			wantOutput: map[string]any{
 				"message":          "Password updated for tsdbadmin.",
@@ -124,7 +116,7 @@ func TestBranchUpdatePasswordTool(t *testing.T) {
 			name: "warns when the password was neither saved nor returned",
 			tool: toolBranchUpdatePassword,
 			args: args,
-			opts: []runOption{experimental, generated, withConfig(map[string]any{"password_storage": "none"})},
+			opts: []runOption{generated, withConfig(map[string]any{"password_storage": "none"})},
 			mock: expectUpdate,
 			wantOutput: map[string]any{
 				"message": "Password updated for tsdbadmin. Warning: the new password was not saved, and was not returned because with_password was false.",

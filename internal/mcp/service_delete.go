@@ -49,20 +49,13 @@ func (ServiceDeleteOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newServiceDeleteTool(experimental bool) *mcp.Tool {
-	// Branches are a preview, so only the experimental description mentions
-	// them. The PROD prompt lists them regardless: they're deleted either way.
-	var branches string
-	if experimental {
-		branches = "Deleting a service also deletes all of its branches. "
-	}
-
+func newServiceDeleteTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceDelete,
 		Title: "Delete Database Service",
 		Description: `Delete a database service permanently.
 
-This operation is irreversible: the service and all of its data are destroyed. ` + branches + `Deleting a service tagged PROD automatically prompts the user, via an elicitation request through the MCP client, to confirm the deletion before it proceeds, so agents don't need to ask the user for confirmation themselves; if the client cannot prompt, the deletion is refused and the user must run 'tiger service delete' from the CLI instead.`,
+This operation is irreversible: the service and all of its data are destroyed. Deleting a service also deletes all of its branches. Deleting a service tagged PROD automatically prompts the user, via an elicitation request through the MCP client, to confirm the deletion before it proceeds, so agents don't need to ask the user for confirmation themselves; if the client cannot prompt, the deletion is refused and the user must run 'tiger service delete' from the CLI instead.`,
 		InputSchema:  ServiceDeleteInput{}.Schema(),
 		OutputSchema: ServiceDeleteOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -149,10 +142,8 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 }
 
 // listBranchesToDelete returns the branches that deleting service takes with
-// it. The API deletes them without asking, so this isn't gated on the
-// experimental env var: whoever has branches gets told. A failed listing is
-// logged and returned rather than failing the call, so the delete can still go
-// ahead.
+// it. A failed listing is logged and returned rather than failing the call, so
+// the delete can still go ahead.
 func (s *Server) listBranchesToDelete(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, service api.Service) ([]api.Branch, error) {
 	if !common.CanHaveBranches(service) {
 		return nil, nil

@@ -46,44 +46,39 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			// A branch never becomes the default, so there's nothing to opt out of.
 			name:    "no --no-set-default flag",
 			args:    []string{"branch", "create", "svc-12345", "--no-set-default"},
-			opts:    []runOption{withExperimental()},
 			wantErr: "unknown flag: --no-set-default",
 		},
 		{
 			name:    "zero wait timeout",
 			args:    []string{"branch", "create", "svc-12345", "--wait-timeout", "0s"},
-			opts:    []runOption{withExperimental()},
 			wantErr: "wait timeout must be positive, got 0s",
 		},
 		{
 			name:    "not logged in",
 			args:    []string{"branch", "create", "svc-12345"},
-			opts:    []runOption{withExperimental(), withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "read-only all refuses",
 			args:    []string{"branch", "create", "svc-12345"},
-			opts:    []runOption{withExperimental(), withConfig(map[string]any{"read_only": "all"})},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
 			name:    "invalid cpu/memory combination",
 			args:    []string{"branch", "create", "svc-12345", "--cpu", "1", "--memory", "4"},
-			opts:    []runOption{withExperimental()},
 			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name:    "missing service id",
 			args:    []string{"branch", "create"},
-			opts:    []runOption{withExperimental()},
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name: "service not found",
 			args: []string{"branch", "create", "svc-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefNotFound(m, "svc-12345")
 			},
@@ -93,7 +88,6 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 		{
 			name: "network error",
 			args: []string{"branch", "create", "svc-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", parent)
 				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
@@ -106,7 +100,6 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 		{
 			name: "API error",
 			args: []string{"branch", "create", "svc-12345", "--name", "ci-4821"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", parent)
 				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "svc-12345", api.BranchCreate{Name: new("ci-4821")}).
@@ -122,7 +115,6 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 		{
 			name: "nil response body",
 			args: []string{"branch", "create", "svc-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", parent)
 				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
@@ -138,7 +130,6 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			name:     "wait timeout",
 			synctest: true,
 			args:     []string{"branch", "create", "svc-12345", "-o", "env"},
-			opts:     []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupCreate(baseReq, created)(m)
 				queued := sampleBranch(branchStatus(api.DeployStatusQUEUED))
@@ -163,7 +154,6 @@ Error: wait timeout reached after 10m0s - branch may still be provisioning
 			name:     "wait polls until ready",
 			synctest: true,
 			args:     []string{"branch", "create", "svc-12345"},
-			opts:     []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupCreate(baseReq, created)(m)
 				expectGetBranch(m, sampleBranch())
@@ -183,7 +173,6 @@ Connect with: tiger db psql br-12345
 			// e.g. after being deleted.
 			name: "table without a creator",
 			args: []string{"branch", "create", "svc-12345", "--no-wait"},
-			opts: []runOption{withExperimental()},
 			mock: setupCreate(baseReq, sampleBranch(noCreator, func(b *api.Branch) {
 				b.InitialPassword = new("branch-pw")
 			})),
@@ -193,7 +182,6 @@ Connect with: tiger db psql br-12345
 		{
 			name: "table with a creator without a name",
 			args: []string{"branch", "create", "svc-12345", "--no-wait"},
-			opts: []runOption{withExperimental()},
 			mock: setupCreate(baseReq, sampleBranch(namelessCreator, func(b *api.Branch) {
 				b.InitialPassword = new("branch-pw")
 			})),
@@ -204,7 +192,6 @@ Connect with: tiger db psql br-12345
 			// The initial password is saved but never output.
 			name: "json",
 			args: []string{"branch", "create", "svc-12345", "-o", "json"},
-			opts: []runOption{withExperimental()},
 			mock: setupCreate(baseReq, sampleBranch(func(b *api.Branch) {
 				b.InitialPassword = new("branch-pw")
 			})),
@@ -220,7 +207,6 @@ Connect with: tiger db psql br-12345
 		{
 			name: "json without a creator",
 			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "json"},
-			opts: []runOption{withExperimental()},
 			mock: setupCreate(baseReq, sampleBranch(noCreator, func(b *api.Branch) {
 				b.InitialPassword = new("branch-pw")
 			})),
@@ -230,7 +216,6 @@ Connect with: tiger db psql br-12345
 		{
 			name: "yaml",
 			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "yaml"},
-			opts: []runOption{withExperimental()},
 			mock: setupCreate(baseReq, sampleBranch(func(b *api.Branch) {
 				b.InitialPassword = new("branch-pw")
 			})),
@@ -240,7 +225,6 @@ Connect with: tiger db psql br-12345
 		{
 			name: "yaml without a creator",
 			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "yaml"},
-			opts: []runOption{withExperimental()},
 			mock: setupCreate(baseReq, sampleBranch(noCreator, func(b *api.Branch) {
 				b.InitialPassword = new("branch-pw")
 			})),
@@ -251,7 +235,6 @@ Connect with: tiger db psql br-12345
 			// Only service IDs go in the default, so a branch never becomes it.
 			name:       "no-wait saves the password and leaves the default alone",
 			args:       []string{"branch", "create", "svc-12345", "--no-wait", "-o", "env"},
-			opts:       []runOption{withExperimental()},
 			mock:       setupCreate(baseReq, created),
 			wantStdout: sampleBranchEnv,
 			wantStderr: defaultNoWaitStderr,
@@ -260,7 +243,6 @@ Connect with: tiger db psql br-12345
 		{
 			name:       "service branch is the same command",
 			args:       []string{"service", "branch", "svc-12345", "--no-wait", "-o", "env"},
-			opts:       []runOption{withExperimental()},
 			mock:       setupCreate(baseReq, created),
 			wantStdout: sampleBranchEnv,
 			wantStderr: defaultNoWaitStderr,
@@ -271,7 +253,7 @@ Connect with: tiger db psql br-12345
 			// service, as it allows forking one into a DEV fork.
 			name: "read-only prod allows branching a PROD service",
 			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "env"},
-			opts: []runOption{withExperimental(), withConfig(map[string]any{"read_only": "prod"})},
+			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform, envTag("PROD")))
 				m.EXPECT().CreateBranchWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
@@ -286,7 +268,6 @@ Connect with: tiger db psql br-12345
 		{
 			name: "custom name and compute",
 			args: []string{"branch", "create", "svc-12345", "--name", "ci-4821", "--cpu", "2", "--memory", "16", "--no-wait", "-o", "env"},
-			opts: []runOption{withExperimental()},
 			mock: setupCreate(api.BranchCreate{
 				Name:      new("ci-4821"),
 				CPUMillis: new(2000),
@@ -298,7 +279,6 @@ Connect with: tiger db psql br-12345
 		{
 			name: "fractional cores",
 			args: []string{"branch", "create", "svc-12345", "--cpu", "0.25", "--no-wait", "-o", "env"},
-			opts: []runOption{withExperimental()},
 			mock: setupCreate(api.BranchCreate{
 				CPUMillis: new(250),
 				MemoryGbs: new(2),
@@ -311,7 +291,6 @@ Connect with: tiger db psql br-12345
 			// compatibility.
 			name: "deprecated millicores",
 			args: []string{"branch", "create", "svc-12345", "--cpu", "500", "--no-wait", "-o", "env"},
-			opts: []runOption{withExperimental()},
 			mock: setupCreate(api.BranchCreate{
 				CPUMillis: new(500),
 				MemoryGbs: new(4),
@@ -322,7 +301,6 @@ Connect with: tiger db psql br-12345
 		{
 			name: "memory alone sets the matching cpu",
 			args: []string{"branch", "create", "svc-12345", "--memory", "4", "--no-wait", "-o", "env"},
-			opts: []runOption{withExperimental()},
 			mock: setupCreate(api.BranchCreate{
 				CPUMillis: new(500),
 				MemoryGbs: new(4),
@@ -333,7 +311,7 @@ Connect with: tiger db psql br-12345
 		{
 			name:       "default service from config",
 			args:       []string{"branch", "create", "--no-wait", "-o", "env"},
-			opts:       []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			opts:       []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock:       setupCreate(baseReq, created),
 			wantStdout: sampleBranchEnv,
 			wantStderr: defaultNoWaitStderr,
@@ -342,7 +320,6 @@ Connect with: tiger db psql br-12345
 		{
 			name:       "iops",
 			args:       []string{"branch", "create", "svc-12345", "--iops", "16000", "--no-wait", "-o", "env"},
-			opts:       []runOption{withExperimental()},
 			mock:       setupCreate(api.BranchCreate{Iops: new(16000)}, created),
 			wantStdout: sampleBranchEnv,
 			wantStderr: defaultNoWaitStderr,
@@ -351,7 +328,6 @@ Connect with: tiger db psql br-12345
 			// Nothing to save, so nothing is said about saving.
 			name:       "no initial password",
 			args:       []string{"branch", "create", "svc-12345", "--no-wait", "-o", "env"},
-			opts:       []runOption{withExperimental()},
 			mock:       setupCreate(baseReq, sampleBranch(branchStatus(api.DeployStatusQUEUED))),
 			wantStdout: sampleBranchEnv,
 			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
@@ -362,7 +338,6 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 		{
 			name:       "password storage none",
 			args:       []string{"branch", "create", "svc-12345", "--no-wait", "--password-storage", "none", "-o", "env"},
-			opts:       []runOption{withExperimental()},
 			mock:       setupCreate(baseReq, created),
 			wantStdout: sampleBranchEnv,
 			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
@@ -376,7 +351,6 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			// response, as it does for service create.
 			name:       "with password from the create response",
 			args:       []string{"branch", "create", "svc-12345", "--no-wait", "--password-storage", "none", "--with-password", "-o", "env"},
-			opts:       []runOption{withExperimental()},
 			mock:       setupCreate(baseReq, created),
 			wantStdout: sampleBranchEnv + "PGPASSWORD=branch-pw\n",
 			wantStderr: `Creating branch from service 'test-service' (svc-12345)...
@@ -391,7 +365,6 @@ Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 			name:     "with password survives the wait",
 			synctest: true,
 			args:     []string{"branch", "create", "svc-12345", "--password-storage", "none", "--with-password", "-o", "env"},
-			opts:     []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupCreate(baseReq, created)(m)
 				expectGetBranch(m, sampleBranch())

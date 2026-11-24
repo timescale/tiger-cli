@@ -10,7 +10,6 @@ import (
 )
 
 func TestBranchListTool(t *testing.T) {
-	experimental := withExperimental()
 	args := map[string]any{"service_id": "e6ue9697jf"}
 	expectList := func(branches ...api.Branch) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
@@ -24,30 +23,22 @@ func TestBranchListTool(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:        "not registered without the experimental gate",
-			tool:        toolBranchList,
-			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "branch_list"`,
-		},
-		{
 			name:    "rejects a malformed service ID",
 			tool:    toolBranchList,
 			args:    map[string]any{"service_id": "nope"},
-			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: validating /properties/service_id: pattern: "nope" does not match regular expression "^[a-z0-9]{10}$"`,
 		},
 		{
 			name:    "not logged in",
 			tool:    toolBranchList,
 			args:    args,
-			opts:    []runOption{experimental, withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 		},
 		{
 			name: "network error",
 			tool: toolBranchList,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
 					Return(nil, errors.New("connection refused"))
@@ -58,7 +49,6 @@ func TestBranchListTool(t *testing.T) {
 			name: "API error",
 			tool: toolBranchList,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
 					Return(&api.GetBranchesResponse{
@@ -72,7 +62,6 @@ func TestBranchListTool(t *testing.T) {
 			name: "nil response body",
 			tool: toolBranchList,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "e6ue9697jf", nil).
 					Return(&api.GetBranchesResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
@@ -83,7 +72,6 @@ func TestBranchListTool(t *testing.T) {
 			name:       "lists the service's branches",
 			tool:       toolBranchList,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectList(sampleBranch()),
 			wantOutput: map[string]any{"branches": []any{sampleBranchDetail(api.DeployStatusREADY)}},
 		},
@@ -91,7 +79,6 @@ func TestBranchListTool(t *testing.T) {
 			name:       "no branches",
 			tool:       toolBranchList,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectList(),
 			wantOutput: map[string]any{"branches": []any{}},
 		},
@@ -101,7 +88,6 @@ func TestBranchListTool(t *testing.T) {
 			name:       "without a creator",
 			tool:       toolBranchList,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectList(sampleBranch(noCreator)),
 			wantOutput: map[string]any{"branches": []any{sampleBranchDetailNoCreator(api.DeployStatusREADY)}},
 		},
@@ -109,7 +95,6 @@ func TestBranchListTool(t *testing.T) {
 			name:       "creator without a name",
 			tool:       toolBranchList,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectList(sampleBranch(namelessCreator)),
 			wantOutput: map[string]any{"branches": []any{sampleBranchDetailNamelessCreator(api.DeployStatusREADY)}},
 		},

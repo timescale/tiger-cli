@@ -16,7 +16,11 @@ import (
 func buildServiceDeleteCmd(app *common.App) *cobra.Command {
 	var confirm bool
 
-	long := `Delete a database service permanently.
+	cmd := &cobra.Command{
+		Use:     "delete <name-or-id>",
+		Aliases: []string{"rm"},
+		Short:   "Delete a database service",
+		Long: `Delete a database service permanently.
 
 The service can be given by ID or name, but must be given explicitly: there is
 no fallback to the default service.
@@ -24,23 +28,11 @@ no fallback to the default service.
 This operation is irreversible. By default, you will be prompted to type the
 service ID to confirm deletion — the ID, not the name — unless you use the
 --confirm flag.
-`
-	// Branches are a preview, so only the experimental help mentions them. The
-	// command lists them regardless: they're deleted either way.
-	if app.Experimental {
-		long += `
+
 Deleting a service also deletes all of its branches. They are listed in the
 confirmation prompt and again once the service is deleted.
-`
-	}
-	long += `
-Note for AI agents: Always confirm with the user before performing this destructive operation.`
 
-	cmd := &cobra.Command{
-		Use:     "delete <name-or-id>",
-		Aliases: []string{"rm"},
-		Short:   "Delete a database service",
-		Long:    long,
+Note for AI agents: Always confirm with the user before performing this destructive operation.`,
 		Example: `  # Delete a service (with confirmation prompt)
   tiger service delete svc-12345
 
@@ -126,10 +118,8 @@ Note for AI agents: Always confirm with the user before performing this destruct
 }
 
 // listBranchesToDelete returns the branches that deleting service takes with
-// it, so the command can show them before and after the delete. The API
-// deletes them without asking, so this isn't gated on the experimental env
-// var: whoever has branches gets told. A failed listing is a warning rather
-// than an error, so the delete can still go ahead.
+// it, so the command can show them before and after the delete. A failed
+// listing is a warning rather than an error, so the delete can still go ahead.
 func listBranchesToDelete(cmd *cobra.Command, client api.ClientWithResponsesInterface, projectID string, service api.Service) []api.Branch {
 	if !common.CanHaveBranches(service) {
 		return nil

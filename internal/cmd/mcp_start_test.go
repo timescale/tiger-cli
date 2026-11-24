@@ -69,6 +69,13 @@ INFO Skipping write tool in read-only mode tool=service_stop
 INFO Skipping write tool in read-only mode tool=service_resize
 INFO Skipping write tool in read-only mode tool=service_rename
 INFO Skipping write tool in read-only mode tool=service_delete
+INFO Skipping write tool in read-only mode tool=branch_create
+INFO Skipping write tool in read-only mode tool=branch_delete
+INFO Skipping write tool in read-only mode tool=branch_start
+INFO Skipping write tool in read-only mode tool=branch_stop
+INFO Skipping write tool in read-only mode tool=branch_resize
+INFO Skipping write tool in read-only mode tool=branch_rename
+INFO Skipping write tool in read-only mode tool=branch_update_password
 ` + stdioLog),
 		},
 	})

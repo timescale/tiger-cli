@@ -10,7 +10,6 @@ import (
 )
 
 func TestBranchResizeTool(t *testing.T) {
-	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x", "cpu_memory": "2 CPU/16 GB"}
 	req := api.BranchResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}
 	// The resized branch, as the API reports it once the new spec is applied.
@@ -38,30 +37,23 @@ func TestBranchResizeTool(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:        "not registered without the experimental gate",
-			tool:        toolBranchResize,
-			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "branch_resize"`,
-		},
-		{
 			name:    "missing cpu_memory and iops",
 			tool:    toolBranchResize,
 			args:    map[string]any{"branch_id": "br4nch1d9x"},
-			opts:    []runOption{experimental},
 			wantErr: "at least one of cpu_memory or iops is required",
 		},
 		{
 			name:    "read-only all refuses without an API call",
 			tool:    toolBranchResize,
 			args:    args,
-			opts:    []runOption{experimental, withConfigAfterStart(map[string]any{"read_only": "all"})},
+			opts:    []runOption{withConfigAfterStart(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
 			name:       "read-only prod allows",
 			tool:       toolBranchResize,
 			args:       args,
-			opts:       []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock:       expectResize,
 			wantOutput: accepted,
 		},
@@ -69,7 +61,6 @@ func TestBranchResizeTool(t *testing.T) {
 			name: "network error",
 			tool: toolBranchResize,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", req).
@@ -81,7 +72,6 @@ func TestBranchResizeTool(t *testing.T) {
 			name: "nil response body",
 			tool: toolBranchResize,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().ResizeBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", req).
@@ -94,7 +84,6 @@ func TestBranchResizeTool(t *testing.T) {
 			name: "iops only omits cpu and memory",
 			tool: toolBranchResize,
 			args: map[string]any{"branch_id": "br4nch1d9x", "iops": 16000},
-			opts: []runOption{experimental},
 			mock: expectResizeWith(api.BranchResizeInput{Iops: new(16000)}, sampleBranch(func(b *api.Branch) {
 				b.Iops = new(16000)
 			})),
@@ -107,7 +96,6 @@ func TestBranchResizeTool(t *testing.T) {
 			name:       "returns once the resize is accepted",
 			tool:       toolBranchResize,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectResize,
 			wantOutput: accepted,
 		},

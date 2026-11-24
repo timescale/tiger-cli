@@ -20,6 +20,7 @@ Parameters:
 
 Output:
   • service (required): object
+    • branch_count: integer, null - Number of branches of the service (only returned for Fluid Services)
     • connection_string (required): string - PostgreSQL connection string (password embedded only if with_password=true)
     • created: string
     • direct_endpoint: string - Direct database connection endpoint

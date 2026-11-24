@@ -53,10 +53,8 @@ resource usage.`,
 			}
 			service := *resolved
 
-			// Branches are a preview, so they're counted only behind the gate.
-			// The rest of the output doesn't depend on the count.
 			var branchCount *int
-			if app.Experimental && common.CanHaveBranches(service) {
+			if common.CanHaveBranches(service) {
 				if count, err := common.CountBranches(cmd.Context(), client, projectID, service.ServiceID); err != nil {
 					cmd.PrintErrf("Warning: failed to count branches: %v\n", err)
 				} else {

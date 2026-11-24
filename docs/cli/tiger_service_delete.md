@@ -13,6 +13,9 @@ This operation is irreversible. By default, you will be prompted to type the
 service ID to confirm deletion — the ID, not the name — unless you use the
 --confirm flag.
 
+Deleting a service also deletes all of its branches. They are listed in the
+confirmation prompt and again once the service is deleted.
+
 Note for AI agents: Always confirm with the user before performing this destructive operation.
 
 ```

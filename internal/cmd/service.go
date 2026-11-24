@@ -15,9 +15,9 @@ import (
 )
 
 // buildServiceCmd creates the main service command with all subcommands.
-// experimental still gates `backups` and `branch`, which are backed by gateway
-// endpoints marked `x-tigerdata-preview: true`; when false, they are not added
-// to the tree at all. See CLAUDE.md's "Experimental Feature Gating".
+// experimental gates `backup`, which is backed by gateway endpoints marked
+// `x-tigerdata-preview: true`; when false, it is not added to the tree at all.
+// See CLAUDE.md's "Experimental Feature Gating".
 func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service",
@@ -39,11 +39,11 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd.AddCommand(buildServiceResizeCmd(app))
 	cmd.AddCommand(buildServiceLogsCmd(app))
 	cmd.AddCommand(buildServiceMetricsCmd(app))
+	cmd.AddCommand(buildServiceBranchCmd(app))
 
 	// Experimental commands, unregistered until the previews graduate.
 	if app.Experimental {
 		cmd.AddCommand(buildServiceBackupCmd(app))
-		cmd.AddCommand(buildServiceBranchCmd(app))
 	}
 
 	return cmd
@@ -79,8 +79,8 @@ func cpuMemoryHelp(shared, experimental bool) string {
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service
-	// BranchCount is set only by service get, behind the experimental gate,
-	// for a service that can have branches.
+	// BranchCount is set only by service get, for a service that can have
+	// branches.
 	BranchCount *int `json:"branch_count,omitempty"`
 	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty"`

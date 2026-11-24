@@ -12,6 +12,8 @@ connections and returns appropriate exit codes following pg_isready conventions.
 
 You can also pass a read replica set ID to test connectivity to that replica.
 
+You can also pass a branch, by ID or name, to test connectivity to that branch.
+
 --timeout limits the whole check. The host can resolve to several addresses,
 and each gets up to 5s (or PGCONNECT_TIMEOUT, if set) before the check
 moves on to the next, so a --timeout shorter than that limits the first

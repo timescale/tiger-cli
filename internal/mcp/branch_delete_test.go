@@ -10,7 +10,6 @@ import (
 )
 
 func TestBranchDeleteTool(t *testing.T) {
-	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x"}
 	expectDelete := func(m *mocks.MockClientWithResponsesInterface) {
 		expectResolveBranch(m, sampleBranch())
@@ -24,23 +23,17 @@ func TestBranchDeleteTool(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:        "not registered without the experimental gate",
-			tool:        toolBranchDelete,
-			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "branch_delete"`,
-		},
-		{
 			name:    "not logged in",
 			tool:    toolBranchDelete,
 			args:    args,
-			opts:    []runOption{experimental, withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "read-only all refuses without an API call",
 			tool:    toolBranchDelete,
 			args:    args,
-			opts:    []runOption{experimental, withConfigAfterStart(map[string]any{"read_only": "all"})},
+			opts:    []runOption{withConfigAfterStart(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
@@ -49,7 +42,7 @@ func TestBranchDeleteTool(t *testing.T) {
 			name:       "read-only prod deletes without a prompt",
 			tool:       toolBranchDelete,
 			args:       args,
-			opts:       []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock:       expectDelete,
 			wantOutput: deleted,
 		},
@@ -57,7 +50,6 @@ func TestBranchDeleteTool(t *testing.T) {
 			name: "network error",
 			tool: toolBranchDelete,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().DeleteBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
@@ -69,7 +61,6 @@ func TestBranchDeleteTool(t *testing.T) {
 			name: "API error",
 			tool: toolBranchDelete,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().DeleteBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
@@ -84,7 +75,6 @@ func TestBranchDeleteTool(t *testing.T) {
 			name:       "success",
 			tool:       toolBranchDelete,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectDelete,
 			wantOutput: deleted,
 		},

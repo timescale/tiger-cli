@@ -17,10 +17,10 @@ type DBExtensionsListInput struct {
 	Role      string `json:"role,omitempty"`
 }
 
-func (DBExtensionsListInput) Schema(experimental bool) *jsonschema.Schema {
+func (DBExtensionsListInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBExtensionsListInput](nil))
 
-	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one lists the extensions on that read replica instead of the primary service." + branchIDHelp(experimental, "lists the extensions on that branch")
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one lists the extensions on that read replica instead of the primary service A branch ID is also accepted — passing one lists the extensions on that branch instead. Use branch_list to find branch IDs."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
@@ -60,14 +60,14 @@ func (DBExtensionsListOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newDBExtensionsListTool(experimental bool) *mcp.Tool {
+func newDBExtensionsListTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolDBExtensionsList,
 		Title: "List Database Extensions",
 		Description: `List the PostgreSQL extensions installed in a service database.
 
 Connects to a PostgreSQL/TimescaleDB service in Tiger Cloud and returns each installed extension's name, version, schema, and description. The connection is opened in immutable read-only mode.`,
-		InputSchema:  DBExtensionsListInput{}.Schema(experimental),
+		InputSchema:  DBExtensionsListInput{}.Schema(),
 		OutputSchema: DBExtensionsListOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
@@ -84,9 +84,8 @@ func (s *Server) handleDBExtensionsList(ctx context.Context, req *mcp.CallToolRe
 		return nil, DBExtensionsListOutput{}, err
 	}
 
-	// service_id may name a service, one of its read replicas, or (behind the
-	// experimental gate) a branch.
-	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID, s.app.Experimental)
+	// service_id may name a service, one of its read replicas, or a branch.
+	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID)
 	if err != nil {
 		return nil, DBExtensionsListOutput{}, err
 	}

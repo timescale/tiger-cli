@@ -26,6 +26,7 @@ Manage database services within Tiger Cloud platform.
 ### SEE ALSO
 
 * [tiger](tiger.md)	 - Tiger CLI - Tiger Cloud Platform command-line interface
+* [tiger service branch](tiger_service_branch.md)	 - Create a branch of a database service
 * [tiger service create](tiger_service_create.md)	 - Create a new database service
 * [tiger service delete](tiger_service_delete.md)	 - Delete a database service
 * [tiger service fork](tiger_service_fork.md)	 - Fork an existing database service

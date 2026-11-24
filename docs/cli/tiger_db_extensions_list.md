@@ -12,6 +12,9 @@ service from your configuration. You can also pass a read replica set ID to
 list the extensions on that replica. The connection is opened in Tiger Cloud's
 immutable read-only mode.
 
+You can also pass a branch, by ID or name, to list the extensions on that
+branch.
+
 ```
 tiger db extensions list [name-or-id] [flags]
 ```

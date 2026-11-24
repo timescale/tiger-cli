@@ -10,7 +10,6 @@ import (
 )
 
 func TestBranchStopTool(t *testing.T) {
-	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x"}
 	expectStop := func(status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
@@ -30,30 +29,24 @@ func TestBranchStopTool(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:        "not registered without the experimental gate",
-			tool:        toolBranchStop,
-			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "branch_stop"`,
-		},
-		{
 			name:    "not logged in",
 			tool:    toolBranchStop,
 			args:    args,
-			opts:    []runOption{experimental, withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "read-only all refuses without an API call",
 			tool:    toolBranchStop,
 			args:    args,
-			opts:    []runOption{experimental, withConfigAfterStart(map[string]any{"read_only": "all"})},
+			opts:    []runOption{withConfigAfterStart(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
 			name:       "read-only prod allows",
 			tool:       toolBranchStop,
 			args:       args,
-			opts:       []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock:       expectStop(api.DeployStatusPAUSING),
 			wantOutput: accepted,
 		},
@@ -61,7 +54,6 @@ func TestBranchStopTool(t *testing.T) {
 			name: "network error",
 			tool: toolBranchStop,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
@@ -73,7 +65,6 @@ func TestBranchStopTool(t *testing.T) {
 			name: "nil response body",
 			tool: toolBranchStop,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().StopBranchWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x").
@@ -85,7 +76,6 @@ func TestBranchStopTool(t *testing.T) {
 			name:       "stops without waiting by default",
 			tool:       toolBranchStop,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectStop(api.DeployStatusPAUSING),
 			wantOutput: accepted,
 		},
@@ -94,7 +84,6 @@ func TestBranchStopTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchStop,
 			args:     map[string]any{"branch_id": "br4nch1d9x", "wait": true},
-			opts:     []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectStop(api.DeployStatusPAUSING)(m)
 				expectGetBranch(m, sampleBranch(branchStatus(api.DeployStatusPAUSED)))

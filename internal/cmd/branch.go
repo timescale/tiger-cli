@@ -18,9 +18,7 @@ import (
 // be created or resized onto.
 const branchCPUMemoryHelp = "Allowed CPU/Memory Configurations:\n" + fluidCPUMemoryHelp
 
-// buildBranchCmd creates the branch command with all subcommands. Branches are
-// backed by gateway endpoints marked `x-tigerdata-preview: true`, so the whole
-// group is only added to the tree behind the experimental gate (see root.go).
+// buildBranchCmd creates the branch command with all subcommands.
 func buildBranchCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "branch",

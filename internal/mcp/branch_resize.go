@@ -42,8 +42,8 @@ type BranchResizeOutput struct {
 
 func (BranchResizeOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[BranchResizeOutput](nil))
-	// The branch tools only exist behind the experimental gate, so the IOPS
-	// are always included.
+	// Branches only exist on the fluid platform, so the IOPS are always
+	// included.
 	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
 	schema.Properties["message"].Description = "Human-readable outcome of the operation"
 	return schema

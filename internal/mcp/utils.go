@@ -350,16 +350,6 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	return detail
 }
 
-// branchIDHelp is the sentence a db tool's service_id description gains for
-// branches, saying what passing a branch ID does. Branches are a preview, so
-// it is empty without the experimental gate.
-func branchIDHelp(experimental bool, does string) string {
-	if !experimental {
-		return ""
-	}
-	return " A branch ID is also accepted — passing one " + does + " instead. Use branch_list to find branch IDs."
-}
-
 // setBranchIDSchemaProperties sets common branch_id schema properties. Like
 // service_id, branch_id is IDs-only (see setServiceIDSchemaProperties), which
 // resolveBranchByID enforces.
@@ -433,8 +423,8 @@ func (BranchDetail) Schema() *jsonschema.Schema {
 
 	setCreatorInfoSchemaProperties(schema.Properties["creator"])
 
-	// The branch tools only exist behind the experimental gate, so the IOPS
-	// are always included.
+	// Branches only exist on the fluid platform, so the IOPS are always
+	// included.
 	setResourceInfoSchemaProperties(schema.Properties["resources"], true)
 
 	schema.Properties["storage"].Description = "Amount of storage the branch has changed since it was created. The branch is billed only for this storage, not for the storage it still shares with its parent service."

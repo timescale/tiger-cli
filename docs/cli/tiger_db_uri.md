@@ -13,6 +13,8 @@ TimescaleDB/PostgreSQL service.
 
 You can also pass a read replica set ID to get a connection string for that replica.
 
+You can also pass a branch, by ID or name, to get a connection string for that branch.
+
 By default, passwords are excluded from the connection string for security.
 Use --with-password to include the password directly in the connection string.
 

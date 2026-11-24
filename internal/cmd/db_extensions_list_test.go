@@ -90,7 +90,7 @@ func TestDbExtensionsListCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service or read replica set 'svc-12345': connection refused`,
+			wantErr: `failed to resolve service, branch, or read replica set 'svc-12345': connection refused`,
 		},
 		{
 			name: "service not found",
@@ -98,7 +98,7 @@ func TestDbExtensionsListCmd(t *testing.T) {
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTargetNotFound(m, "svc-12345")
 			},
-			wantErr: "service or read replica set 'svc-12345' not found",
+			wantErr: "service, branch, or read replica set 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
@@ -132,21 +132,9 @@ func TestDbExtensionsListCmd(t *testing.T) {
 			wantErr: notReadyMsg("svc-12345"),
 		},
 		{
-			// Branches are a preview, so without the gate a ref naming one is
-			// reported as not found, without mentioning branches.
-			name: "branch not found without experimental",
-			args: []string{"db", "extensions", "list", "test-branch"},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveTarget(m, "test-branch", sampleBranch())
-			},
-			wantErr: "service or read replica set 'test-branch' not found",
-			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
-		},
-		{
 			// A branch is started through `tiger branch`, not `tiger service`.
 			name: "branch paused",
 			args: []string{"db", "extensions", "list", "br-12345"},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveTarget(m, "br-12345", sampleBranch(branchStatus(api.DeployStatusPAUSED)))
 			},
@@ -252,7 +240,7 @@ func TestDbExtensionsListCmd(t *testing.T) {
 			name:       "lists the extensions of a branch",
 			args:       []string{"db", "extensions", "list", "br-12345", "-o", "json"},
 			mock:       func(m *mocks.MockClientWithResponsesInterface) { expectResolveTarget(m, "br-12345", sampleBranch()) },
-			opts:       []runOption{withExperimental(), withFetchExtensions(common.NewBranchConnectionTarget(sampleBranch()), "tsdbadmin", []common.Extension{}, nil)},
+			opts:       []runOption{withFetchExtensions(common.NewBranchConnectionTarget(sampleBranch()), "tsdbadmin", []common.Extension{}, nil)},
 			wantStdout: "[]\n",
 		},
 		{
@@ -261,15 +249,6 @@ func TestDbExtensionsListCmd(t *testing.T) {
 			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			opts:       []runOption{withFetchExtensions(primaryTarget, "reader", []common.Extension{}, nil)},
 			wantStdout: "[]\n",
-		},
-		{
-			// Branches are a preview, so the help mentions them only behind
-			// the gate. The generated docs/cli reference covers the ungated
-			// help.
-			name:       "help mentions branches when experimental",
-			args:       []string{"db", "extensions", "list", "--help"},
-			opts:       []runOption{withExperimental()},
-			wantStdout: matchHelp("You can also pass a branch, by ID or name, to list the extensions on that\nbranch."),
 		},
 	})
 }

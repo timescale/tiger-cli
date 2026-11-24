@@ -52,7 +52,7 @@ func TestServiceGetCmd(t *testing.T) {
 	}
 
 	// setupGetFluid also lists the fluid service's two branches, which only
-	// service get does, behind the experimental gate.
+	// service get does.
 	setupGetFluid := func(m *mocks.MockClientWithResponsesInterface) {
 		expectResolveRef(m, "svc-12345", fluidService)
 		branches := []api.Branch{sampleBranch(), sampleBranch()}
@@ -425,12 +425,6 @@ status: READY
 			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 		{
-			name:       "fluid service lists no branches without the gate",
-			args:       []string{"service", "get", "svc-12345", "-o", "env"},
-			mock:       setupGet(fluidService),
-			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
-		},
-		{
 			// The count is the only thing the branch listing adds, so the
 			// service is still shown without it.
 			name: "branch count fails",
@@ -440,7 +434,6 @@ status: READY
 				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, "svc-12345", nil).
 					Return(nil, errors.New("connection refused"))
 			},
-			opts:       []runOption{experimental},
 			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 			wantStderr: "Warning: failed to count branches: failed to list branches: connection refused\n",
 		},

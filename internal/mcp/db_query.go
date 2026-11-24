@@ -37,10 +37,10 @@ type DBQueryInput struct {
 
 // Schema returns the input schema. Over any transport but stdio the file
 // property is left out, so the schema rejects it.
-func (DBQueryInput) Schema(experimental bool, transport Transport) *jsonschema.Schema {
+func (DBQueryInput) Schema(transport Transport) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBQueryInput](nil))
 
-	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service." + branchIDHelp(experimental, "runs the query against that branch")
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service A branch ID is also accepted — passing one runs the query against that branch instead. Use branch_list to find branch IDs."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
@@ -121,7 +121,7 @@ func (DBQueryOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newDBQueryTool(experimental bool, transport Transport) *mcp.Tool {
+func newDBQueryTool(transport Transport) *mcp.Tool {
 	sqlSource := "Pass the SQL as 'query'."
 	if transport == TransportStdio {
 		sqlSource = "Pass the SQL as 'query', or point 'file' at a .sql file within the MCP server's working directory to run its contents."
@@ -139,7 +139,7 @@ Multi-statement queries (semicolon-separated) are supported when no parameters a
 Process data in the database, not in your context: aggregate, filter, sort/limit, and join in SQL rather than fetching raw rows.
 
 WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
-		InputSchema:  DBQueryInput{}.Schema(experimental, transport),
+		InputSchema:  DBQueryInput{}.Schema(transport),
 		OutputSchema: DBQueryOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
@@ -176,9 +176,8 @@ func (s *Server) handleDBQuery(ctx context.Context, req *mcp.CallToolRequest, in
 		slog.String("read_only", string(cfg.ReadOnly)),
 	)
 
-	// service_id may name a service, one of its read replicas, or (behind the
-	// experimental gate) a branch.
-	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID, s.app.Experimental)
+	// service_id may name a service, one of its read replicas, or a branch.
+	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID)
 	if err != nil {
 		return nil, DBQueryOutput{}, err
 	}

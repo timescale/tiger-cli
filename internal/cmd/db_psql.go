@@ -55,7 +55,10 @@ requested service. The prompt is automatically skipped when stdin is not a
 terminal (e.g. in scripts) or when the service has no read replicas.
 
 You can also pass a read replica set ID to connect straight to that replica,
-skipping the prompt. Read replicas share the primary's credentials.` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to connect to that branch. A branch\nhas its own credentials and no read replicas."),
+skipping the prompt. Read replicas share the primary's credentials.
+
+You can also pass a branch, by ID or name, to connect to that branch. A branch
+has its own credentials and no read replicas.`,
 		Example: `  # Connect to default service
   tiger db psql
 
@@ -97,7 +100,7 @@ skipping the prompt. Read replicas share the primary's credentials.` + branchRef
 				return err
 			}
 
-			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}

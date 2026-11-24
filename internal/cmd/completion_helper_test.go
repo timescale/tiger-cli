@@ -145,7 +145,6 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "branch argument lists branches by name with their IDs",
 			args:       []string{"__complete", "branch", "get", ""},
-			opts:       []runOption{withExperimental()},
 			mock:       listBranches,
 			wantStdout: "test-branch\tbr-12345\nother-branch\tbr-67890\n" + noFileComp,
 			wantStderr: directive,
@@ -155,7 +154,6 @@ func TestCompletion(t *testing.T) {
 			// as the description.
 			name:       "branch argument offers IDs matching what is typed",
 			args:       []string{"__complete", "branch", "stop", "br-6"},
-			opts:       []runOption{withExperimental()},
 			mock:       listBranches,
 			wantStdout: "br-67890\tother-branch\n" + noFileComp,
 			wantStderr: directive,
@@ -163,14 +161,12 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "branch argument completes only the first argument",
 			args:       []string{"__complete", "branch", "rename", "br-12345", ""},
-			opts:       []runOption{withExperimental()},
 			wantStdout: noFileComp,
 			wantStderr: directive,
 		},
 		{
 			name: "branch argument offers nothing when the API fails",
 			args: []string{"__complete", "branch", "delete", ""},
-			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetProjectBranchesWithResponse(validCtx, testProjectID).
 					Return(nil, errors.New("connection refused"))
@@ -266,7 +262,7 @@ func TestCompletion(t *testing.T) {
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
-			name:       "--platform flag values when experimental",
+			name:       "--platform flag values",
 			args:       []string{"__complete", "service", "create", "--platform", ""},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: "standard\nfluid\n" + noFileComp,
@@ -290,7 +286,7 @@ func TestCompletion(t *testing.T) {
 		{
 			// Without --platform yet, the fluid platform's values join the
 			// standard ones, once each.
-			name:       "--memory flag values include the fluid platform's when experimental",
+			name:       "--memory flag values include the fluid platform's",
 			args:       []string{"__complete", "service", "create", "--memory", ""},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: "2\n4\n8\n16\n32\n64\n128\n256\nshared\n" + keepOrder,
@@ -300,7 +296,7 @@ func TestCompletion(t *testing.T) {
 		{
 			// The fluid platform's smaller sizes sort in among the standard
 			// ones rather than trailing them.
-			name:       "--cpu flag values include the fluid platform's when experimental",
+			name:       "--cpu flag values include the fluid platform's",
 			args:       []string{"__complete", "service", "create", "--cpu", ""},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: "0.25\n0.5\n1\n2\n4\n8\n16\n32\nshared\n" + keepOrder,
@@ -335,7 +331,6 @@ func TestCompletion(t *testing.T) {
 			// Only fluid services can be branched.
 			name:       "--cpu flag values for branches are the fluid platform's",
 			args:       []string{"__complete", "branch", "create", "--cpu", ""},
-			opts:       []runOption{withExperimental()},
 			wantStdout: "0.25\n0.5\n1\n2\n4\n8\n16\n32\n" + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
@@ -343,7 +338,6 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "--iops flag values for branch create",
 			args:       []string{"__complete", "branch", "create", "--iops", ""},
-			opts:       []runOption{withExperimental()},
 			wantStdout: iopsSteps(3000, 256000) + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
@@ -351,7 +345,6 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "--memory flag values for branch resize are the fluid platform's",
 			args:       []string{"__complete", "branch", "resize", "--memory", ""},
-			opts:       []runOption{withExperimental()},
 			wantStdout: "2\n4\n8\n16\n32\n64\n128\n256\n" + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},

@@ -26,7 +26,9 @@ service from your configuration. The password can be provided via:
 3. Interactive prompt (if neither provided)
 
 The password will be saved according to your --password-storage setting
-(keyring, pgpass, or none).` + branchRefHelp(app.Experimental, "You can also pass a branch, by ID or name, to save the password for that branch."),
+(keyring, pgpass, or none).
+
+You can also pass a branch, by ID or name, to save the password for that branch.`,
 		Example: `  # Save password with explicit value (highest precedence)
   tiger db save-password svc-12345 --password=your-password
 
@@ -59,7 +61,7 @@ The password will be saved according to your --password-storage setting
 			// Resolve the target so a read replica stores the password against
 			// its parent primary: replicas share the primary's credentials, and
 			// psql/ping look the password up against the primary.
-			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef, app.Experimental)
+			target, err := resolveConnectionTarget(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}

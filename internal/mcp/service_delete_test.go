@@ -3,7 +3,6 @@ package mcp
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -172,8 +171,7 @@ func TestServiceDeleteTool(t *testing.T) {
 		},
 		{
 			// The API deletes a service's branches along with it, so the
-			// prompt and the result name them even without the experimental
-			// gate. Both handler runs list them.
+			// prompt and the result name them. Both handler runs list them.
 			name: "PROD prompt and result name the branches deleted with the service",
 			tool: toolServiceDelete,
 			args: args,
@@ -310,17 +308,4 @@ func TestServiceDeleteTool(t *testing.T) {
 			wantErr: "unknown error",
 		},
 	})
-}
-
-// TestServiceDeleteToolDescription covers the description's experimental
-// gate at the helper level: the harness calls tools but never lists them, so
-// a description isn't reachable through runTool.
-func TestServiceDeleteToolDescription(t *testing.T) {
-	const branchNote = "Deleting a service also deletes all of its branches."
-	if got := newServiceDeleteTool(false).Description; strings.Contains(got, "branch") {
-		t.Errorf("description must not mention branches without the gate, got:\n%s", got)
-	}
-	if got := newServiceDeleteTool(true).Description; !strings.Contains(got, branchNote) {
-		t.Errorf("description must contain %q behind the gate, got:\n%s", branchNote, got)
-	}
 }

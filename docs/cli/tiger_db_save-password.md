@@ -15,6 +15,8 @@ service from your configuration. The password can be provided via:
 The password will be saved according to your --password-storage setting
 (keyring, pgpass, or none).
 
+You can also pass a branch, by ID or name, to save the password for that branch.
+
 ```
 tiger db save-password [name-or-id] [flags]
 ```

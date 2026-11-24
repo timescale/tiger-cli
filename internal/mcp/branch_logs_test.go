@@ -13,7 +13,6 @@ import (
 )
 
 func TestBranchLogsTool(t *testing.T) {
-	experimental := withExperimental()
 	args := map[string]any{"branch_id": "br4nch1d9x"}
 
 	// FetchBranchLogs pins an absent upper bound to time.Now(). Cases that
@@ -50,30 +49,22 @@ func TestBranchLogsTool(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:        "not registered without the experimental gate",
-			tool:        toolBranchLogs,
-			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "branch_logs"`,
-		},
-		{
 			name:    "not logged in",
 			tool:    toolBranchLogs,
 			args:    args,
-			opts:    []runOption{experimental, withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "rejects a malformed branch ID",
 			tool:    toolBranchLogs,
 			args:    map[string]any{"branch_id": "nope"},
-			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: validating /properties/branch_id: pattern: "nope" does not match regular expression "^[a-z0-9]{10}$"`,
 		},
 		{
 			name:    "zero tail",
 			tool:    toolBranchLogs,
 			args:    map[string]any{"branch_id": "br4nch1d9x", "tail": 0},
-			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: validating /properties/tail: minimum: 0/1 is less than 1.000000`,
 		},
 		{
@@ -81,14 +72,12 @@ func TestBranchLogsTool(t *testing.T) {
 			name:    "null since",
 			tool:    toolBranchLogs,
 			args:    map[string]any{"branch_id": "br4nch1d9x", "since": nil},
-			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: validating /properties/since: type: <invalid reflect.Value> has type "null", want "string"`,
 		},
 		{
 			name: "branch not found",
 			tool: toolBranchLogs,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveStatus(m, "br4nch1d9x", branchType, http.StatusNotFound, &api.ClientError{Message: new("resource not found")})
 			},
@@ -99,7 +88,6 @@ func TestBranchLogsTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchLogs,
 			args:     args,
-			opts:     []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().GetBranchLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", defaultParams).
@@ -112,7 +100,6 @@ func TestBranchLogsTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchLogs,
 			args:     args,
-			opts:     []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().GetBranchLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", defaultParams).
@@ -128,7 +115,6 @@ func TestBranchLogsTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchLogs,
 			args:     args,
-			opts:     []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				m.EXPECT().GetBranchLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", "br4nch1d9x", defaultParams).
@@ -141,7 +127,6 @@ func TestBranchLogsTool(t *testing.T) {
 			synctest:   true,
 			tool:       toolBranchLogs,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectLogs(api.BranchLogs{Entries: []api.ServiceLogEntry{}}),
 			wantOutput: map[string]any{"logs": []any{}},
 		},
@@ -150,7 +135,6 @@ func TestBranchLogsTool(t *testing.T) {
 			synctest:   true,
 			tool:       toolBranchLogs,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectLogs(api.BranchLogs{Entries: entries}),
 			wantOutput: entriesOutput,
 		},
@@ -160,7 +144,6 @@ func TestBranchLogsTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchLogs,
 			args:     args,
-			opts:     []runOption{experimental},
 			mock: expectLogs(api.BranchLogs{Entries: []api.ServiceLogEntry{
 				{Message: "LOG: checkpoint complete", Severity: "LOG", Timestamp: time.Date(2025, 1, 15, 10, 31, 0, 0, time.UTC)},
 				{Message: "LOG: no timestamp", Severity: "LOG"},
@@ -176,7 +159,6 @@ func TestBranchLogsTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchLogs,
 			args:     args,
-			opts:     []runOption{experimental},
 			mock: expectLogs(api.BranchLogs{Entries: []api.ServiceLogEntry{
 				{Message: "LOG: ready", Severity: "LOG", Timestamp: time.Date(2025, 1, 15, 10, 31, 0, 0, time.FixedZone("UTC+2", 2*60*60))},
 			}}),
@@ -189,7 +171,6 @@ func TestBranchLogsTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchLogs,
 			args:     map[string]any{"branch_id": "br4nch1d9x", "tail": 3},
-			opts:     []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				page1 := []api.ServiceLogEntry{
@@ -222,7 +203,6 @@ func TestBranchLogsTool(t *testing.T) {
 				"since":     "2024-01-15T09:00:00Z",
 				"until":     "2024-01-15T10:00:00Z",
 			},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
@@ -241,7 +221,6 @@ func TestBranchLogsTool(t *testing.T) {
 			synctest: true,
 			tool:     toolBranchLogs,
 			args:     map[string]any{"branch_id": "br4nch1d9x", "since": "2024-01-15T09:00:00Z"},
-			opts:     []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
@@ -258,7 +237,6 @@ func TestBranchLogsTool(t *testing.T) {
 			name: "until alone reaches the request",
 			tool: toolBranchLogs,
 			args: map[string]any{"branch_id": "br4nch1d9x", "until": "2024-01-15T10:00:00Z"},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveBranch(m, sampleBranch())
 				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)

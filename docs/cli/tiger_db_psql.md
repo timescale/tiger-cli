@@ -32,6 +32,9 @@ terminal (e.g. in scripts) or when the service has no read replicas.
 You can also pass a read replica set ID to connect straight to that replica,
 skipping the prompt. Read replicas share the primary's credentials.
 
+You can also pass a branch, by ID or name, to connect to that branch. A branch
+has its own credentials and no read replicas.
+
 ```
 tiger db psql [name-or-id] [flags]
 ```
